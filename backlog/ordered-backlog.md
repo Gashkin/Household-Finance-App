@@ -18,3 +18,4 @@
 16. Persist load batch state (summary, rejections, rollback snapshot) durably so post-load verification survives restarts.
 17. Implement targeted upload classification: tabs ending in `26` are one-off commitments, `Monthly Budget` defines recurring commitments, and `Jun26` bank amounts are current balances.
 18. Prep and execute targeted workbook load: convert xlsx to load-ready data and load only `Monthly Budget` and tabs ending in `26`.
+19. Create one-off loader scripts to ingest workbook data into persisted planner components without relying on Migrater UI workflow.

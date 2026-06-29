@@ -1,6 +1,6 @@
 ## Current Item
-ITEM-018: Prep and execute targeted workbook load: convert xlsx to load-ready data and load only `Monthly Budget` and tabs ending in `26`.
-Status: Completed
+ITEM-019: Create one-off loader scripts to ingest workbook data into persisted planner components without relying on Migrater UI workflow.
+Status: Not Started
 
 ## Completed Items
 - Phase 0 archaeology completed
@@ -34,4 +34,4 @@ Status: Completed
 (none)
 
 ## Next Item
-ITEM-018: Prep targeted upload execution: finalize runbook, sample workbook checks, and go-live readiness checklist.
+ITEM-019: Create one-off loader scripts for workbook ingestion.
