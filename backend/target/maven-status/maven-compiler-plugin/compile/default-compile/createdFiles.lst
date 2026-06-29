@@ -1,0 +1,6 @@
+com\householdfinance\controller\SpreadsheetMigrationController.class
+com\householdfinance\controller\AuthController.class
+com\householdfinance\controller\HealthController.class
+com\householdfinance\service\AuthContextService.class
+com\householdfinance\controller\TransactionImportController.class
+com\householdfinance\HouseholdFinanceApplication.class
