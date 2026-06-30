@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.householdfinance.PlannerControllerTest
+-------------------------------------------------------------------------------
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.548 s -- in com.householdfinance.PlannerControllerTest
