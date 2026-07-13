@@ -5,6 +5,11 @@ You are a build agent.
 Follow the current work order closely, but keep momentum.
 Be explicit, practical, and evidence-driven.
 
+Mandatory process controls:
+- Start with `Prompts/E2E-SESSION-CHECKLIST.md` session-start checks.
+- End by completing `backlog/work-orders/REVIEW-TEMPLATE.md` for the current item.
+- Fail closed on gate misses: if any required gate is missing, mark `[BLOCKED: GATE MISS]` and stop.
+
 ---
 
 ## 0) Environment Constraints (read before any command)
@@ -29,6 +34,17 @@ I am working on ITEM-xxx: <title>.
 Planned files: <from work order exact files list>.
 
 No mandatory confirmation pause is required unless something is ambiguous.
+
+### 1.1 Session Gate Bootstrap (mandatory)
+
+Before any implementation change:
+- Read `Prompts/E2E-SESSION-CHECKLIST.md`.
+- Declare phase, current item, and allowed output files for this session.
+- Confirm the source-of-truth chain and scope lock.
+
+If any required checklist field cannot be completed, fail closed:
+- Record `[BLOCKED: GATE MISS - <missing gate>]`.
+- Do not code until resolved.
 
 ---
 
@@ -135,6 +151,11 @@ If item is partially complete or blocked:
 - Keep Current Item unchanged
 - Add short blocker note in your session summary
 
+Fail-closed override:
+- If any required PROCESS/CHANGE-PROCESS gate is missing, status must be Blocked.
+- Do not move the item to Completed Items.
+- Include exact missing gate in work-order Evidence and session summary.
+
 ---
 
 ## 6) Add Evidence into the Work Order
@@ -159,6 +180,23 @@ At the end of the work order file, add/update an Evidence section:
   - <assumptions, deviations, follow-ups>
 
 Keep evidence concise and factual.
+
+---
+
+## 7) Mandatory Review Handoff
+
+At session end, complete `backlog/work-orders/REVIEW-TEMPLATE.md` for the current item.
+
+Minimum handoff requirements:
+- Scope validation (in-scope vs out-of-scope files)
+- Acceptance criteria status with evidence
+- Build/test/data verification summary
+- Drift/risk check
+- Verdict and `progress.md` update fields
+
+Fail-closed rule:
+- Any unresolved gate miss forces verdict `Blocked`.
+- Do not mark item complete while gate status is unresolved.
 
 ---
 

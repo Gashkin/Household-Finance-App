@@ -597,9 +597,9 @@ function MigraterWorkspace() {
         {migrationPreview && (
           <>
             <div className="migration-summary">
-              <span>Baseline total: {migrationPreview.baselineTotal.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</span>
-              <span>App total: {migrationPreview.appTotal.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</span>
-              <span>Variance: {migrationPreview.variance.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</span>
+              <span>Baseline total: {migrationPreview.baselineTotal.toLocaleString(undefined, { style: 'currency', currency: 'EUR' })}</span>
+              <span>App total: {migrationPreview.appTotal.toLocaleString(undefined, { style: 'currency', currency: 'EUR' })}</span>
+              <span>Variance: {migrationPreview.variance.toLocaleString(undefined, { style: 'currency', currency: 'EUR' })}</span>
             </div>
 
             <table>
@@ -626,9 +626,9 @@ function MigraterWorkspace() {
                     </td>
                     <td>{row.sheet}</td>
                     <td>{row.metric}</td>
-                    <td>{row.baselineAmount.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
-                    <td>{row.appAmount.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
-                    <td>{row.variance.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
+                    <td>{row.baselineAmount.toLocaleString(undefined, { style: 'currency', currency: 'EUR' })}</td>
+                    <td>{row.appAmount.toLocaleString(undefined, { style: 'currency', currency: 'EUR' })}</td>
+                    <td>{row.variance.toLocaleString(undefined, { style: 'currency', currency: 'EUR' })}</td>
                     <td>{row.status}</td>
                   </tr>
                 ))}
@@ -666,9 +666,9 @@ function MigraterWorkspace() {
                       <td>{sheet.totalRows}</td>
                       <td>{sheet.mismatchRows}</td>
                       <td>{sheet.unresolvedRows}</td>
-                      <td>{sheet.baselineTotal.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
-                      <td>{sheet.appTotal.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
-                      <td>{sheet.varianceTotal.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
+                      <td>{sheet.baselineTotal.toLocaleString(undefined, { style: 'currency', currency: 'EUR' })}</td>
+                      <td>{sheet.appTotal.toLocaleString(undefined, { style: 'currency', currency: 'EUR' })}</td>
+                      <td>{sheet.varianceTotal.toLocaleString(undefined, { style: 'currency', currency: 'EUR' })}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -840,7 +840,7 @@ function MigraterWorkspace() {
                       <tr key={`${account.name}-${account.sourceSheet}-${index}`}>
                         <td>{account.name}</td>
                         <td>{account.type}</td>
-                        <td>{account.balance.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
+                        <td>{account.balance.toLocaleString(undefined, { style: 'currency', currency: 'EUR' })}</td>
                         <td>{account.sourceSheet} #{account.sourceRow}</td>
                       </tr>
                     ))}
@@ -886,7 +886,7 @@ function MigraterWorkspace() {
                     {mappingResult.commitments.map((commitment, index) => (
                       <tr key={`${commitment.title}-${index}`}>
                         <td>{commitment.title}</td>
-                        <td>{commitment.amount.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
+                        <td>{commitment.amount.toLocaleString(undefined, { style: 'currency', currency: 'EUR' })}</td>
                         <td>{commitment.dueDate || 'N/A'}</td>
                       </tr>
                     ))}
@@ -912,7 +912,7 @@ function MigraterWorkspace() {
                       <tr key={`${transaction.description}-${transaction.date}-${index}`}>
                         <td>{transaction.date || 'N/A'}</td>
                         <td>{transaction.description}</td>
-                        <td>{transaction.amount.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</td>
+                        <td>{transaction.amount.toLocaleString(undefined, { style: 'currency', currency: 'EUR' })}</td>
                         <td>{transaction.account || 'N/A'}</td>
                       </tr>
                     ))}

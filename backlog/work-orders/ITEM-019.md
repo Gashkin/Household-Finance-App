@@ -1,30 +1,36 @@
-# ITEM-019: Create one-off loader scripts for workbook ingestion
+# ITEM-019: Create one-off SQL insert scripts for manual balance, recurring commitment, current-month payment, and future one-off loading
 
 ## Objective
-Build script-based loaders to import workbook data directly into persisted planner components for one-time migration, without depending on a dedicated Migrater runtime workflow.
+Build direct database scripts to load manually supplied balances into persisted planner components for one-time migration, without depending on a dedicated Migrater runtime workflow, workbook extractor, or JSON loader.
 
 ## Scope
-- One-time ingestion of workbook data into accounts, categories, and commitments.
-- Targeted loading rules: `Monthly Budget` and tabs ending in `26` only.
-- Repeatable local execution with clear operator commands and output.
+- One-time insertion or replacement of manually supplied account balances, recurring commitments, current-month one-off payments, and future one-off payments.
+- Repeatable local execution with a clear operator command and output.
 
 ## Checklist
-- [ ] Create a loader entrypoint script for local execution.
-- [ ] Add script options for source workbook path and load mode (MERGE or REPLACE).
-- [ ] Implement parsing and normalization for target tabs only.
-- [ ] Implement account balance load behavior for `Jun26` bank rows.
-- [ ] Implement recurring commitment load from `Monthly Budget`.
-- [ ] Implement one-off commitment load from tabs ending in `26`.
-- [ ] Emit structured load report (applied counts, skipped rows, warnings, errors).
-- [ ] Add safe failure handling with non-zero exit code on hard errors.
-- [ ] Add dry-run mode to validate and preview before commit.
-- [ ] Document usage examples and expected outputs.
-- [ ] Add tests for script parsing and load classification behavior.
+- [x] Create direct SQL script(s) for local execution.
+- [x] Use idempotent upsert semantics so the script can be rerun safely.
+- [x] Load the provided AIB and Card balances into the accounts table.
+- [x] Load the provided recurring monthly commitments into the monthly_commitments table.
+- [x] Load the provided current-month one-off payments into the transactions table.
+- [x] Load the provided future one-off August payments into the transactions table.
+- [x] Document how to run the script against the local H2 database.
 
 ## Deliverables
-- Script(s) under backend tools/scripts path.
-- Loader usage documentation.
-- Test coverage for parsing and classification rules.
+- SQL script under a backend database or scripts path.
+- Short usage note for local execution.
+
+## Usage Note (local H2)
+- Ensure backend has been started at least once so schema tables exist.
+- Run commands in order:
+	- `RUNSCRIPT FROM 'C:/Users/ger_o/Household-Finance-App/backend/sql/insert-current-balances.sql';`
+	- `RUNSCRIPT FROM 'C:/Users/ger_o/Household-Finance-App/backend/sql/insert-recurring-commitments.sql';`
+	- `RUNSCRIPT FROM 'C:/Users/ger_o/Household-Finance-App/backend/sql/insert-current-month-payments.sql';`
+	- `RUNSCRIPT FROM 'C:/Users/ger_o/Household-Finance-App/backend/sql/insert-august-one-offs.sql';`
+
+## Notes
+- Persistence targets were updated during implementation from a single `commitments` table to `monthly_commitments` plus `transactions`.
+- Follow-on schema and service migration work is tracked in ITEM-020.
 
 ## Suggested files
 - backend/

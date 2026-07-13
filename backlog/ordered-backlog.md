@@ -18,4 +18,6 @@
 16. Persist load batch state (summary, rejections, rollback snapshot) durably so post-load verification survives restarts.
 17. Implement targeted upload classification: tabs ending in `26` are one-off commitments, `Monthly Budget` defines recurring commitments, and `Jun26` bank amounts are current balances.
 18. Prep and execute targeted workbook load: convert xlsx to load-ready data and load only `Monthly Budget` and tabs ending in `26`.
-19. Create one-off loader scripts to ingest workbook data into persisted planner components without relying on Migrater UI workflow.
+19. Create one-off SQL insert scripts to load manually supplied balances, recurring commitments, current-month payments, and future one-off payments into persisted planner components without relying on Migrater UI workflow, workbook extraction, or JSON loading.
+20. Split legacy commitments persistence into `monthly_commitments` and `transactions`, update planner persistence logic to use both tables, and keep planner API behavior stable during transition.
+21. Migrate workbook ingestion load/rollback/snapshot paths from legacy `commitments` storage to `monthly_commitments` and `transactions` so ingest and rollback operate on the same model as planner persistence.

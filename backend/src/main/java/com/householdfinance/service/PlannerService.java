@@ -2,16 +2,23 @@ package com.householdfinance.service;
 
 import com.householdfinance.entity.AccountEntity;
 import com.householdfinance.entity.CategoryEntity;
-import com.householdfinance.entity.CommitmentEntity;
+import com.householdfinance.entity.MonthlyCommitmentEntity;
+import com.householdfinance.entity.TransactionEntity;
+import com.householdfinance.entity.TransactionType;
 import com.householdfinance.repository.AccountRepository;
 import com.householdfinance.repository.CategoryRepository;
-import com.householdfinance.repository.CommitmentRepository;
-import jakarta.annotation.PostConstruct;
+import com.householdfinance.repository.MonthlyCommitmentRepository;
+import com.householdfinance.repository.TransactionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.format.DateTimeParseException;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 @Service
@@ -22,47 +29,60 @@ public class PlannerService {
     public record AccountUpsertRequest(String id, String name, String type, double balance) {}
     public record Category(String id, String name, String budget) {}
     public record CategoryUpsertRequest(String id, String name, String budget) {}
-    public record Commitment(String id, String title, double amount, String dueDate) {}
-    public record CommitmentUpsertRequest(String id, String title, double amount, String dueDate) {}
+        public record Commitment(String id, String title, double amount, String dueDate, String category, Integer dayOfMonth) {}
+        public record CommitmentUpsertRequest(String id, String title, double amount, String dueDate, String category, Integer dayOfMonth) {}
     public record PlannerData(List<Account> accounts, List<Category> categories, List<Commitment> commitments) {}
 
     private final AccountRepository accountRepository;
     private final CategoryRepository categoryRepository;
-    private final CommitmentRepository commitmentRepository;
+        private final MonthlyCommitmentRepository monthlyCommitmentRepository;
+        private final TransactionRepository transactionRepository;
+
+        private static final DateTimeFormatter DUE_MONTH_LABEL = new DateTimeFormatterBuilder()
+            .parseCaseInsensitive()
+            .appendPattern("MMMyy")
+            .toFormatter(Locale.ENGLISH);
 
     public PlannerService(
             AccountRepository accountRepository,
             CategoryRepository categoryRepository,
-            CommitmentRepository commitmentRepository
+            MonthlyCommitmentRepository monthlyCommitmentRepository,
+            TransactionRepository transactionRepository
     ) {
         this.accountRepository = accountRepository;
         this.categoryRepository = categoryRepository;
-        this.commitmentRepository = commitmentRepository;
-    }
-
-    @PostConstruct
-    @Transactional
-    public void ensureSeedData() {
-        if (accountRepository.count() == 0) {
-            accountRepository.save(new AccountEntity("A1", "Checking", "Bank", 4120.75));
-            accountRepository.save(new AccountEntity("A2", "Savings", "Bank", 12500.00));
-            accountRepository.save(new AccountEntity("A3", "Credit Card", "Credit", -850.10));
-        }
-
-        if (categoryRepository.count() == 0) {
-            categoryRepository.save(new CategoryEntity("C1", "Housing", "$1,200"));
-            categoryRepository.save(new CategoryEntity("C2", "Groceries", "$450"));
-            categoryRepository.save(new CategoryEntity("C3", "Utilities", "$250"));
-        }
-
-        if (commitmentRepository.count() == 0) {
-            commitmentRepository.save(new CommitmentEntity("M1", "Rent", 1200.00, "2026-07-01"));
-            commitmentRepository.save(new CommitmentEntity("M2", "Electricity", 95.60, "2026-07-05"));
-            commitmentRepository.save(new CommitmentEntity("M3", "Internet", 65.00, "2026-07-10"));
-        }
+        this.monthlyCommitmentRepository = monthlyCommitmentRepository;
+        this.transactionRepository = transactionRepository;
     }
 
     public PlannerData getPlannerData() {
+        var monthlyCommitments = monthlyCommitmentRepository.findAll().stream()
+            .sorted(Comparator.comparing(entity -> Objects.toString(entity.getId(), "")))
+            .map(entity -> new Commitment(
+                entity.getId(),
+                entity.getTitle(),
+                entity.getAmount(),
+                "Recurring",
+                entity.getCategory(),
+                entity.getDayOfMonth()
+            ))
+            .toList();
+
+        var futureTransactions = transactionRepository.findByTxnTypeIn(List.of(
+                TransactionType.ONE_OFF_FUTURE,
+                TransactionType.MONTHLY_INSTANCE_FUTURE
+            )).stream()
+            .sorted(Comparator.comparing(entity -> Objects.toString(entity.getId(), "")))
+            .map(entity -> new Commitment(
+                entity.getId(),
+                entity.getTitle(),
+                entity.getAmount(),
+                toDueMonthLabel(entity.getTxnDate()),
+                entity.getCategory(),
+                null
+            ))
+            .toList();
+
         return new PlannerData(
                 accountRepository.findAll().stream()
                         .sorted(Comparator.comparing(entity -> Objects.toString(entity.getId(), "")))
@@ -72,10 +92,7 @@ public class PlannerService {
                         .sorted(Comparator.comparing(entity -> Objects.toString(entity.getId(), "")))
                         .map(entity -> new Category(entity.getId(), entity.getName(), entity.getBudget()))
                         .toList(),
-                commitmentRepository.findAll().stream()
-                        .sorted(Comparator.comparing(entity -> Objects.toString(entity.getId(), "")))
-                        .map(entity -> new Commitment(entity.getId(), entity.getTitle(), entity.getAmount(), entity.getDueDate()))
-                        .toList()
+                mergeCommitments(monthlyCommitments, futureTransactions)
         );
     }
 
@@ -154,38 +171,87 @@ public class PlannerService {
     public Commitment createCommitment(CommitmentUpsertRequest request) {
         validateCommitmentRequest(request, false);
         var requestId = nonNull(request.id());
-        if (commitmentRepository.existsById(requestId)) {
+        if (monthlyCommitmentRepository.existsById(requestId) || transactionRepository.existsById(requestId)) {
             throw new IllegalArgumentException("Commitment id already exists: " + requestId);
         }
 
-        var saved = commitmentRepository.save(
-                new CommitmentEntity(requestId, request.title(), request.amount(), request.dueDate())
+        if (isRecurringDueDate(request.dueDate())) {
+            var saved = monthlyCommitmentRepository.save(
+                    new MonthlyCommitmentEntity(
+                            requestId,
+                            request.title(),
+                            request.amount(),
+                            normalizeDayOfMonth(request.dayOfMonth()),
+                            request.category()
+                    )
+            );
+            return new Commitment(saved.getId(), saved.getTitle(), saved.getAmount(), "Recurring", saved.getCategory(), saved.getDayOfMonth());
+        }
+
+        var dueDate = parseDueMonthLabel(request.dueDate());
+        var saved = transactionRepository.save(
+                new TransactionEntity(
+                        requestId,
+                        dueDate,
+                        request.title(),
+                        request.amount(),
+                        request.category(),
+                        TransactionType.ONE_OFF_FUTURE,
+                        null
+                )
         );
-        return new Commitment(saved.getId(), saved.getTitle(), saved.getAmount(), saved.getDueDate());
+        return new Commitment(saved.getId(), saved.getTitle(), saved.getAmount(), toDueMonthLabel(saved.getTxnDate()), saved.getCategory(), null);
     }
 
     @Transactional
     public Commitment updateCommitment(String id, CommitmentUpsertRequest request) {
         validateCommitmentRequest(request, true);
         var entityId = nonNull(id);
-        var entity = commitmentRepository.findById(entityId)
+        if (monthlyCommitmentRepository.existsById(entityId)) {
+            if (!isRecurringDueDate(request.dueDate())) {
+                throw new IllegalArgumentException("Recurring commitment must use dueDate 'Recurring'.");
+            }
+            var entity = monthlyCommitmentRepository.findById(entityId)
+                    .orElseThrow(() -> new IllegalArgumentException("Commitment not found: " + id));
+            entity.setTitle(request.title());
+            entity.setAmount(request.amount());
+            entity.setCategory(request.category());
+            entity.setDayOfMonth(normalizeDayOfMonth(request.dayOfMonth()));
+            var saved = monthlyCommitmentRepository.save(entity);
+            return new Commitment(saved.getId(), saved.getTitle(), saved.getAmount(), "Recurring", saved.getCategory(), saved.getDayOfMonth());
+        }
+
+        var entity = transactionRepository.findById(entityId)
                 .orElseThrow(() -> new IllegalArgumentException("Commitment not found: " + id));
+
+        if (isRecurringDueDate(request.dueDate())) {
+            throw new IllegalArgumentException("One-off or future transaction commitments must use a month label dueDate (for example Jul26).");
+        }
 
         entity.setTitle(request.title());
         entity.setAmount(request.amount());
-        entity.setDueDate(request.dueDate());
+        entity.setCategory(request.category());
+        entity.setTxnDate(parseDueMonthLabel(request.dueDate()));
+        entity.setTxnType(TransactionType.ONE_OFF_FUTURE);
 
-        var saved = commitmentRepository.save(entity);
-        return new Commitment(saved.getId(), saved.getTitle(), saved.getAmount(), saved.getDueDate());
+        var saved = transactionRepository.save(entity);
+        return new Commitment(saved.getId(), saved.getTitle(), saved.getAmount(), toDueMonthLabel(saved.getTxnDate()), saved.getCategory(), null);
     }
 
     @Transactional
     public void deleteCommitment(String id) {
         var entityId = nonNull(id);
-        if (!commitmentRepository.existsById(entityId)) {
+        if (monthlyCommitmentRepository.existsById(entityId)) {
+            monthlyCommitmentRepository.deleteById(entityId);
+            return;
+        }
+        if (transactionRepository.existsById(entityId)) {
+            transactionRepository.deleteById(entityId);
+            return;
+        }
+        if (!monthlyCommitmentRepository.existsById(entityId) && !transactionRepository.existsById(entityId)) {
             throw new IllegalArgumentException("Commitment not found: " + id);
         }
-        commitmentRepository.deleteById(entityId);
     }
 
     private void validateAccountRequest(AccountUpsertRequest request, boolean update) {
@@ -231,6 +297,42 @@ public class PlannerService {
         if (isBlank(request.dueDate())) {
             throw new IllegalArgumentException("Commitment dueDate is required.");
         }
+        if (!isRecurringDueDate(request.dueDate())) {
+            parseDueMonthLabel(request.dueDate());
+        }
+    }
+
+    private boolean isRecurringDueDate(String dueDate) {
+        return dueDate != null && "Recurring".equalsIgnoreCase(dueDate.trim());
+    }
+
+    private LocalDate parseDueMonthLabel(String dueDate) {
+        try {
+            var monthYear = java.time.YearMonth.parse(dueDate, DUE_MONTH_LABEL);
+            return monthYear.atDay(1);
+        } catch (DateTimeParseException exception) {
+            throw new IllegalArgumentException("Commitment dueDate must be 'Recurring' or a month label like Jul26.");
+        }
+    }
+
+    private String toDueMonthLabel(LocalDate date) {
+        return date.format(DUE_MONTH_LABEL);
+    }
+
+    private int normalizeDayOfMonth(Integer dayOfMonth) {
+        if (dayOfMonth == null) {
+            return 1;
+        }
+        if (dayOfMonth < 1 || dayOfMonth > 31) {
+            throw new IllegalArgumentException("Commitment dayOfMonth must be between 1 and 31.");
+        }
+        return dayOfMonth;
+    }
+
+    private List<Commitment> mergeCommitments(List<Commitment> monthlyCommitments, List<Commitment> futureTransactions) {
+        return java.util.stream.Stream.concat(monthlyCommitments.stream(), futureTransactions.stream())
+                .sorted(Comparator.comparing(commitment -> Objects.toString(commitment.id(), "")))
+                .toList();
     }
 
     private boolean isBlank(String value) {

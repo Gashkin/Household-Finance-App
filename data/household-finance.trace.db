@@ -1,0 +1,43 @@
+2026-06-30 23:26:07.640766+01:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "MIGRATION_ARTIFACTS" not found (this database is empty); SQL statement:
+TRUNCATE TABLE migration_artifacts [42104-224]
+2026-06-30 23:26:07.641894+01:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "COMMITMENTS" not found (this database is empty); SQL statement:
+
+TRUNCATE TABLE commitments [42104-224]
+2026-06-30 23:26:07.648367+01:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "CATEGORIES" not found (this database is empty); SQL statement:
+
+TRUNCATE TABLE categories [42104-224]
+2026-06-30 23:26:07.648987+01:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "ACCOUNTS" not found (this database is empty); SQL statement:
+
+TRUNCATE TABLE accounts [42104-224]
+2026-06-30 23:26:07.649999+01:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "\000aRUNSCRIPT FROM ''c:[*]\\Users\\ger_o\\Household-Finance-App\\backend\\sql/insert-current-balances.sql''"; SQL statement:
+
+RUNSCRIPT FROM ''c:\Users\ger_o\Household-Finance-App\backend\sql/insert-current-balances.sql'' [42000-224]
+2026-06-30 23:26:07.649999+01:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "\000aRUNSCRIPT FROM ''c:[*]\\Users\\ger_o\\Household-Finance-App\\backend\\sql/insert-recurring-commitments.sql''"; SQL statement:
+
+RUNSCRIPT FROM ''c:\Users\ger_o\Household-Finance-App\backend\sql/insert-recurring-commitments.sql'' [42000-224]
+2026-06-30 23:26:07.649999+01:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "\000aRUNSCRIPT FROM ''c:[*]\\Users\\ger_o\\Household-Finance-App\\backend\\sql/insert-current-month-payments.sql''"; SQL statement:
+
+RUNSCRIPT FROM ''c:\Users\ger_o\Household-Finance-App\backend\sql/insert-current-month-payments.sql'' [42000-224]
+2026-06-30 23:26:07.649999+01:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "\000aRUNSCRIPT FROM ''c:[*]\\Users\\ger_o\\Household-Finance-App\\backend\\sql/insert-august-one-offs.sql''"; SQL statement:
+
+RUNSCRIPT FROM ''c:\Users\ger_o\Household-Finance-App\backend\sql/insert-august-one-offs.sql'' [42000-224]
+2026-06-30 23:26:07.658541+01:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "ACCOUNTS" not found (this database is empty); SQL statement:
+
+SELECT COUNT(*) AS accounts_count FROM accounts [42104-224]
+2026-06-30 23:26:07.658541+01:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "CATEGORIES" not found (this database is empty); SQL statement:
+
+SELECT COUNT(*) AS categories_count FROM categories [42104-224]
+2026-06-30 23:26:07.658541+01:00 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "COMMITMENTS" not found (this database is empty); SQL statement:
+
+SELECT COUNT(*) AS commitments_count FROM commitments [42104-224]

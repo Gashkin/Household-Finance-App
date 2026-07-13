@@ -22,14 +22,22 @@ public class CommitmentEntity {
     @Column(nullable = false, length = 32)
     private String dueDate;
 
+    @Column(length = 64)
+    private String category;
+
     public CommitmentEntity() {
     }
 
     public CommitmentEntity(String id, String title, double amount, String dueDate) {
+        this(id, title, amount, dueDate, null);
+    }
+
+    public CommitmentEntity(String id, String title, double amount, String dueDate, String category) {
         this.id = id;
         this.title = title;
         this.amount = amount;
         this.dueDate = dueDate;
+        this.category = category;
     }
 
     public String getId() {
@@ -62,5 +70,13 @@ public class CommitmentEntity {
 
     public void setDueDate(String dueDate) {
         this.dueDate = dueDate;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
     }
 }
