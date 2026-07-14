@@ -59,6 +59,29 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 }
 
+.planner-tabs {
+  display: flex;
+  gap: 0.6rem;
+  margin: 1rem 0 1.25rem;
+  flex-wrap: wrap;
+}
+
+.planner-tabs button {
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  background: #ffffff;
+  color: #1f2937;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.planner-tabs button.active {
+  background: #0f172a;
+  color: #f8fafc;
+  border-color: #0f172a;
+}
+
 .workspace-card {
   background: #f9fafb;
   border: 1px solid #e5e7eb;
@@ -238,8 +261,87 @@ body {
   font-size: 0.95rem;
 }
 
+.monthly-commitment-toolbar {
+  margin-top: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.monthly-commitment-create-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1.5fr auto;
+  gap: 0.6rem;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.onceoff-commitment-create-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1.5fr auto;
+  gap: 0.6rem;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.grid-input {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 0.6rem;
+  padding: 0.42rem 0.55rem;
+  background: #ffffff;
+  font-size: 0.92rem;
+}
+
+.grid-action-row {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.grid-action {
+  border: 1px solid #cbd5e1;
+  border-radius: 0.55rem;
+  padding: 0.38rem 0.55rem;
+  background: #f8fafc;
+  color: #0f172a;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.grid-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.grid-action.danger {
+  border-color: #fecaca;
+  color: #991b1b;
+  background: #fff1f2;
+}
+
+.dirty-row td {
+  background: #fff7ed;
+}
+
 .duplicate-row {
   background: #fef2f2;
+}
+
+@media (max-width: 900px) {
+  .monthly-commitment-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .monthly-commitment-create-row {
+    grid-template-columns: 1fr;
+  }
+
+  .onceoff-commitment-create-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .summary-grid {

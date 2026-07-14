@@ -174,6 +174,7 @@ Mapped cells:
 Behavior contract:
 - Provides a top-level control surface with key totals and entry points.
 - Contains Current Month Snapshot and links/sections for commitments, classification, and configuration.
+- Planner workspace uses tabbed navigation to separate Forecast/Current Month, Monthly Commitments, Once Off Commitments, and Transaction Import.
 - Uses full-window layout of the planner shell.
 - Preserves boxed-card/table containment and readable financial working presentation.
 
@@ -211,10 +212,13 @@ Behavior contract:
 - Monthly Commitments Grid is an editable planner grid for recurring monthly household payments.
 - Each row represents one monthly payment commitment.
 - Grid columns include at minimum: payment description, category, and amount.
+- Grid includes recurring schedule context (day_of_month) when available.
 - Planner can edit payment description, category, and amount inline.
-- Shows commitments included by the active month filter.
+- Planner can create new recurring rows and delete existing recurring rows in-grid.
+- Save updates are persisted through planner commitment upsert endpoints with dueDate fixed to Recurring.
 - Rows remain visually boxed and contained within their card/table layout.
 - Category is displayed per commitment, including inferred category when source category is missing.
+- Recurring commitments remain definitions only; monthly conversion into transaction instances is performed by a monthly batch job outside this grid.
 
 Minimum readiness criteria before Snapshot backlog items:
 - Month filter behavior is deterministic and testable.
@@ -245,8 +249,11 @@ Behavior contract:
 - Each row represents one one-off payment commitment.
 - Grid columns include at minimum: payment description, category, and amount.
 - Planner can edit payment description, category, and amount inline.
+- Planner can add and delete one-off rows in-grid.
+- Planner can save all pending one-off row edits at page level in a single action.
 - One-off rows include category values.
 - Expense values are represented with negative signs for financial consistency.
+- Due month label is required for one-off rows and uses month token format (for example Jul26).
 - Grid formatting follows row boxing/containment rules used by planner tables.
 
 Minimum readiness criteria before Snapshot backlog items:

@@ -21,3 +21,6 @@
 19. Create one-off SQL insert scripts to load manually supplied balances, recurring commitments, current-month payments, and future one-off payments into persisted planner components without relying on Migrater UI workflow, workbook extraction, or JSON loading.
 20. Split legacy commitments persistence into `monthly_commitments` and `transactions`, update planner persistence logic to use both tables, and keep planner API behavior stable during transition.
 21. Migrate workbook ingestion load/rollback/snapshot paths from legacy `commitments` storage to `monthly_commitments` and `transactions` so ingest and rollback operate on the same model as planner persistence.
+22. Build planner tabbed navigation with a dedicated Monthly Commitments grid slice while preserving current forecast and import workflows as separate tabs.
+23. Make the Monthly Commitments tab fully editable with inline add/save/delete actions wired to planner commitment CRUD endpoints.
+24. Add Once Off Commitments grid with inline add/edit/delete and page-level save-all against future one-off transaction rows.

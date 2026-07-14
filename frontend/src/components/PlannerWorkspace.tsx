@@ -19,6 +19,7 @@ interface Commitment {
   amount: number;
   dueDate: string;
   category?: string | null;
+  dayOfMonth?: number | null;
 }
 
 interface ImportedTransaction {
@@ -47,7 +48,38 @@ interface PlannerData {
   commitments: Commitment[];
 }
 
+interface EditableMonthlyCommitment {
+  title: string;
+  amount: string;
+  dayOfMonth: string;
+  category: string;
+}
+
+interface MonthlyCommitmentPayload {
+  title: string;
+  amount: number;
+  dueDate: 'Recurring';
+  category: string | null;
+  dayOfMonth: number;
+}
+
+interface EditableOneOffCommitment {
+  title: string;
+  amount: string;
+  dueDate: string;
+  category: string;
+}
+
+interface OneOffCommitmentPayload {
+  title: string;
+  amount: number;
+  dueDate: string;
+  category: string | null;
+  dayOfMonth: null;
+}
+
 type ForecastPeriod = 'this-month';
+type PlannerTab = 'forecast-current-month' | 'monthly-commitments' | 'once-off-commitments' | 'transaction-import';
 
 const commitmentCategoryLookup: Record<string, string> = {
   salary: 'Income',
@@ -108,6 +140,7 @@ function getCurrentMonthLabel(referenceDate: Date) {
 function PlannerWorkspace() {
   const [plannerData, setPlannerData] = useState<PlannerData>({ accounts: [], categories: [], commitments: [] });
   const [forecastPeriod, setForecastPeriod] = useState<ForecastPeriod>('this-month');
+  const [activeTab, setActiveTab] = useState<PlannerTab>('forecast-current-month');
   const [csvInput, setCsvInput] = useState('');
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
@@ -115,6 +148,22 @@ function PlannerWorkspace() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPlannerLoading, setIsPlannerLoading] = useState(false);
   const [plannerError, setPlannerError] = useState('');
+  const [monthlyCommitmentStatus, setMonthlyCommitmentStatus] = useState('');
+  const [monthlyCommitmentEdits, setMonthlyCommitmentEdits] = useState<Record<string, EditableMonthlyCommitment>>({});
+  const [newMonthlyCommitment, setNewMonthlyCommitment] = useState<EditableMonthlyCommitment>({
+    title: '',
+    amount: '',
+    dayOfMonth: '1',
+    category: '',
+  });
+  const [oneOffCommitmentStatus, setOneOffCommitmentStatus] = useState('');
+  const [oneOffCommitmentEdits, setOneOffCommitmentEdits] = useState<Record<string, EditableOneOffCommitment>>({});
+  const [newOneOffCommitment, setNewOneOffCommitment] = useState<EditableOneOffCommitment>({
+    title: '',
+    amount: '',
+    dueDate: getCurrentMonthLabel(new Date()),
+    category: '',
+  });
 
   const currentMonthLabel = getCurrentMonthLabel(new Date());
   const visibleCommitments = plannerData.commitments.filter((commitment) => {
@@ -129,6 +178,60 @@ function PlannerWorkspace() {
     ...commitment,
     resolvedCategory: getCommitmentCategory(commitment),
   }));
+
+  const monthlyCommitments = plannerData.commitments
+    .filter((commitment) => commitment.dueDate === 'Recurring')
+    .map((commitment) => ({
+      ...commitment,
+      resolvedCategory: getCommitmentCategory(commitment),
+    }))
+    .sort((left, right) => Math.abs(right.amount) - Math.abs(left.amount) || left.title.localeCompare(right.title));
+
+  const monthlyCommitmentTotal = monthlyCommitments.reduce((sum, commitment) => sum + commitment.amount, 0);
+
+  const oneOffCommitments = plannerData.commitments
+    .filter((commitment) => commitment.dueDate !== 'Recurring')
+    .map((commitment) => ({
+      ...commitment,
+      resolvedCategory: getCommitmentCategory(commitment),
+    }))
+    .sort((left, right) => left.dueDate.localeCompare(right.dueDate) || left.title.localeCompare(right.title));
+
+  const oneOffCommitmentTotal = oneOffCommitments.reduce((sum, commitment) => sum + commitment.amount, 0);
+
+  const monthlyDirtyIds = monthlyCommitments
+    .filter((commitment) => {
+      const edit = monthlyCommitmentEdits[commitment.id];
+      if (!edit) {
+        return false;
+      }
+
+      const currentCategory = commitment.category?.trim() ?? '';
+      return (
+        edit.title.trim() !== commitment.title
+        || Number(edit.amount) !== commitment.amount
+        || Number(edit.dayOfMonth) !== (commitment.dayOfMonth ?? 1)
+        || edit.category.trim() !== currentCategory
+      );
+    })
+    .map((commitment) => commitment.id);
+
+  const oneOffDirtyIds = oneOffCommitments
+    .filter((commitment) => {
+      const edit = oneOffCommitmentEdits[commitment.id];
+      if (!edit) {
+        return false;
+      }
+
+      const currentCategory = commitment.category?.trim() ?? '';
+      return (
+        edit.title.trim() !== commitment.title
+        || Number(edit.amount) !== commitment.amount
+        || edit.dueDate.trim() !== commitment.dueDate
+        || edit.category.trim() !== currentCategory
+      );
+    })
+    .map((commitment) => commitment.id);
 
   const categoryTotals = Array.from(
     forecastCommitments.reduce((totals, commitment) => {
@@ -149,28 +252,60 @@ function PlannerWorkspace() {
   const endOfPeriodTotal = openingAccountTotal + totalIncomes + totalExpenses;
   const netMovement = totalIncomes + totalExpenses;
 
-  useEffect(() => {
-    const loadPlannerData = async () => {
-      setIsPlannerLoading(true);
-      setPlannerError('');
+  const loadPlannerData = async () => {
+    setIsPlannerLoading(true);
+    setPlannerError('');
 
-      try {
-        const response = await fetch('http://localhost:8080/planner');
-        if (!response.ok) {
-          throw new Error('Planner request failed.');
-        }
-
-        const data = (await response.json()) as PlannerData;
-        setPlannerData(data);
-      } catch {
-        setPlannerError('Unable to load real planner data. Ensure backend is running on port 8080.');
-      } finally {
-        setIsPlannerLoading(false);
+    try {
+      const response = await fetch('http://localhost:8080/planner');
+      if (!response.ok) {
+        throw new Error('Planner request failed.');
       }
-    };
 
+      const data = (await response.json()) as PlannerData;
+      setPlannerData(data);
+    } catch {
+      setPlannerError('Unable to load real planner data. Ensure backend is running on port 8080.');
+    } finally {
+      setIsPlannerLoading(false);
+    }
+  };
+
+  useEffect(() => {
     void loadPlannerData();
   }, []);
+
+  useEffect(() => {
+    setMonthlyCommitmentEdits(
+      Object.fromEntries(
+        monthlyCommitments.map((commitment) => [
+          commitment.id,
+          {
+            title: commitment.title,
+            amount: String(commitment.amount),
+            dayOfMonth: String(commitment.dayOfMonth ?? 1),
+            category: commitment.category ?? '',
+          },
+        ])
+      )
+    );
+  }, [plannerData.commitments]);
+
+  useEffect(() => {
+    setOneOffCommitmentEdits(
+      Object.fromEntries(
+        oneOffCommitments.map((commitment) => [
+          commitment.id,
+          {
+            title: commitment.title,
+            amount: String(commitment.amount),
+            dueDate: commitment.dueDate,
+            category: commitment.category ?? '',
+          },
+        ])
+      )
+    );
+  }, [plannerData.commitments]);
 
   const previewImport = async () => {
     setIsSubmitting(true);
@@ -237,210 +372,855 @@ function PlannerWorkspace() {
     }
   };
 
+  const setMonthlyField = (id: string, field: keyof EditableMonthlyCommitment, value: string) => {
+    setMonthlyCommitmentEdits((current) => ({
+      ...current,
+      [id]: {
+        ...(current[id] ?? { title: '', amount: '', dayOfMonth: '1', category: '' }),
+        [field]: value,
+      },
+    }));
+  };
+
+  const buildMonthlyCommitmentPayload = (edit: EditableMonthlyCommitment): MonthlyCommitmentPayload | null => {
+    const parsedAmount = Number(edit.amount);
+    const parsedDay = Number(edit.dayOfMonth);
+    if (!edit.title.trim() || Number.isNaN(parsedAmount) || Number.isNaN(parsedDay) || !Number.isInteger(parsedDay)) {
+      return null;
+    }
+
+    if (parsedDay < 1 || parsedDay > 31) {
+      return null;
+    }
+
+    return {
+      title: edit.title.trim(),
+      amount: parsedAmount,
+      dueDate: 'Recurring',
+      category: edit.category.trim() ? edit.category.trim() : null,
+      dayOfMonth: parsedDay,
+    };
+  };
+
+  const saveMonthlyCommitment = async (id: string) => {
+    const edit = monthlyCommitmentEdits[id];
+    if (!edit) {
+      return;
+    }
+
+    const payload = buildMonthlyCommitmentPayload(edit);
+    if (!payload) {
+      setMonthlyCommitmentStatus('Monthly commitment requires title, numeric amount, and day of month (1-31).');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMonthlyCommitmentStatus('');
+    try {
+      const response = await fetch(`http://localhost:8080/planner/commitments/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error('Monthly commitment update failed.');
+      }
+
+      setMonthlyCommitmentStatus('Monthly commitment saved.');
+      await loadPlannerData();
+    } catch {
+      setMonthlyCommitmentStatus('Unable to save monthly commitment. Check backend and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const saveAllMonthlyCommitments = async () => {
+    if (monthlyDirtyIds.length === 0) {
+      setMonthlyCommitmentStatus('No unsaved monthly commitment changes.');
+      return;
+    }
+
+    const payloads = monthlyDirtyIds.map((id) => {
+      const edit = monthlyCommitmentEdits[id];
+      if (!edit) {
+        return null;
+      }
+      const payload = buildMonthlyCommitmentPayload(edit);
+      if (!payload) {
+        return null;
+      }
+      return { id, payload };
+    });
+
+    if (payloads.some((entry) => entry === null)) {
+      setMonthlyCommitmentStatus('Fix invalid rows before page-level save (title, numeric amount, day 1-31).');
+      return;
+    }
+
+    const validPayloads = payloads.filter((entry): entry is { id: string; payload: MonthlyCommitmentPayload } => entry !== null);
+
+    setIsSubmitting(true);
+    setMonthlyCommitmentStatus('');
+    let savedCount = 0;
+    const failedIds: string[] = [];
+
+    try {
+      for (const entry of validPayloads) {
+        const response = await fetch(`http://localhost:8080/planner/commitments/${entry.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(entry.payload),
+        });
+
+        if (!response.ok) {
+          failedIds.push(entry.id);
+          continue;
+        }
+
+        savedCount += 1;
+      }
+
+      if (failedIds.length > 0) {
+        setMonthlyCommitmentStatus(`Saved ${savedCount} row(s). Failed: ${failedIds.join(', ')}.`);
+      } else {
+        setMonthlyCommitmentStatus(`Saved ${savedCount} monthly commitment row(s).`);
+      }
+
+      await loadPlannerData();
+    } catch {
+      setMonthlyCommitmentStatus('Unable to save all monthly commitments. Check backend and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const deleteMonthlyCommitment = async (id: string) => {
+    setIsSubmitting(true);
+    setMonthlyCommitmentStatus('');
+    try {
+      const response = await fetch(`http://localhost:8080/planner/commitments/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Monthly commitment delete failed.');
+      }
+
+      setMonthlyCommitmentStatus('Monthly commitment deleted.');
+      await loadPlannerData();
+    } catch {
+      setMonthlyCommitmentStatus('Unable to delete monthly commitment. Check backend and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const createMonthlyCommitment = async () => {
+    const parsedAmount = Number(newMonthlyCommitment.amount);
+    const parsedDay = Number(newMonthlyCommitment.dayOfMonth);
+    if (!newMonthlyCommitment.title.trim() || Number.isNaN(parsedAmount) || Number.isNaN(parsedDay)) {
+      setMonthlyCommitmentStatus('New monthly commitment requires title, numeric amount, and numeric day of month.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMonthlyCommitmentStatus('');
+    try {
+      const response = await fetch('http://localhost:8080/planner/commitments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: `MC-${Date.now()}`,
+          title: newMonthlyCommitment.title.trim(),
+          amount: parsedAmount,
+          dueDate: 'Recurring',
+          category: newMonthlyCommitment.category.trim() ? newMonthlyCommitment.category.trim() : null,
+          dayOfMonth: parsedDay,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Monthly commitment create failed.');
+      }
+
+      setMonthlyCommitmentStatus('Monthly commitment created.');
+      setNewMonthlyCommitment({ title: '', amount: '', dayOfMonth: '1', category: '' });
+      await loadPlannerData();
+    } catch {
+      setMonthlyCommitmentStatus('Unable to create monthly commitment. Check backend and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const setOneOffField = (id: string, field: keyof EditableOneOffCommitment, value: string) => {
+    setOneOffCommitmentEdits((current) => ({
+      ...current,
+      [id]: {
+        ...(current[id] ?? { title: '', amount: '', dueDate: currentMonthLabel, category: '' }),
+        [field]: value,
+      },
+    }));
+  };
+
+  const isValidDueMonthLabel = (value: string) => /^[A-Za-z]{3}\d{2}$/.test(value.trim());
+
+  const buildOneOffCommitmentPayload = (edit: EditableOneOffCommitment): OneOffCommitmentPayload | null => {
+    const parsedAmount = Number(edit.amount);
+    if (!edit.title.trim() || Number.isNaN(parsedAmount) || !isValidDueMonthLabel(edit.dueDate)) {
+      return null;
+    }
+
+    return {
+      title: edit.title.trim(),
+      amount: parsedAmount,
+      dueDate: edit.dueDate.trim(),
+      category: edit.category.trim() ? edit.category.trim() : null,
+      dayOfMonth: null,
+    };
+  };
+
+  const saveOneOffCommitment = async (id: string) => {
+    const edit = oneOffCommitmentEdits[id];
+    if (!edit) {
+      return;
+    }
+
+    const payload = buildOneOffCommitmentPayload(edit);
+    if (!payload) {
+      setOneOffCommitmentStatus('One-off commitment requires title, numeric amount, and due month label like Jul26.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setOneOffCommitmentStatus('');
+    try {
+      const response = await fetch(`http://localhost:8080/planner/commitments/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error('One-off commitment update failed.');
+      }
+
+      setOneOffCommitmentStatus('One-off commitment saved.');
+      await loadPlannerData();
+    } catch {
+      setOneOffCommitmentStatus('Unable to save one-off commitment. Check backend and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const saveAllOneOffCommitments = async () => {
+    if (oneOffDirtyIds.length === 0) {
+      setOneOffCommitmentStatus('No unsaved one-off commitment changes.');
+      return;
+    }
+
+    const payloads = oneOffDirtyIds.map((id) => {
+      const edit = oneOffCommitmentEdits[id];
+      if (!edit) {
+        return null;
+      }
+      const payload = buildOneOffCommitmentPayload(edit);
+      if (!payload) {
+        return null;
+      }
+      return { id, payload };
+    });
+
+    if (payloads.some((entry) => entry === null)) {
+      setOneOffCommitmentStatus('Fix invalid one-off rows before page-level save (title, numeric amount, due month like Jul26).');
+      return;
+    }
+
+    const validPayloads = payloads.filter((entry): entry is { id: string; payload: OneOffCommitmentPayload } => entry !== null);
+
+    setIsSubmitting(true);
+    setOneOffCommitmentStatus('');
+    let savedCount = 0;
+    const failedIds: string[] = [];
+
+    try {
+      for (const entry of validPayloads) {
+        const response = await fetch(`http://localhost:8080/planner/commitments/${entry.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(entry.payload),
+        });
+
+        if (!response.ok) {
+          failedIds.push(entry.id);
+          continue;
+        }
+
+        savedCount += 1;
+      }
+
+      if (failedIds.length > 0) {
+        setOneOffCommitmentStatus(`Saved ${savedCount} row(s). Failed: ${failedIds.join(', ')}.`);
+      } else {
+        setOneOffCommitmentStatus(`Saved ${savedCount} one-off commitment row(s).`);
+      }
+
+      await loadPlannerData();
+    } catch {
+      setOneOffCommitmentStatus('Unable to save all one-off commitments. Check backend and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const deleteOneOffCommitment = async (id: string) => {
+    setIsSubmitting(true);
+    setOneOffCommitmentStatus('');
+    try {
+      const response = await fetch(`http://localhost:8080/planner/commitments/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('One-off commitment delete failed.');
+      }
+
+      setOneOffCommitmentStatus('One-off commitment deleted.');
+      await loadPlannerData();
+    } catch {
+      setOneOffCommitmentStatus('Unable to delete one-off commitment. Check backend and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const createOneOffCommitment = async () => {
+    const payload = buildOneOffCommitmentPayload(newOneOffCommitment);
+    if (!payload) {
+      setOneOffCommitmentStatus('New one-off commitment requires title, numeric amount, and due month label like Jul26.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setOneOffCommitmentStatus('');
+    try {
+      const response = await fetch('http://localhost:8080/planner/commitments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: `OF-${Date.now()}`,
+          ...payload,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('One-off commitment create failed.');
+      }
+
+      setOneOffCommitmentStatus('One-off commitment created.');
+      setNewOneOffCommitment({ title: '', amount: '', dueDate: currentMonthLabel, category: '' });
+      await loadPlannerData();
+    } catch {
+      setOneOffCommitmentStatus('Unable to create one-off commitment. Check backend and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <section>
       <h2>Planner workspace</h2>
       <p>Manage accounts, categories, commitments, and transaction imports for the planner role.</p>
 
-      <div className="workspace-card forecast-card">
-        <div className="forecast-title-row">
-          <div>
-            <h3>Forecast working</h3>
-            <p>Trial balance style view for the current month.</p>
-          </div>
-          <div className="forecast-controls">
-            <label htmlFor="forecast-period">Forecast</label>
-            <select
-              id="forecast-period"
-              value={forecastPeriod}
-              onChange={(event) => setForecastPeriod(event.target.value as ForecastPeriod)}
-            >
-              <option value="this-month">This month</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="forecast-formula">
-          <span>Working:</span>
-          <strong>{formatCurrency(openingAccountTotal)} + {formatCurrency(totalIncomes)} + {formatCurrency(totalExpenses)} = {formatCurrency(endOfPeriodTotal)}</strong>
-        </div>
-
-        <div className="forecast-summary-grid">
-          <div className="summary-card">
-            <h3>Opening balances</h3>
-            <p>{formatCurrency(openingAccountTotal)}</p>
-          </div>
-          <div className="summary-card highlight">
-            <h3>Total incomes</h3>
-            <p className="cashflow-positive">{formatCurrency(totalIncomes)}</p>
-          </div>
-          <div className="summary-card highlight-negative">
-            <h3>Total expenses</h3>
-            <p className="cashflow-negative">{formatCurrency(totalExpenses)}</p>
-          </div>
-          <div className="summary-card highlight">
-            <h3>End of period total</h3>
-            <p>{formatCurrency(endOfPeriodTotal)}</p>
-          </div>
-        </div>
-
-        <div className="forecast-controls">
-          <span className="forecast-note">This month excludes recurring items already counted elsewhere.</span>
-        </div>
+      <div className="planner-tabs" role="tablist" aria-label="Planner tabs">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'forecast-current-month'}
+          className={activeTab === 'forecast-current-month' ? 'active' : ''}
+          onClick={() => setActiveTab('forecast-current-month')}
+        >
+          Forecast and Current Month
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'monthly-commitments'}
+          className={activeTab === 'monthly-commitments' ? 'active' : ''}
+          onClick={() => setActiveTab('monthly-commitments')}
+        >
+          Monthly Commitments
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'once-off-commitments'}
+          className={activeTab === 'once-off-commitments' ? 'active' : ''}
+          onClick={() => setActiveTab('once-off-commitments')}
+        >
+          Once Off Commitments
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'transaction-import'}
+          className={activeTab === 'transaction-import' ? 'active' : ''}
+          onClick={() => setActiveTab('transaction-import')}
+        >
+          Transaction Import
+        </button>
       </div>
 
-      <div className="planner-grid">
+      {activeTab === 'forecast-current-month' && (
+        <>
+          <div className="workspace-card forecast-card">
+            <div className="forecast-title-row">
+              <div>
+                <h3>Forecast working</h3>
+                <p>Trial balance style view for the current month.</p>
+              </div>
+              <div className="forecast-controls">
+                <label htmlFor="forecast-period">Forecast</label>
+                <select
+                  id="forecast-period"
+                  value={forecastPeriod}
+                  onChange={(event) => setForecastPeriod(event.target.value as ForecastPeriod)}
+                >
+                  <option value="this-month">This month</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="forecast-formula">
+              <span>Working:</span>
+              <strong>{formatCurrency(openingAccountTotal)} + {formatCurrency(totalIncomes)} + {formatCurrency(totalExpenses)} = {formatCurrency(endOfPeriodTotal)}</strong>
+            </div>
+
+            <div className="forecast-summary-grid">
+              <div className="summary-card">
+                <h3>Opening balances</h3>
+                <p>{formatCurrency(openingAccountTotal)}</p>
+              </div>
+              <div className="summary-card highlight">
+                <h3>Total incomes</h3>
+                <p className="cashflow-positive">{formatCurrency(totalIncomes)}</p>
+              </div>
+              <div className="summary-card highlight-negative">
+                <h3>Total expenses</h3>
+                <p className="cashflow-negative">{formatCurrency(totalExpenses)}</p>
+              </div>
+              <div className="summary-card highlight">
+                <h3>End of period total</h3>
+                <p>{formatCurrency(endOfPeriodTotal)}</p>
+              </div>
+            </div>
+
+            <div className="forecast-controls">
+              <span className="forecast-note">This month excludes recurring items already counted elsewhere.</span>
+            </div>
+          </div>
+
+          <div className="planner-grid">
+            <div className="workspace-card">
+              <h3>Accounts</h3>
+              {isPlannerLoading && <p>Loading real account data...</p>}
+              {!isPlannerLoading && plannerError && <p>{plannerError}</p>}
+              <p className="ledger-caption">Opening balances + current month income and expenses = end of period total.</p>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Working line</th>
+                    <th>Amount</th>
+                    <th>Maths</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Opening account balances</td>
+                    <td>{formatCurrency(openingAccountTotal)}</td>
+                    <td>{plannerData.accounts.map((account) => `${account.name} ${formatCurrency(account.balance)}`).join(' + ')}</td>
+                  </tr>
+                  <tr>
+                    <td>Total incomes</td>
+                    <td className="cashflow-positive">{formatCurrency(totalIncomes)}</td>
+                    <td>Positive commitments in the selected period</td>
+                  </tr>
+                  <tr>
+                    <td>Total expenses</td>
+                    <td className="cashflow-negative">{formatCurrency(totalExpenses)}</td>
+                    <td>Negative commitments in the selected period</td>
+                  </tr>
+                  <tr className="ledger-total-row">
+                    <td>End of period total</td>
+                    <td>{formatCurrency(endOfPeriodTotal)}</td>
+                    <td>{formatCurrency(openingAccountTotal)} + {formatCurrency(totalIncomes)} + {formatCurrency(totalExpenses)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="workspace-card">
+              <h3>Categories</h3>
+              {isPlannerLoading && <p>Loading real category data...</p>}
+              <p className="ledger-caption">Each category is the sum of the commitments assigned to it in the selected period.</p>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Working</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {categoryTotals.map(([categoryName, total]) => (
+                    <tr key={categoryName}>
+                      <td>{categoryName}</td>
+                      <td>{`Sum of commitments for ${categoryName}`}</td>
+                      <td>{formatCurrency(total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="workspace-card">
+              <h3>Commitments</h3>
+              {isPlannerLoading && <p>Loading real commitment data...</p>}
+              <p className="ledger-caption">Filtered to {forecastPeriod === 'this-month' ? currentMonthLabel : 'all periods'}.</p>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Commitment</th>
+                    <th>Amount</th>
+                    <th>Due</th>
+                    <th>Category</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {forecastCommitments.map((commitment) => (
+                    <tr key={commitment.id}>
+                      <td>{commitment.title}</td>
+                      <td>{formatCurrency(commitment.amount)}</td>
+                      <td>{commitment.dueDate}</td>
+                      <td>{commitment.resolvedCategory}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td>Net movement</td>
+                    <td>{formatCurrency(netMovement)}</td>
+                    <td colSpan={2}>{formatCurrency(totalIncomes)} + {formatCurrency(totalExpenses)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {activeTab === 'monthly-commitments' && (
         <div className="workspace-card">
-          <h3>Accounts</h3>
-          {isPlannerLoading && <p>Loading real account data...</p>}
+          <h3>Monthly commitments grid</h3>
+          <p className="ledger-caption">Recurring commitments are defined here. Conversion to future transaction instances is handled by a monthly batch job.</p>
+          {isPlannerLoading && <p>Loading recurring commitments...</p>}
           {!isPlannerLoading && plannerError && <p>{plannerError}</p>}
-          <p className="ledger-caption">Opening balances + current month income and expenses = end of period total.</p>
-          <table>
-            <thead>
-              <tr>
-                <th>Working line</th>
-                <th>Amount</th>
-                <th>Maths</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Opening account balances</td>
-                <td>{formatCurrency(openingAccountTotal)}</td>
-                <td>{plannerData.accounts.map((account) => `${account.name} ${formatCurrency(account.balance)}`).join(' + ')}</td>
-              </tr>
-              <tr>
-                <td>Total incomes</td>
-                <td className="cashflow-positive">{formatCurrency(totalIncomes)}</td>
-                <td>Positive commitments in the selected period</td>
-              </tr>
-              <tr>
-                <td>Total expenses</td>
-                <td className="cashflow-negative">{formatCurrency(totalExpenses)}</td>
-                <td>Negative commitments in the selected period</td>
-              </tr>
-              <tr className="ledger-total-row">
-                <td>End of period total</td>
-                <td>{formatCurrency(endOfPeriodTotal)}</td>
-                <td>{formatCurrency(openingAccountTotal)} + {formatCurrency(totalIncomes)} + {formatCurrency(totalExpenses)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+          {monthlyCommitmentStatus && <p className="import-status">{monthlyCommitmentStatus}</p>}
 
-        <div className="workspace-card">
-          <h3>Categories</h3>
-          {isPlannerLoading && <p>Loading real category data...</p>}
-          <p className="ledger-caption">Each category is the sum of the commitments assigned to it in the selected period.</p>
-          <table>
-            <thead>
-              <tr>
-                <th>Category</th>
-                <th>Working</th>
-                <th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {categoryTotals.map(([categoryName, total]) => (
-                <tr key={categoryName}>
-                  <td>{categoryName}</td>
-                  <td>{`Sum of commitments for ${categoryName}`}</td>
-                  <td>{formatCurrency(total)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+          <div className="monthly-commitment-toolbar">
+            <span>{monthlyDirtyIds.length} unsaved change(s)</span>
+            <button type="button" className="grid-action" onClick={saveAllMonthlyCommitments} disabled={isSubmitting || monthlyDirtyIds.length === 0}>
+              Save all changes
+            </button>
+          </div>
 
-        <div className="workspace-card">
-          <h3>Commitments</h3>
-          {isPlannerLoading && <p>Loading real commitment data...</p>}
-          <p className="ledger-caption">Filtered to {forecastPeriod === 'this-month' ? currentMonthLabel : 'all periods'}.</p>
+          <div className="monthly-commitment-create-row">
+            <input
+              className="grid-input"
+              value={newMonthlyCommitment.title}
+              placeholder="New commitment title"
+              onChange={(event) => setNewMonthlyCommitment((current) => ({ ...current, title: event.target.value }))}
+            />
+            <input
+              className="grid-input"
+              value={newMonthlyCommitment.amount}
+              placeholder="Amount"
+              onChange={(event) => setNewMonthlyCommitment((current) => ({ ...current, amount: event.target.value }))}
+            />
+            <input
+              className="grid-input"
+              value={newMonthlyCommitment.dayOfMonth}
+              placeholder="Day"
+              onChange={(event) => setNewMonthlyCommitment((current) => ({ ...current, dayOfMonth: event.target.value }))}
+            />
+            <input
+              className="grid-input"
+              value={newMonthlyCommitment.category}
+              placeholder="Category"
+              onChange={(event) => setNewMonthlyCommitment((current) => ({ ...current, category: event.target.value }))}
+            />
+            <button type="button" className="grid-action" onClick={createMonthlyCommitment} disabled={isSubmitting}>
+              Add
+            </button>
+          </div>
+
           <table>
             <thead>
               <tr>
                 <th>Commitment</th>
                 <th>Amount</th>
-                <th>Due</th>
+                <th>Day of month</th>
                 <th>Category</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {forecastCommitments.map((commitment) => (
-                <tr key={commitment.id}>
-                  <td>{commitment.title}</td>
-                  <td>{formatCurrency(commitment.amount)}</td>
-                  <td>{commitment.dueDate}</td>
-                  <td>{commitment.resolvedCategory}</td>
+              {monthlyCommitments.map((commitment) => (
+                <tr key={commitment.id} className={monthlyDirtyIds.includes(commitment.id) ? 'dirty-row' : ''}>
+                  <td>
+                    <input
+                      className="grid-input"
+                      value={monthlyCommitmentEdits[commitment.id]?.title ?? ''}
+                      onChange={(event) => setMonthlyField(commitment.id, 'title', event.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="grid-input"
+                      value={monthlyCommitmentEdits[commitment.id]?.amount ?? ''}
+                      onChange={(event) => setMonthlyField(commitment.id, 'amount', event.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="grid-input"
+                      value={monthlyCommitmentEdits[commitment.id]?.dayOfMonth ?? '1'}
+                      onChange={(event) => setMonthlyField(commitment.id, 'dayOfMonth', event.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="grid-input"
+                      value={monthlyCommitmentEdits[commitment.id]?.category ?? ''}
+                      onChange={(event) => setMonthlyField(commitment.id, 'category', event.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <div className="grid-action-row">
+                      <button type="button" className="grid-action" onClick={() => saveMonthlyCommitment(commitment.id)} disabled={isSubmitting}>
+                        Save
+                      </button>
+                      <button type="button" className="grid-action danger" onClick={() => deleteMonthlyCommitment(commitment.id)} disabled={isSubmitting}>
+                        Delete
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
+              {monthlyCommitments.length === 0 && (
+                <tr>
+                  <td colSpan={5}>No recurring commitments found.</td>
+                </tr>
+              )}
             </tbody>
             <tfoot>
               <tr>
-                <td>Net movement</td>
-                <td>{formatCurrency(netMovement)}</td>
-                <td colSpan={2}>{formatCurrency(totalIncomes)} + {formatCurrency(totalExpenses)}</td>
+                <td>Total recurring monthly amount</td>
+                <td>{formatCurrency(monthlyCommitmentTotal)}</td>
+                <td colSpan={3}>Recurring definition total</td>
               </tr>
             </tfoot>
           </table>
         </div>
-      </div>
+      )}
 
-      <div className="workspace-card import-card">
-        <h3>Transaction import and review</h3>
-        <p>Paste your CSV content, preview duplicates, then accept selected rows.</p>
+      {activeTab === 'transaction-import' && (
+        <div className="workspace-card import-card">
+          <h3>Transaction import and review</h3>
+          <p>Paste your CSV content, preview duplicates, then accept selected rows.</p>
 
-        <textarea
-          className="import-input"
-          value={csvInput}
-          onChange={(event) => setCsvInput(event.target.value)}
-          rows={7}
-        />
+          <textarea
+            className="import-input"
+            value={csvInput}
+            onChange={(event) => setCsvInput(event.target.value)}
+            rows={7}
+          />
 
-        <div className="import-actions">
-          <button type="button" onClick={previewImport} disabled={isSubmitting}>
-            Preview import
-          </button>
-          <button type="button" onClick={acceptSelected} disabled={isSubmitting || !preview}>
-            Accept selected rows
-          </button>
+          <div className="import-actions">
+            <button type="button" onClick={previewImport} disabled={isSubmitting}>
+              Preview import
+            </button>
+            <button type="button" onClick={acceptSelected} disabled={isSubmitting || !preview}>
+              Accept selected rows
+            </button>
+          </div>
+
+          {importStatus && <p className="import-status">{importStatus}</p>}
+
+          {preview && (
+            <table>
+              <thead>
+                <tr>
+                  <th>Accept</th>
+                  <th>Date</th>
+                  <th>Description</th>
+                  <th>Amount</th>
+                  <th>Account</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {preview.transactions.map((transaction) => (
+                  <tr key={transaction.rowId} className={transaction.duplicate ? 'duplicate-row' : ''}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedRowIds.includes(transaction.rowId)}
+                        onChange={() => toggleSelection(transaction.rowId)}
+                      />
+                    </td>
+                    <td>{transaction.date}</td>
+                    <td>{transaction.description}</td>
+                    <td>{transaction.amount.toLocaleString(undefined, { style: 'currency', currency: 'EUR' })}</td>
+                    <td>{transaction.account}</td>
+                    <td>{transaction.duplicate ? 'Duplicate' : 'New'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
+      )}
 
-        {importStatus && <p className="import-status">{importStatus}</p>}
+      {activeTab === 'once-off-commitments' && (
+        <div className="workspace-card">
+          <h3>Once off commitments grid</h3>
+          <p className="ledger-caption">Future one-off commitments are maintained as transaction rows with due month labels.</p>
+          {isPlannerLoading && <p>Loading future one-off commitments...</p>}
+          {!isPlannerLoading && plannerError && <p>{plannerError}</p>}
+          {oneOffCommitmentStatus && <p className="import-status">{oneOffCommitmentStatus}</p>}
 
-        {preview && (
+          <div className="monthly-commitment-toolbar">
+            <span>{oneOffDirtyIds.length} unsaved change(s)</span>
+            <button type="button" className="grid-action" onClick={saveAllOneOffCommitments} disabled={isSubmitting || oneOffDirtyIds.length === 0}>
+              Save all changes
+            </button>
+          </div>
+
+          <div className="onceoff-commitment-create-row">
+            <input
+              className="grid-input"
+              value={newOneOffCommitment.title}
+              placeholder="New one-off title"
+              onChange={(event) => setNewOneOffCommitment((current) => ({ ...current, title: event.target.value }))}
+            />
+            <input
+              className="grid-input"
+              value={newOneOffCommitment.amount}
+              placeholder="Amount"
+              onChange={(event) => setNewOneOffCommitment((current) => ({ ...current, amount: event.target.value }))}
+            />
+            <input
+              className="grid-input"
+              value={newOneOffCommitment.dueDate}
+              placeholder="Due month (Jul26)"
+              onChange={(event) => setNewOneOffCommitment((current) => ({ ...current, dueDate: event.target.value }))}
+            />
+            <input
+              className="grid-input"
+              value={newOneOffCommitment.category}
+              placeholder="Category"
+              onChange={(event) => setNewOneOffCommitment((current) => ({ ...current, category: event.target.value }))}
+            />
+            <button type="button" className="grid-action" onClick={createOneOffCommitment} disabled={isSubmitting}>
+              Add
+            </button>
+          </div>
+
           <table>
             <thead>
               <tr>
-                <th>Accept</th>
-                <th>Date</th>
-                <th>Description</th>
+                <th>Commitment</th>
                 <th>Amount</th>
-                <th>Account</th>
-                <th>Status</th>
+                <th>Due month</th>
+                <th>Category</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {preview.transactions.map((transaction) => (
-                <tr key={transaction.rowId} className={transaction.duplicate ? 'duplicate-row' : ''}>
+              {oneOffCommitments.map((commitment) => (
+                <tr key={commitment.id} className={oneOffDirtyIds.includes(commitment.id) ? 'dirty-row' : ''}>
                   <td>
                     <input
-                      type="checkbox"
-                      checked={selectedRowIds.includes(transaction.rowId)}
-                      onChange={() => toggleSelection(transaction.rowId)}
+                      className="grid-input"
+                      value={oneOffCommitmentEdits[commitment.id]?.title ?? ''}
+                      onChange={(event) => setOneOffField(commitment.id, 'title', event.target.value)}
                     />
                   </td>
-                  <td>{transaction.date}</td>
-                  <td>{transaction.description}</td>
-                  <td>{transaction.amount.toLocaleString(undefined, { style: 'currency', currency: 'EUR' })}</td>
-                  <td>{transaction.account}</td>
-                  <td>{transaction.duplicate ? 'Duplicate' : 'New'}</td>
+                  <td>
+                    <input
+                      className="grid-input"
+                      value={oneOffCommitmentEdits[commitment.id]?.amount ?? ''}
+                      onChange={(event) => setOneOffField(commitment.id, 'amount', event.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="grid-input"
+                      value={oneOffCommitmentEdits[commitment.id]?.dueDate ?? currentMonthLabel}
+                      onChange={(event) => setOneOffField(commitment.id, 'dueDate', event.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="grid-input"
+                      value={oneOffCommitmentEdits[commitment.id]?.category ?? ''}
+                      onChange={(event) => setOneOffField(commitment.id, 'category', event.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <div className="grid-action-row">
+                      <button type="button" className="grid-action" onClick={() => saveOneOffCommitment(commitment.id)} disabled={isSubmitting}>
+                        Save
+                      </button>
+                      <button type="button" className="grid-action danger" onClick={() => deleteOneOffCommitment(commitment.id)} disabled={isSubmitting}>
+                        Delete
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
+              {oneOffCommitments.length === 0 && (
+                <tr>
+                  <td colSpan={5}>No one-off commitments found.</td>
+                </tr>
+              )}
             </tbody>
+            <tfoot>
+              <tr>
+                <td>Total future one-off amount</td>
+                <td>{formatCurrency(oneOffCommitmentTotal)}</td>
+                <td colSpan={3}>One-off future transaction total</td>
+              </tr>
+            </tfoot>
           </table>
-        )}
-      </div>
+        </div>
+      )}
     </section>
   );
 }

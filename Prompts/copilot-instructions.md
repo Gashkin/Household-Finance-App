@@ -29,6 +29,18 @@ Do not resolve conflicts yourself.
 
 ---
 
+## E2E Process Enforcement (Mandatory)
+
+- Treat `Prompts/PROCESS.md` and `Prompts/CHANGE-PROCESS.md` as hard gates, not guidance.
+- At session start, run `Prompts/E2E-SESSION-CHECKLIST.md` and declare current phase + ITEM.
+- Execute exactly one work order per session.
+- If a required gate is missing, stop with `[BLOCKED: GATE MISS - <missing gate>]` and do not implement.
+- At session end, produce review output using `backlog/work-orders/REVIEW-TEMPLATE.md`.
+- Update `progress.md` only after verdict is recorded.
+- Do not proceed to the next item in the same session.
+
+---
+
 ## Build Rules
 
 - Work on one item at a time

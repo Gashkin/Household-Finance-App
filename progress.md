@@ -1,5 +1,5 @@
 ## Current Item
-ITEM-021: Migrate workbook ingestion load/rollback/snapshot paths from legacy commitments storage to monthly_commitments and transactions.
+ITEM-024: Add Once Off Commitments grid with inline CRUD and page-level save.
 Status: Ready for Review
 
 ## Completed Items
@@ -30,9 +30,14 @@ Status: Ready for Review
 - ITEM-017: Implement targeted upload classification for one-off and recurring commitments with Jun26 balance semantics completed
 - ITEM-018: Prep and execute targeted workbook load for `Monthly Budget` and `*26` tabs completed
 - ITEM-019: Create one-off SQL insert scripts for manual balance, recurring commitment, current-month payment, and future one-off loading completed
+- ITEM-020: Split legacy commitments persistence into monthly_commitments and transactions, update planner persistence logic to use both tables, and keep planner API behavior stable during transition completed
+- ITEM-021: Migrate workbook ingestion load/rollback/snapshot paths from legacy commitments storage to monthly_commitments and transactions completed
+- ITEM-022: Build planner tabs and Monthly Commitments UI slice completed
+- ITEM-023: Make the Monthly Commitments tab editable with inline CRUD actions completed
+- ITEM-024: Add Once Off Commitments grid with inline CRUD and page-level save completed
 
 ## Blocked Items
 (none)
 
 ## Next Item
-None (ordered backlog currently ends at ITEM-021)
+None (ordered backlog currently ends at ITEM-024)
