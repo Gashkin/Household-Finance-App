@@ -171,7 +171,7 @@ class WorkbookIngestionControllerTest {
                 0,
                 1,
                 new WorkbookIngestionService.LoadComponentCounts(2, 2, 1, 3),
-                List.of(new WorkbookIngestionService.ValidationIssue("TRANSACTIONS", "Workbook", "WARNING", "Transactions are validated but not persisted in this phase.")),
+          List.of(new WorkbookIngestionService.ValidationIssue("TRANSACTIONS", "Workbook", "WARNING", "Mapped transaction rows are validated but not persisted in this phase.")),
                 "confirm-123"
         );
 
@@ -197,7 +197,7 @@ class WorkbookIngestionControllerTest {
                               "component":"TRANSACTIONS",
                               "rowReference":"Workbook",
                               "severity":"WARNING",
-                              "message":"Transactions are validated but not persisted in this phase."
+                              "message":"Mapped transaction rows are validated but not persisted in this phase."
                             }
                           ],
                           "confirmationToken":"confirm-123"
@@ -216,7 +216,7 @@ class WorkbookIngestionControllerTest {
                 2,
                 1,
                 3,
-                "Workbook load applied for persisted components. Transactions are not persisted yet."
+                "Workbook load applied for persisted components. Mapped transaction rows are not persisted yet."
         );
 
         given(workbookIngestionService.executeValidatedLoad(request)).willReturn(result);
@@ -256,7 +256,7 @@ class WorkbookIngestionControllerTest {
                       2,
                       1,
                       3,
-                      "Workbook load applied for persisted components. Transactions are not persisted yet."
+                      "Workbook load applied for persisted components. Mapped transaction rows are not persisted yet."
                     );
 
                     given(workbookIngestionService.getLatestLoadSummary()).willReturn(summary);
@@ -283,7 +283,7 @@ class WorkbookIngestionControllerTest {
                       new WorkbookIngestionService.LoadRejectedRow(
                         "TRANSACTIONS",
                         "Transactions:5",
-                        "Transactions are not persisted in this phase."
+                        "Mapped transaction rows are not persisted in this phase."
                       )
                     ));
 
@@ -294,7 +294,7 @@ class WorkbookIngestionControllerTest {
                           {
                             "component":"TRANSACTIONS",
                             "rowReference":"Transactions:5",
-                            "reason":"Transactions are not persisted in this phase."
+                            "reason":"Mapped transaction rows are not persisted in this phase."
                           }
                         ]
                         """));

@@ -11,3 +11,8 @@
 - The consumer service owns read-only reporting views.
 - The import service owns imported transaction processing.
 - The calculation service owns derived financial metrics.
+
+## Data ownership detail
+- Planner service owns `monthly_commitments` definitions (recurring commitments with `day_of_month`).
+- Planner and import services write `transactions` instances according to flow responsibility.
+- Calculation service reads `transactions` as the source for snapshot and period aggregates.

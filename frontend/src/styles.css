@@ -1,5 +1,5 @@
 :root {
-  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   color: #111827;
   background: #f3f4f6;
 }
@@ -16,7 +16,10 @@ body {
 
 .app-shell {
   min-height: 100vh;
+  width: 100%;
   padding: 2rem;
+  display: flex;
+  flex-direction: column;
 }
 
 .app-header {
@@ -46,12 +49,37 @@ body {
   border-radius: 1rem;
   padding: 1.5rem;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  width: 100%;
+  flex: 1;
 }
 
 .planner-grid {
   display: grid;
   gap: 1.5rem;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.planner-tabs {
+  display: flex;
+  gap: 0.6rem;
+  margin: 1rem 0 1.25rem;
+  flex-wrap: wrap;
+}
+
+.planner-tabs button {
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  background: #ffffff;
+  color: #1f2937;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.planner-tabs button.active {
+  background: #0f172a;
+  color: #f8fafc;
+  border-color: #0f172a;
 }
 
 .workspace-card {
@@ -61,24 +89,137 @@ body {
   padding: 1rem;
 }
 
+.forecast-card {
+  margin-bottom: 1.5rem;
+}
+
+.forecast-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.forecast-title-row h3 {
+  margin: 0 0 0.25rem;
+}
+
+.forecast-title-row p,
+.ledger-caption,
+.forecast-note {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.92rem;
+}
+
+.forecast-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.forecast-controls label {
+  font-weight: 600;
+  color: #374151;
+}
+
+.forecast-controls select {
+  border: 1px solid #d1d5db;
+  border-radius: 0.65rem;
+  padding: 0.45rem 0.65rem;
+  background: #ffffff;
+}
+
+.forecast-formula {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.9rem;
+  background: #111827;
+  color: #f9fafb;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.forecast-formula span {
+  color: #cbd5e1;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.forecast-summary-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin-top: 1rem;
+}
+
+.summary-card.highlight-negative {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.summary-card.highlight-negative h3 {
+  color: #991b1b;
+}
+
+.summary-card.highlight-negative p {
+  color: #b91c1c;
+}
+
+.ledger-total-row {
+  background: #eff6ff;
+  font-weight: 700;
+}
+
+.ledger-caption {
+  margin: 0.25rem 0 0.5rem;
+}
+
 .workspace-card table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0 0.5rem;
+  table-layout: fixed;
 }
 
 .workspace-card th,
 .workspace-card td {
   text-align: left;
-  padding: 0.5rem 0;
+  padding: 0.65rem 0.75rem;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .workspace-card th {
   font-size: 0.9rem;
   color: #6b7280;
+  padding-bottom: 0.1rem;
 }
 
-.workspace-card tr:not(:last-child) {
+.workspace-card tbody tr td,
+.workspace-card tfoot td {
+  background: #ffffff;
+  border-top: 1px solid #e5e7eb;
   border-bottom: 1px solid #e5e7eb;
+}
+
+.workspace-card tbody tr td:first-child,
+.workspace-card tfoot td:first-child {
+  border-left: 1px solid #e5e7eb;
+  border-top-left-radius: 0.85rem;
+  border-bottom-left-radius: 0.85rem;
+}
+
+.workspace-card tbody tr td:last-child,
+.workspace-card tfoot td:last-child {
+  border-right: 1px solid #e5e7eb;
+  border-top-right-radius: 0.85rem;
+  border-bottom-right-radius: 0.85rem;
 }
 
 .import-card {
@@ -120,8 +261,87 @@ body {
   font-size: 0.95rem;
 }
 
+.monthly-commitment-toolbar {
+  margin-top: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.monthly-commitment-create-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1.5fr auto;
+  gap: 0.6rem;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.onceoff-commitment-create-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1.5fr auto;
+  gap: 0.6rem;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.grid-input {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 0.6rem;
+  padding: 0.42rem 0.55rem;
+  background: #ffffff;
+  font-size: 0.92rem;
+}
+
+.grid-action-row {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.grid-action {
+  border: 1px solid #cbd5e1;
+  border-radius: 0.55rem;
+  padding: 0.38rem 0.55rem;
+  background: #f8fafc;
+  color: #0f172a;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.grid-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.grid-action.danger {
+  border-color: #fecaca;
+  color: #991b1b;
+  background: #fff1f2;
+}
+
+.dirty-row td {
+  background: #fff7ed;
+}
+
 .duplicate-row {
   background: #fef2f2;
+}
+
+@media (max-width: 900px) {
+  .monthly-commitment-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .monthly-commitment-create-row {
+    grid-template-columns: 1fr;
+  }
+
+  .onceoff-commitment-create-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .summary-grid {
@@ -138,6 +358,11 @@ body {
   background: #f9fafb;
 }
 
+.summary-card.highlight {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
 .summary-card h3 {
   margin: 0 0 0.35rem;
   color: #6b7280;
@@ -147,11 +372,6 @@ body {
 .summary-card p {
   margin: 0;
   font-weight: 600;
-}
-
-.summary-card.highlight {
-  border-color: #2563eb;
-  background: #eff6ff;
 }
 
 .transactions-card {

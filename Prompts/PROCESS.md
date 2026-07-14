@@ -24,6 +24,11 @@ Your job is to:
 - Review agent output before confirming gates
 - Never let an agent resolve ambiguity for you
 
+E2E enforcement note:
+- Session behavior is governed by `Prompts/copilot-instructions.md` E2E Process Enforcement (Mandatory).
+- Session-level gate checks use `Prompts/E2E-SESSION-CHECKLIST.md`.
+- End-of-item review output must use `backlog/work-orders/REVIEW-TEMPLATE.md`.
+
 ---
 
 ## The Complete Pipeline

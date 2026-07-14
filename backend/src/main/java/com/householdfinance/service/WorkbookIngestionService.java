@@ -2,10 +2,13 @@ package com.householdfinance.service;
 
 import com.householdfinance.entity.AccountEntity;
 import com.householdfinance.entity.CategoryEntity;
-import com.householdfinance.entity.CommitmentEntity;
+import com.householdfinance.entity.MonthlyCommitmentEntity;
+import com.householdfinance.entity.TransactionEntity;
+import com.householdfinance.entity.TransactionType;
 import com.householdfinance.repository.AccountRepository;
 import com.householdfinance.repository.CategoryRepository;
-import com.householdfinance.repository.CommitmentRepository;
+import com.householdfinance.repository.MonthlyCommitmentRepository;
+import com.householdfinance.repository.TransactionRepository;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -16,6 +19,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -49,6 +57,10 @@ public class WorkbookIngestionService {
 
     private static final String CURRENT_MONTH_SHEET = "Jun26";
     private static final Pattern MONTH_SUFFIX_TAB_PATTERN = Pattern.compile(".*26$");
+        private static final DateTimeFormatter DUE_MONTH_LABEL = new DateTimeFormatterBuilder()
+            .parseCaseInsensitive()
+            .appendPattern("MMMyy")
+            .toFormatter(Locale.ENGLISH);
 
     public record WorkbookSheetPreview(String sheetName, int rowCount, List<String> headers, List<List<String>> sampleRows) {}
 
@@ -133,12 +145,23 @@ public class WorkbookIngestionService {
 
             public record SnapshotCategory(String id, String name, String budget) {}
 
-            public record SnapshotCommitment(String id, String title, double amount, String dueDate) {}
+            public record SnapshotMonthlyCommitment(String id, String title, double amount, int dayOfMonth, String category) {}
+
+            public record SnapshotTransaction(
+                String id,
+                String txnDate,
+                String title,
+                double amount,
+                String category,
+                String txnType,
+                String sourceMonthlyCommitmentId
+            ) {}
 
             public record PlannerSnapshotPayload(
                 List<SnapshotAccount> accounts,
                 List<SnapshotCategory> categories,
-                List<SnapshotCommitment> commitments
+                List<SnapshotMonthlyCommitment> monthlyCommitments,
+                List<SnapshotTransaction> transactions
             ) {}
 
             private record PendingValidation(
@@ -151,19 +174,22 @@ public class WorkbookIngestionService {
     private final MigrationArtifactService migrationArtifactService;
             private final AccountRepository accountRepository;
             private final CategoryRepository categoryRepository;
-            private final CommitmentRepository commitmentRepository;
+            private final MonthlyCommitmentRepository monthlyCommitmentRepository;
+            private final TransactionRepository transactionRepository;
             private final Map<String, PendingValidation> pendingValidations = new ConcurrentHashMap<>();
 
             public WorkbookIngestionService(
                 MigrationArtifactService migrationArtifactService,
                 AccountRepository accountRepository,
                 CategoryRepository categoryRepository,
-                CommitmentRepository commitmentRepository
+                MonthlyCommitmentRepository monthlyCommitmentRepository,
+                TransactionRepository transactionRepository
             ) {
         this.migrationArtifactService = migrationArtifactService;
             this.accountRepository = accountRepository;
             this.categoryRepository = categoryRepository;
-            this.commitmentRepository = commitmentRepository;
+            this.monthlyCommitmentRepository = monthlyCommitmentRepository;
+            this.transactionRepository = transactionRepository;
     }
 
     public WorkbookPreview previewWorkbook(MultipartFile file) {
@@ -289,7 +315,8 @@ public class WorkbookIngestionService {
         var beforeSnapshot = snapshotPlannerState();
 
         if (pending.mode() == LoadMode.REPLACE) {
-            commitmentRepository.deleteAll();
+            transactionRepository.deleteAll();
+            monthlyCommitmentRepository.deleteAll();
             categoryRepository.deleteAll();
             accountRepository.deleteAll();
         }
@@ -309,14 +336,14 @@ public class WorkbookIngestionService {
                 skippedTransactions,
                 skippedTransactions == 0
                         ? "Workbook load applied successfully."
-                        : "Workbook load applied for persisted components. Transactions are not persisted yet."
+                    : "Workbook load applied for persisted components. Mapped transaction rows are not persisted yet."
         );
 
         var rejectedRows = pending.mapping().transactions().stream()
                 .map(transaction -> new LoadRejectedRow(
                         "TRANSACTIONS",
                         rowRef(transaction.sourceSheet(), transaction.sourceRow()),
-                        "Transactions are not persisted in this phase."
+                    "Mapped transaction rows are not persisted in this phase."
                 ))
                 .toList();
 
@@ -419,31 +446,61 @@ public class WorkbookIngestionService {
         var categories = categoryRepository.findAll().stream()
                 .map(entity -> new SnapshotCategory(entity.getId(), entity.getName(), entity.getBudget()))
                 .toList();
-        var commitments = commitmentRepository.findAll().stream()
-                .map(entity -> new SnapshotCommitment(entity.getId(), entity.getTitle(), entity.getAmount(), entity.getDueDate()))
+        var monthlyCommitments = monthlyCommitmentRepository.findAll().stream()
+            .map(entity -> new SnapshotMonthlyCommitment(
+                entity.getId(),
+                entity.getTitle(),
+                entity.getAmount(),
+                entity.getDayOfMonth(),
+                entity.getCategory()
+            ))
+            .toList();
+        var transactions = transactionRepository.findAll().stream()
+            .map(entity -> new SnapshotTransaction(
+                entity.getId(),
+                entity.getTxnDate().toString(),
+                entity.getTitle(),
+                entity.getAmount(),
+                entity.getCategory(),
+                entity.getTxnType().name(),
+                entity.getSourceMonthlyCommitmentId()
+            ))
                 .toList();
 
-        return new PlannerSnapshotPayload(accounts, categories, commitments);
+        return new PlannerSnapshotPayload(accounts, categories, monthlyCommitments, transactions);
     }
 
     private void restorePlannerState(PlannerSnapshotPayload snapshot) {
-        commitmentRepository.deleteAll();
+        transactionRepository.deleteAll();
+        monthlyCommitmentRepository.deleteAll();
         categoryRepository.deleteAll();
         accountRepository.deleteAll();
 
-        commitmentRepository.saveAll(snapshot.commitments().stream()
-                .map(commitment -> new CommitmentEntity(
-                        commitment.id(),
-                        commitment.title(),
-                        commitment.amount(),
-                        commitment.dueDate()
+        accountRepository.saveAll(snapshot.accounts().stream()
+            .map(account -> new AccountEntity(account.id(), account.name(), account.type(), account.balance()))
+            .toList());
+        categoryRepository.saveAll(snapshot.categories().stream()
+            .map(category -> new CategoryEntity(category.id(), category.name(), category.budget()))
+            .toList());
+        monthlyCommitmentRepository.saveAll(snapshot.monthlyCommitments().stream()
+            .map(commitment -> new MonthlyCommitmentEntity(
+                commitment.id(),
+                commitment.title(),
+                commitment.amount(),
+                commitment.dayOfMonth(),
+                commitment.category()
                 ))
                 .toList());
-        categoryRepository.saveAll(snapshot.categories().stream()
-                .map(category -> new CategoryEntity(category.id(), category.name(), category.budget()))
-                .toList());
-        accountRepository.saveAll(snapshot.accounts().stream()
-                .map(account -> new AccountEntity(account.id(), account.name(), account.type(), account.balance()))
+        transactionRepository.saveAll(snapshot.transactions().stream()
+            .map(transaction -> new TransactionEntity(
+                transaction.id(),
+                LocalDate.parse(transaction.txnDate()),
+                transaction.title(),
+                transaction.amount(),
+                transaction.category(),
+                TransactionType.valueOf(transaction.txnType()),
+                transaction.sourceMonthlyCommitmentId()
+            ))
                 .toList());
     }
 
@@ -652,7 +709,7 @@ public class WorkbookIngestionService {
                     "TRANSACTIONS",
                     "Workbook",
                     ValidationSeverity.WARNING.name(),
-                    "Transactions are validated but not persisted in this phase."
+                    "Mapped transaction rows are validated but not persisted in this phase."
             ));
         }
     }
@@ -707,28 +764,70 @@ public class WorkbookIngestionService {
     }
 
     private int applyCommitments(List<MappedCommitment> commitments, LoadMode mode) {
-        Map<String, CommitmentEntity> existingByTitle = new HashMap<>();
-        for (var entity : commitmentRepository.findAll()) {
-            existingByTitle.put(normalize(entity.getTitle()), entity);
+        Map<String, MonthlyCommitmentEntity> existingRecurringByTitle = new HashMap<>();
+        for (var entity : monthlyCommitmentRepository.findAll()) {
+            existingRecurringByTitle.put(normalize(entity.getTitle()), entity);
+        }
+
+        Map<String, TransactionEntity> existingOneOffByTitle = new HashMap<>();
+        for (var entity : transactionRepository.findByTxnTypeIn(List.of(TransactionType.ONE_OFF_FUTURE))) {
+            existingOneOffByTitle.put(normalize(entity.getTitle()), entity);
         }
 
         var applied = 0;
         for (int i = 0; i < commitments.size(); i++) {
             var mapped = commitments.get(i);
             var key = normalize(mapped.title());
-            var existing = existingByTitle.get(key);
 
-            if (mode == LoadMode.MERGE && existing != null) {
-                existing.setAmount(mapped.amount());
-                existing.setDueDate(mapped.dueDate());
-                commitmentRepository.save(existing);
+            if (isRecurringDueDate(mapped.dueDate())) {
+                var existingRecurring = existingRecurringByTitle.get(key);
+                if (mode == LoadMode.MERGE && existingRecurring != null) {
+                    existingRecurring.setAmount(mapped.amount());
+                    existingRecurring.setDayOfMonth(1);
+                    monthlyCommitmentRepository.save(existingRecurring);
+                } else {
+                    var id = existingRecurring != null ? existingRecurring.getId() : generatedId("M", i + 1);
+                    monthlyCommitmentRepository.save(new MonthlyCommitmentEntity(id, mapped.title(), mapped.amount(), 1, null));
+                }
             } else {
-                var id = existing != null ? existing.getId() : generatedId("M", i + 1);
-                commitmentRepository.save(new CommitmentEntity(id, mapped.title(), mapped.amount(), mapped.dueDate()));
+                var existingOneOff = existingOneOffByTitle.get(key);
+                var dueDate = parseDueMonthLabel(mapped.dueDate());
+
+                if (mode == LoadMode.MERGE && existingOneOff != null) {
+                    existingOneOff.setTxnDate(dueDate);
+                    existingOneOff.setAmount(mapped.amount());
+                    existingOneOff.setTxnType(TransactionType.ONE_OFF_FUTURE);
+                    existingOneOff.setSourceMonthlyCommitmentId(null);
+                    transactionRepository.save(existingOneOff);
+                } else {
+                    var id = existingOneOff != null ? existingOneOff.getId() : generatedId("T", i + 1);
+                    transactionRepository.save(new TransactionEntity(
+                            id,
+                            dueDate,
+                            mapped.title(),
+                            mapped.amount(),
+                            null,
+                            TransactionType.ONE_OFF_FUTURE,
+                            null
+                    ));
+                }
             }
             applied++;
         }
         return applied;
+    }
+
+    private boolean isRecurringDueDate(String dueDate) {
+        return dueDate != null && "Recurring".equalsIgnoreCase(dueDate.trim());
+    }
+
+    private LocalDate parseDueMonthLabel(String dueDate) {
+        try {
+            var monthYear = YearMonth.parse(dueDate, DUE_MONTH_LABEL);
+            return monthYear.atDay(1);
+        } catch (DateTimeParseException exception) {
+            throw new IllegalArgumentException("Commitment dueDate must be 'Recurring' or a month label like Jul26.");
+        }
     }
 
     private LoadMode parseLoadMode(String rawMode) {

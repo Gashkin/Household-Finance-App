@@ -22,3 +22,14 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+# Generated workbook analysis and loader outputs
+AnalysisScripts/output/
+
+# Generated backend runtime and build outputs
+backend/data/*.db
+backend/data/*.lock.db
+backend/target/
+
+# Generated frontend build output
+frontend/dist/

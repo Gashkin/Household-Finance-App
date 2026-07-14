@@ -1,6 +1,6 @@
 ## Current Item
-ITEM-019: Create one-off loader scripts to ingest workbook data into persisted planner components without relying on Migrater UI workflow.
-Status: Not Started
+ITEM-024: Add Once Off Commitments grid with inline CRUD and page-level save.
+Status: Ready for Review
 
 ## Completed Items
 - Phase 0 archaeology completed
@@ -29,9 +29,15 @@ Status: Not Started
 - ITEM-016: Persist load batch state (summary, rejections, rollback snapshot) durably so post-load verification survives restarts completed
 - ITEM-017: Implement targeted upload classification for one-off and recurring commitments with Jun26 balance semantics completed
 - ITEM-018: Prep and execute targeted workbook load for `Monthly Budget` and `*26` tabs completed
+- ITEM-019: Create one-off SQL insert scripts for manual balance, recurring commitment, current-month payment, and future one-off loading completed
+- ITEM-020: Split legacy commitments persistence into monthly_commitments and transactions, update planner persistence logic to use both tables, and keep planner API behavior stable during transition completed
+- ITEM-021: Migrate workbook ingestion load/rollback/snapshot paths from legacy commitments storage to monthly_commitments and transactions completed
+- ITEM-022: Build planner tabs and Monthly Commitments UI slice completed
+- ITEM-023: Make the Monthly Commitments tab editable with inline CRUD actions completed
+- ITEM-024: Add Once Off Commitments grid with inline CRUD and page-level save completed
 
 ## Blocked Items
 (none)
 
 ## Next Item
-ITEM-019: Create one-off loader scripts for workbook ingestion.
+None (ordered backlog currently ends at ITEM-024)

@@ -19,7 +19,7 @@ interface MonthlyOverview {
 }
 
 function formatCurrency(value: number) {
-  return value.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
+  return value.toLocaleString(undefined, { style: 'currency', currency: 'EUR' });
 }
 
 function ConsumerDashboard() {

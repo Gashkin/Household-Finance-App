@@ -35,7 +35,7 @@ class PlannerControllerTest {
         var sampleData = new PlannerService.PlannerData(
                 List.of(new PlannerService.Account("A1", "Checking", "Bank", 4120.75)),
                 List.of(new PlannerService.Category("C1", "Housing", "$1,200")),
-                List.of(new PlannerService.Commitment("M1", "Rent", 1200.0, "2026-07-01"))
+                List.of(new PlannerService.Commitment("M1", "Rent", 1200.0, "2026-07-01", "Housing", null))
         );
 
         given(plannerService.getPlannerData()).willReturn(sampleData);
@@ -46,7 +46,7 @@ class PlannerControllerTest {
                         {
                           "accounts":[{"id":"A1","name":"Checking","type":"Bank","balance":4120.75}],
                           "categories":[{"id":"C1","name":"Housing","budget":"$1,200"}],
-                          "commitments":[{"id":"M1","title":"Rent","amount":1200.0,"dueDate":"2026-07-01"}]
+                                                                                                        "commitments":[{"id":"M1","title":"Rent","amount":1200.0,"dueDate":"2026-07-01","category":"Housing"}]
                         }
                         """));
     }
