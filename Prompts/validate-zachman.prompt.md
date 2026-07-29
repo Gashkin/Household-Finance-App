@@ -1,4 +1,19 @@
-# Validate Zachman Prompt
+﻿# Validate Zachman Prompt
+
+## OKF-First Context Contract (Mandatory)
+
+Before producing output, load context in this order:
+1. knowledge/okf/index.md
+2. Relevant OKF indexes under knowledge/okf/ (domain/, workflows/, ules/, decisions/, work-items/)
+3. Legacy source docs (spec/, ops/, dr/, acklog/) only when needed for gaps or verification
+
+Rules:
+- Treat OKF as the primary context source.
+- If required context is missing in OKF, fall back to legacy docs and record the gap in knowledge/okf/migration-map.md under Open Gaps.
+- For generated outputs, include an OKF Traceability section listing consulted OKF concept paths.
+- Do not contradict ADR decisions; reflect them through linked OKF decision concepts.
+
+---
 # Usage: #validate-zachman.prompt.md
 # Source: spec/zachman.md + spec/elicitation/elicitation-summary.md
 # Output: spec/validation/ folder
@@ -21,11 +36,11 @@ Every item in elicitation-summary.md must be
 represented somewhere in spec/zachman.md.
 
 Check each section:
-- Core Entities → represented in Row 2 What?
-- Primary Journeys → represented in Row 2 How?
-- Non-Negotiables → represented in Row 1 or 2 Why?
-- Explicit Exclusions → noted in Row 1 scope?
-- Known Uncertainties → marked as [NEEDS DECISION]?
+- Core Entities â†’ represented in Row 2 What?
+- Primary Journeys â†’ represented in Row 2 How?
+- Non-Negotiables â†’ represented in Row 1 or 2 Why?
+- Explicit Exclusions â†’ noted in Row 1 scope?
+- Known Uncertainties â†’ marked as [NEEDS DECISION]?
 
 Output:
   ## Elicitation Coverage
@@ -35,7 +50,7 @@ Output:
   - [elicitation item]: in [row/column] but insufficient depth
   ### [ELICITATION GAP] Items
   - [item]: carried forward as [NEEDS DECISION] in [row/column]
-    → confirmed: yes / missing
+    â†’ confirmed: yes / missing
 
 Write output to: spec/validation/elicitation-coverage.md
 
@@ -45,7 +60,7 @@ Write output to: spec/validation/elicitation-coverage.md
 
 Source: spec/zachman.md
 
-Each row must be internally consistent —
+Each row must be internally consistent â€”
 all six columns should describe the same level of abstraction.
 
 ### Row 1 Check
@@ -191,4 +206,5 @@ Produce: spec/validation/validation-summary.md
 They are expected and correct.
 Do not flag them as issues.
 Count them and list them in the summary as
-information only — they will be resolved in Phase 2.
+information only â€” they will be resolved in Phase 2.
+

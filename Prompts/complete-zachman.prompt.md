@@ -1,5 +1,20 @@
-# Complete Zachman Prompt
-# Usage: #complete-zachman.prompt.md — run per gap in resolution list
+﻿# Complete Zachman Prompt
+
+## OKF-First Context Contract (Mandatory)
+
+Before producing output, load context in this order:
+1. knowledge/okf/index.md
+2. Relevant OKF indexes under knowledge/okf/ (domain/, workflows/, ules/, decisions/, work-items/)
+3. Legacy source docs (spec/, ops/, dr/, acklog/) only when needed for gaps or verification
+
+Rules:
+- Treat OKF as the primary context source.
+- If required context is missing in OKF, fall back to legacy docs and record the gap in knowledge/okf/migration-map.md under Open Gaps.
+- For generated outputs, include an OKF Traceability section listing consulted OKF concept paths.
+- Do not contradict ADR decisions; reflect them through linked OKF decision concepts.
+
+---
+# Usage: #complete-zachman.prompt.md â€” run per gap in resolution list
 # Source: spec/audit/zachman-resolution.md + spec/zachman.md
 # Output: updated spec/zachman.md + new adr/ADR-NNN.md
 
@@ -19,7 +34,7 @@ Constraints: [paste agents/architecture.md,
   agents/microservice-strategy.md,
   agents/principles.md]
 
-Generate 2–3 options for resolving this gap.
+Generate 2â€“3 options for resolving this gap.
 
 For each option:
 ### Option [n]: [Short Title]
@@ -54,7 +69,7 @@ When the human confirms a choice:
    - Supersedes: [ADR-n] if applicable
 
 3. Update spec/audit/zachman-resolution.md
-   - Mark the resolved item as ✓ Resolved: ADR-NNN
+   - Mark the resolved item as âœ“ Resolved: ADR-NNN
 
 4. Report:
    - Cell updated: [row, column]
@@ -72,7 +87,7 @@ When the human confirms a choice:
    - Flag mismatches as:
      [CONFLICT: sub-document field '{X}' vs zachman.md field '{Y}']
    - Fix mismatches in the sub-document before marking
-     the item resolved — zachman.md is authoritative
+     the item resolved â€” zachman.md is authoritative
 
 ---
 
@@ -84,3 +99,4 @@ Generation list until that list is empty.
 Gate: do not proceed to generate-ops.prompt.md until
 zachman-resolution.md shows zero items in
 Must Resolve Before Generation.
+

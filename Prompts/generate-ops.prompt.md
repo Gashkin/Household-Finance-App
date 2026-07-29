@@ -1,6 +1,21 @@
-# Generate Operational MDs Prompt
-# Usage: #generate-ops.prompt.md — specify which pass to run
-# Source: spec/zachman.md (must be complete — zero BLOCKS GENERATION items)
+﻿# Generate Operational MDs Prompt
+
+## OKF-First Context Contract (Mandatory)
+
+Before producing output, load context in this order:
+1. knowledge/okf/index.md
+2. Relevant OKF indexes under knowledge/okf/ (domain/, workflows/, ules/, decisions/, work-items/)
+3. Legacy source docs (spec/, ops/, dr/, acklog/) only when needed for gaps or verification
+
+Rules:
+- Treat OKF as the primary context source.
+- If required context is missing in OKF, fall back to legacy docs and record the gap in knowledge/okf/migration-map.md under Open Gaps.
+- For generated outputs, include an OKF Traceability section listing consulted OKF concept paths.
+- Do not contradict ADR decisions; reflect them through linked OKF decision concepts.
+
+---
+# Usage: #generate-ops.prompt.md â€” specify which pass to run
+# Source: spec/zachman.md (must be complete â€” zero BLOCKS GENERATION items)
 # Output: ops/ folder
 
 You are a spec extraction agent.
@@ -16,16 +31,16 @@ Global rules that apply to every file you generate:
   Every line is a statement of fact or constraint
 - Do not resolve conflicts between sources
   Flag as [CONFLICT: describe it]
-- Output MD only — no preamble, no summary at the end
+- Output MD only â€” no preamble, no summary at the end
 
 ---
 
-## Pass 1 — Extract from Zachman
+## Pass 1 â€” Extract from Zachman
 
 Run all four. Do not skip any.
 
 ### ops/pass1/service-boundaries.md
-Source: spec/zachman.md Network + Data columns, Rows 3–4
+Source: spec/zachman.md Network + Data columns, Rows 3â€“4
 
 Structure per service:
   ## [Service Name]
@@ -37,14 +52,14 @@ Structure per service:
   - what it consumes from other services (read-only)
 
 ### ops/pass1/domain-rules.md
-Source: spec/zachman.md Motivation + Data columns, Rows 2–3
+Source: spec/zachman.md Motivation + Data columns, Rows 2â€“3
 
 Structure:
   ## [Domain Area]
   ### Invariants
   - rules that must always be true
   ### State Transitions
-  - [current state] + [trigger] → [new state]
+  - [current state] + [trigger] â†’ [new state]
   ### Validation Rules
   - field/entity: rule as a boolean constraint
   ### Calculations
@@ -58,7 +73,7 @@ Structure per user journey:
   ### Trigger
   - what initiates this flow
   ### Steps
-  1. [Actor/Service] → [action] → [Actor/Service]
+  1. [Actor/Service] â†’ [action] â†’ [Actor/Service]
   ### Data Touched
   - entities read or written per step
   ### End State
@@ -89,7 +104,7 @@ Structure:
 
 ### Audit B: Zachman coverage
   ## Unrepresented Zachman Content
-  - [row/col]: [missing] → belongs in [file]
+  - [row/col]: [missing] â†’ belongs in [file]
   ## Zachman Gaps
   - [row/col]: empty or ambiguous
     [NEEDS DECISION: describe]
@@ -108,7 +123,7 @@ before running Pass 2.
 
 ---
 
-## Pass 2 — Author Fresh
+## Pass 2 â€” Author Fresh
 
 Run only after Pass 1 gate is passed.
 Source for all Pass 2 files: reviewed ops/pass1/ files.
@@ -147,7 +162,7 @@ If any are missing, add them before proceeding.
 
 ### ops/pass2/testing-strategy.md  
 Source: ops/pass1/domain-rules.md, ops/pass1/service-boundaries.md,  
-        ops/pass1/data-flow.md, spec/zachman.md Rows 4–5  
+        ops/pass1/data-flow.md, spec/zachman.md Rows 4â€“5  
         (including any linked sub-documents referenced from Row 5 cells)  
   
   ## Per Service  
@@ -159,16 +174,16 @@ Source: ops/pass1/domain-rules.md, ops/pass1/service-boundaries.md,
     - Every enum field: assert each enum value persists and queries correctly  
     - Every constraint (required, unique, FK): assert valid accepted, invalid rejected  
     - Every state transition in domain-rules.md State Transitions: assert  
-      [current] + [trigger] → [new state], and assert illegal transitions rejected  
+      [current] + [trigger] â†’ [new state], and assert illegal transitions rejected  
   - Operator/algorithm coverage: one test area per operator or algorithm  
     defined in specs/row5/ binding artifacts  
-    - Enumerate each operator/value individually — do not summarise as a group  
+    - Enumerate each operator/value individually â€” do not summarise as a group  
     - Include: valid input, null input, empty input, type mismatch input  
   - Extension point coverage: one test area per extension point or dependency  
     listed in service-boundaries.md Dependencies  
     - Extension present and returns expected value  
     - Extension present and throws exception  
-    - Extension absent (if optional) — assert fallback behaviour  
+    - Extension absent (if optional) â€” assert fallback behaviour  
   - Hierarchy/graph coverage: for any entity with a self-referencing  
     relationship (parent, hierarchy, dependency graph):  
     - Valid tree (depth 1, depth 3)  
@@ -193,7 +208,7 @@ Source: ops/pass1/domain-rules.md, ops/pass1/service-boundaries.md,
     (max lengths, min/max numeric, date boundaries)  
   
   ## Definition of Done  
-  Checklist — agent must satisfy all before a slice is complete:  
+  Checklist â€” agent must satisfy all before a slice is complete:  
   - Every entity in domain-rules.md has at least one test area  
   - Every state machine in domain-rules.md has transition coverage  
   - Every invariant in domain-rules.md is asserted by at least one test  
@@ -206,7 +221,7 @@ Source: ops/pass1/domain-rules.md, ops/pass1/service-boundaries.md,
   - All test data uses synthetic/masked values  
   - No unresolved [NEEDS DECISION] or [CONFLICT] tags in referenced specs---
 
-## Pass 3 — Derive from Pass 1 + 2
+## Pass 3 â€” Derive from Pass 1 + 2
 
 Run only after Pass 2 gate is passed.
 Source: all reviewed ops/pass1/ and ops/pass2/ files.
@@ -224,7 +239,7 @@ Source: all reviewed ops/pass1/ and ops/pass2/ files.
 Before writing any request/response shape, verify each field name
 against the actual entity fields in specs/what/data-model.md.
 If a field in the intended request shape does not exist on the entity,
-write [CONFLICT: field 'X' not present on entity Y — reconcile before proceeding].
+write [CONFLICT: field 'X' not present on entity Y â€” reconcile before proceeding].
 Do not invent field names. Do not use business-language aliases for technical field names.
 Every entity reference must use the correct Python module path (kafka_compliance_agent.models).
   ## [event.name] (dot notation, past tense verb)
@@ -261,3 +276,4 @@ Gate: no unresolved CONFLICT tags before proceeding to generate-backlog.
 
 Gate: all four Pass 3 files must be marked Ready: yes
 before proceeding to generate-backlog.prompt.md.
+

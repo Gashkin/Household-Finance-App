@@ -1,4 +1,19 @@
-# Audit Backlog Prompt
+﻿# Audit Backlog Prompt
+
+## OKF-First Context Contract (Mandatory)
+
+Before producing output, load context in this order:
+1. knowledge/okf/index.md
+2. Relevant OKF indexes under knowledge/okf/ (domain/, workflows/, ules/, decisions/, work-items/)
+3. Legacy source docs (spec/, ops/, dr/, acklog/) only when needed for gaps or verification
+
+Rules:
+- Treat OKF as the primary context source.
+- If required context is missing in OKF, fall back to legacy docs and record the gap in knowledge/okf/migration-map.md under Open Gaps.
+- For generated outputs, include an OKF Traceability section listing consulted OKF concept paths.
+- Do not contradict ADR decisions; reflect them through linked OKF decision concepts.
+
+---
 # Usage: #audit-backlog.prompt.md
 # Source: backlog/ folder + all ops/ files
 # Run after generate-backlog.prompt.md completes fully
@@ -46,7 +61,7 @@ For each item check:
   [ ] Do Not section is present
 
 Flag failures as:
-  [ITEM-NNN: INCOMPLETE — reason]
+  [ITEM-NNN: INCOMPLETE â€” reason]
 
 ---
 
@@ -106,7 +121,7 @@ For each item, verify the spec reference is real:
 
 
 Flag as:
-  [ITEM-NNN: SPEC INCOMPLETE — ops/[file] section [x]
+  [ITEM-NNN: SPEC INCOMPLETE â€” ops/[file] section [x]
    does not contain sufficient detail for this item]
 
 ---  
@@ -124,20 +139,20 @@ For each item that introduces a new entity type into an existing service:
   - If ANY method contains hardcoded entity-specific logic (casts, findById on a specific repository,  
     entity-specific status transitions, entity-specific event emissions):  
     - Check whether the work order lists that method as requiring modification  
-    - If not: [ITEM-NNN: HARDCODED RISK — method X in file Y is hardcoded for entityType=Rule  
+    - If not: [ITEM-NNN: HARDCODED RISK â€” method X in file Y is hardcoded for entityType=Rule  
       but item introduces entityType=Z without dispatch logic]  
   
 ### Stub Propagation Check  
   For each item that contains a stub or no-op deferred to a future item  
-  (e.g., "for ScopeOverride: stub/no-op — ITEM-015"):  
+  (e.g., "for ScopeOverride: stub/no-op â€” ITEM-015"):  
   - Find the consuming item (ITEM-015 in the example)  
   - Verify the consuming item's file list includes the file containing the stub  
   - Verify the consuming item's acceptance criteria include un-stubbing that specific method  
-  - If not: [ITEM-NNN: ORPHANED STUB — stub in method X deferred to ITEM-M,  
+  - If not: [ITEM-NNN: ORPHANED STUB â€” stub in method X deferred to ITEM-M,  
     but ITEM-M does not list file Y or include un-stub in AC]  
   
 Flag failures as:  
-  [ITEM-NNN: DISPATCH INCOMPLETE — reason] 
+  [ITEM-NNN: DISPATCH INCOMPLETE â€” reason] 
 
 ## Consolidation
 
@@ -174,3 +189,4 @@ Write output to: backlog/audit/backlog-audit.md
   If no:
   "Resolve blocking issues and re-run
    #audit-backlog.prompt.md"
+

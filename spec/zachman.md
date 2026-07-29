@@ -139,14 +139,14 @@ This section is part of the normal Zachman structure by explicitly mapping each 
 - Monthly Commitments Grid
 - One Off Commitments Grid
 - Current Month Snapshot
-- Payment Classification
+- Account Management
 - Configuration Page
 
 ### Delivery Priority (Grid-First)
 - Priority 1: Monthly Commitments Grid
 - Priority 2: One Off Commitments Grid
 - Priority 3: Current Month Snapshot
-- Priority 4: Payment Classification
+- Priority 4: Account Management
 - Priority 5: Configuration Page
 - Priority 6: Planner Dashboard polish
 
@@ -160,7 +160,7 @@ Rationale:
 - Current Month Snapshot: Row 5 What (monthly balances and commitment totals), Row 5 How (on-screen calculations), Row 5 When (current month cut)
 - Monthly Commitments Grid: Row 5 What (month-scoped commitments), Row 5 How (filter and presentation behavior), Row 5 Who (planner review)
 - One Off Commitments Grid: Row 5 What (non-recurring commitments), Row 5 How (sign conventions and display), Row 5 When (month-specific planning)
-- Payment Classification: Row 5 How (import pipeline interaction), Row 5 What (preview rows, duplicates, categories), Row 5 Who (planner accept/reject)
+- Account Management: Row 5 How (account-scoped import/history/mapping workflow), Row 5 What (accounts, balances, imported rows, mapping state), Row 5 Who (planner reconciliation actions)
 - Configuration Page: Row 5 Why (planning consistency), Row 5 What (rules/dictionaries/defaults), Row 5 How (configuration controls)
 
 ### Screen 1: Planner Dashboard
@@ -174,7 +174,7 @@ Mapped cells:
 Behavior contract:
 - Provides a top-level control surface with key totals and entry points.
 - Contains Current Month Snapshot and links/sections for commitments, classification, and configuration.
-- Planner workspace uses tabbed navigation to separate Forecast/Current Month, Monthly Commitments, Once Off Commitments, and Transaction Import.
+- Planner workspace uses tabbed navigation to separate Forecast/Current Month, Monthly Commitments, Once Off Commitments, and Account Management.
 - Uses full-window layout of the planner shell.
 - Preserves boxed-card/table containment and readable financial working presentation.
 
@@ -194,7 +194,9 @@ Behavior contract:
 - End-of-period total is calculated on screen as opening account balances + total incomes + total expenses.
 - Total incomes are the sum of positive visible commitment amounts.
 - Total expenses are the sum of negative visible commitment amounts.
+- Credit Card Repayment affordability is calculated as: Monthly Ongoing Commitment Income - Monthly EOM - Monthly Ongoing Commitment Becky - Monthly Ongoing Commitment Morgage - Monthly Ongoing Commitment CU + 1000 overdraft - 75 life insurance.
 - Forecast presentation is ledger/trial-balance style with explicit working rather than summary-only values.
+- Forecast grid layout uses three columns where Accounts and Categories are stacked in the left column, Credit Card Repayment appears in the middle column, and Commitments remains in the right column.
 
 ### Screen 3: Monthly Commitments Grid
 
@@ -216,6 +218,7 @@ Behavior contract:
 - Planner can edit payment description, category, and amount inline.
 - Planner can create new recurring rows and delete existing recurring rows in-grid.
 - Save updates are persisted through planner commitment upsert endpoints with dueDate fixed to Recurring.
+- Grid supports CSV download for bulk editing and CSV upload for batch create/update operations.
 - Rows remain visually boxed and contained within their card/table layout.
 - Category is displayed per commitment, including inferred category when source category is missing.
 - Recurring commitments remain definitions only; monthly conversion into transaction instances is performed by a monthly batch job outside this grid.
@@ -251,9 +254,10 @@ Behavior contract:
 - Planner can edit payment description, category, and amount inline.
 - Planner can add and delete one-off rows in-grid.
 - Planner can save all pending one-off row edits at page level in a single action.
+- Grid supports CSV download for bulk editing and CSV upload for batch create/update operations.
 - One-off rows include category values.
 - Expense values are represented with negative signs for financial consistency.
-- Due month label is required for one-off rows and uses month token format (for example Jul26).
+- Singular due date is required for one-off rows and uses full date format (YYYY-MM-DD).
 - Grid formatting follows row boxing/containment rules used by planner tables.
 
 Minimum readiness criteria before Snapshot backlog items:
@@ -268,19 +272,20 @@ Acceptance criteria:
 - Amount field validates numeric entry and preserves financial sign conventions.
 - Saved grid changes are reflected in data used by Current Month Snapshot.
 
-### Screen 5: Payment Classification
+### Screen 5: Account Management
 
 Mapped cells:
-- Row 5 How: preview, select, and accept workflow for transaction import
-- Row 5 What: imported rows, duplicate flags, and category assignment outputs
-- Row 5 Who: planner as classification decision maker
+- Row 5 How: account toggle, balance update, import preview/accept, history review, and map-to-future workflow
+- Row 5 What: account balances, imported transaction rows, duplicate flags, and mapping assignments to one-off future transactions
+- Row 5 Who: planner as account and transaction reconciliation operator
 
 Behavior contract:
-- Planner can paste CSV input for preview.
-- Preview request posts CSV text to import preview endpoint.
-- Preview list supports row-level selection and duplicate visibility.
-- Accept action sends selected row IDs for import acceptance.
-- Missing category values are inferred from title mapping where possible; unresolved values remain Uncategorized.
+- Account Management replaces Transaction Import as the planner import and account operations surface.
+- Planner can toggle between Current Account, Credit card, and Revolut.
+- Planner can view and save account balances in-tab.
+- Planner can paste CSV input for preview and accept selected rows.
+- Accepted rows appear in transaction history.
+- Planner can map imported transaction history rows to future one-off commitments when auto-mapping is missing.
 
 ### Screen 6: Configuration Page
 
@@ -300,7 +305,7 @@ Behavior contract:
 - Prioritized screen delivery in grid-first order so Monthly Commitments Grid and One Off Commitments Grid are upstream dependencies for Current Month Snapshot.
 - Added explicit input dependency from Current Month Snapshot to both commitment grids.
 - Reframed planner specification from a single workspace description into six explicit screens.
-- Established initial boundaries for Planner Dashboard, Current Month Snapshot, Monthly Commitments Grid, One Off Commitments Grid, Payment Classification, and Configuration Page.
+- Established initial boundaries for Planner Dashboard, Current Month Snapshot, Monthly Commitments Grid, One Off Commitments Grid, Account Management, and Configuration Page.
 - Added forecast selector with `This month` period.
 - Added ledger/trial-balance style forecast working panel.
 - Added category rollup based on summed visible commitments.
@@ -310,6 +315,7 @@ Behavior contract:
 - Sorted category rollup by amount descending.
 - Updated planner table styling so rows remain boxed and inside visual card boundaries.
 - Updated planner layout to stretch and use full window width.
+- Added Credit Card Repayment affordability working panel in Forecast and Current Month.
 
 ## Migration backlog
 - Inventory the existing workbook sheets, tabs, and formulas that must be preserved.

@@ -1,4 +1,19 @@
-# The Change Process  
+﻿# The Change Process  
+
+## OKF-First Context Contract (Mandatory)
+
+Before producing output, load context in this order:
+1. knowledge/okf/index.md
+2. Relevant OKF indexes under knowledge/okf/ (domain/, workflows/, ules/, decisions/, work-items/)
+3. Legacy source docs (spec/, ops/, dr/, acklog/) only when needed for gaps or verification
+
+Rules:
+- Treat OKF as the primary context source.
+- If required context is missing in OKF, fall back to legacy docs and record the gap in knowledge/okf/migration-map.md under Open Gaps.
+- For generated outputs, include an OKF Traceability section listing consulted OKF concept paths.
+- Do not contradict ADR decisions; reflect them through linked OKF decision concepts.
+
+---
 ## Evolving an Existing Codebase via Spec-Driven Development  
 ### A complete walkthrough for making large functional changes to a built system  
   
@@ -27,20 +42,20 @@ Ask me what you need to know. Tell me what to run. Keep me on track."
   
 ## The Change Pipeline
 ANALYSIS
-Phase C1: Gap Analysis — what the codebase needs vs what it has
+Phase C1: Gap Analysis â€” what the codebase needs vs what it has
 
 DECISION
-Phase C2: Write ADRs — new architectural decisions
-Phase C3: Update Zachman — add/modify cells to reflect new decisions
+Phase C2: Write ADRs â€” new architectural decisions
+Phase C3: Update Zachman â€” add/modify cells to reflect new decisions
 
 REGENERATION
-Phase C4: Regenerate ops/ — full regenerate per PROCESS.md rules
+Phase C4: Regenerate ops/ â€” full regenerate per PROCESS.md rules
 
 DELTA BACKLOG
-Phase C5: Evolve Backlog — generate new items, mark superseded items
+Phase C5: Evolve Backlog â€” generate new items, mark superseded items
 
 EXECUTION
-Phase C6: Execute Items — same as PROCESS.md Phase 5
+Phase C6: Execute Items â€” same as PROCESS.md Phase 5
 
 
 ---  
@@ -48,19 +63,19 @@ Phase C6: Execute Items — same as PROCESS.md Phase 5
 ## Entry Points  
   
 **Have a migration/gap analysis document:**  
-→ Begin at Phase C2  
+â†’ Begin at Phase C2  
   
 **Have new ADRs but haven't updated Zachman:**  
-→ Begin at Phase C3  
+â†’ Begin at Phase C3  
   
 **Have updated Zachman, need new ops/:**  
-→ Begin at Phase C4  
+â†’ Begin at Phase C4  
   
 **Have updated ops/, need new work orders:**  
-→ Begin at Phase C5  
+â†’ Begin at Phase C5  
   
 **Have new work orders, ready to build:**  
-→ Begin at Phase C6  
+â†’ Begin at Phase C6  
   
 ---  
   
@@ -84,14 +99,14 @@ Identify what the codebase needs to support the new requirements vs what current
    - What becomes obsolete  
   
 ### Output  
-- `specs/[context]/[context]-migration-analysis.md` — full gap analysis  
-- `specs/[context]/[context]-codebase-changes.md` — changes needed, grouped by theme  
+- `specs/[context]/[context]-migration-analysis.md` â€” full gap analysis  
+- `specs/[context]/[context]-codebase-changes.md` â€” changes needed, grouped by theme  
   
 ### Gate  
 - [ ] Every theme has at least one concrete code-level example  
 - [ ] Every "what exists" claim has been verified against actual source  
 - [ ] Every "what is missing" claim traces to a specific new requirement  
-- [ ] No claims based on assumptions — all verified via code review  
+- [ ] No claims based on assumptions â€” all verified via code review  
 - [ ] Document reviewed by human before proceeding  
   
 ---  
@@ -123,7 +138,7 @@ For each new architectural decision:
 ### Gate  
 - [ ] Every new ADR has a clear Decision statement (not a discussion)  
 - [ ] Every superseded ADR is marked with new status  
-- [ ] No ADR contains [NEEDS DECISION] — that belongs in Zachman  
+- [ ] No ADR contains [NEEDS DECISION] â€” that belongs in Zachman  
 - [ ] ADRs reviewed by human before proceeding  
   
 ---  
@@ -150,7 +165,7 @@ Zachman is the single source of truth. All changes flow from it.
    - Row 4 (Technology Model): new modules, packages, dependencies  
    - Row 5 (Detailed Representation): new algorithms, APIs, schemas  
 2. Add new content to the appropriate cells  
-3. Mark superseded content (do not delete — it documents history)  
+3. Mark superseded content (do not delete â€” it documents history)  
 4. Add [NEEDS DECISION] tags for anything the ADRs left unresolved  
   
 ### Output  
@@ -171,10 +186,10 @@ ops/ files are derived from Zachman. They are never edited directly.
 When Zachman changes, ops/ must be regenerated.  
   
 ### Rules (from PROCESS.md)  
-- ops/ files are never edited directly — fix Zachman and regenerate  
+- ops/ files are never edited directly â€” fix Zachman and regenerate  
 - Run #generate-ops.prompt.md for each pass  
 - The regenerated ops/ will now contain both existing content AND new content  
-- Completed items are not affected — they are already built and tested  
+- Completed items are not affected â€” they are already built and tested  
   
 ### Input  
 - Updated spec/zachman.md (Phase C3 output)  
@@ -209,7 +224,7 @@ Do NOT regenerate the entire backlog from scratch.
   
 ### Rules  
 - Read progress.md and all existing work orders to understand what is built  
-- Items that are completed stay completed — they are not regenerated  
+- Items that are completed stay completed â€” they are not regenerated  
 - Items that are now obsolete are marked [SUPERSEDED by ITEM-nnn]  
 - New items start numbering from the current highest + 1  
 - Every new item must include a "Sample Host Changes" section if it affects the host  
@@ -225,18 +240,18 @@ Do NOT regenerate the entire backlog from scratch.
   
 #### Step 1: Identify Superseded Items  
 For each existing incomplete/not-started item:  
-- If the regenerated ops/ no longer contains the scope this item was derived from → mark [SUPERSEDED]  
-- If a new item covers this item's scope differently → mark [SUPERSEDED by ITEM-nnn]  
-- If the item is still valid as-is → leave unchanged  
+- If the regenerated ops/ no longer contains the scope this item was derived from â†’ mark [SUPERSEDED]  
+- If a new item covers this item's scope differently â†’ mark [SUPERSEDED by ITEM-nnn]  
+- If the item is still valid as-is â†’ leave unchanged  
   
 #### Step 2: Identify New Slices  
 Compare regenerated ops/ against existing slices.md:  
-- New user journeys in data-flow.md that have no corresponding slice → new slice  
-- Existing slices whose scope expanded → note expansion  
+- New user journeys in data-flow.md that have no corresponding slice â†’ new slice  
+- Existing slices whose scope expanded â†’ note expansion  
   
 #### Step 3: Generate New Items  
 For each new slice or expanded scope:  
-- Generate items following the same order: Schema → Logic → Endpoint → Integration → Tests  
+- Generate items following the same order: Schema â†’ Logic â†’ Endpoint â†’ Integration â†’ Tests  
 - Number sequentially from current highest ITEM number + 1  
 - Apply all work order rules from generate-backlog.prompt.md  
 - Include "Sample Host Changes" section in any item that modifies library behavior  
@@ -283,12 +298,12 @@ Use #execute-item.prompt.md per item.
   
 ## Relationship to PROCESS.md
 PROCESS.md (greenfield) CHANGE_PROCESS.md (evolution)
-───────────────────────────── ─────────────────────────────────
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Phase E: Elicitation Phase C1: Gap Analysis
 Phase P: Population Phase C2: Write ADRs
 Phase V: Validation Phase C3: Update Zachman
-Phase 1: Audit Zachman ─── (skip — Zachman already audited)
-Phase 2: Complete Zachman ─── (skip — Zachman already complete)
+Phase 1: Audit Zachman â”€â”€â”€ (skip â€” Zachman already audited)
+Phase 2: Complete Zachman â”€â”€â”€ (skip â€” Zachman already complete)
 Phase 3: Generate ops/ Phase C4: Regenerate ops/
 Phase 4: Generate Backlog Phase C5: Evolve Backlog (DELTA only)
 Phase 5: Execute Items Phase C6: Execute Items (same)
@@ -303,11 +318,11 @@ It reads existing state and produces only what is new or changed.
   
 All ten rules from PROCESS.md apply. Additionally:  
   
-11. Completed items are immutable — never regenerate or modify a completed work order  
-12. Superseded items are not deleted — they are marked and left in place for history  
-13. New items must not break existing passing tests — every item leaves the build green  
-14. The sample host must compile after every item — no big-bang migrations  
-15. Analysis documents are checked into specs/ — they are inputs to Zachman, not sources for backlog  
+11. Completed items are immutable â€” never regenerate or modify a completed work order  
+12. Superseded items are not deleted â€” they are marked and left in place for history  
+13. New items must not break existing passing tests â€” every item leaves the build green  
+14. The sample host must compile after every item â€” no big-bang migrations  
+15. Analysis documents are checked into specs/ â€” they are inputs to Zachman, not sources for backlog  
   
 ---  
   
@@ -342,7 +357,7 @@ that takes the existing file as an input.
 ### The sample host won't compile mid-migration  
 This means an item was missing its "Sample Host Changes" section.  
 Fix: add the host changes to the current item (do not create a separate host item).  
-Rule 14 exists to prevent this — enforce it at work order review time.  
+Rule 14 exists to prevent this â€” enforce it at work order review time.  
   
 ---  
   
@@ -351,13 +366,13 @@ Rule 14 exists to prevent this — enforce it at work order review time.
 | Situation | Action |  
 |---|---|  
 | New integration target identified | Start at Phase C1 |  
-| Gap analysis complete | `Phase C2` — write ADRs |  
-| ADRs written | `Phase C3` — update spec/zachman.md |  
+| Gap analysis complete | `Phase C2` â€” write ADRs |  
+| ADRs written | `Phase C3` â€” update spec/zachman.md |  
 | Zachman updated | `#generate-ops.prompt.md` all passes (Phase C4) |  
-| ops/ regenerated | `Phase C5` — evolve backlog (delta generation) |  
+| ops/ regenerated | `Phase C5` â€” evolve backlog (delta generation) |  
 | New work orders ready | `#execute-item.prompt.md` per item (Phase C6) |  
-| Completed item needs modification | Write new ITEM that modifies it — do NOT edit the completed item |  
-| Existing items now obsolete | Mark [SUPERSEDED by ITEM-nnn] — do NOT delete |  
+| Completed item needs modification | Write new ITEM that modifies it â€” do NOT edit the completed item |  
+| Existing items now obsolete | Mark [SUPERSEDED by ITEM-nnn] â€” do NOT delete |  
   
 ---  
   
@@ -365,27 +380,27 @@ Rule 14 exists to prevent this — enforce it at work order review time.
   
 This is the concrete example that motivated this process:
 Phase C1: cwo-migration-analysis.md + cwo-raas-codebase-changes.md
-→ identified 5 themes, 16 new items needed
+â†’ identified 5 themes, 16 new items needed
 
 Phase C2: ADR-042 (module decomposition), ADR-043 (condition format SPI),
 ADR-044 (SPI defaults)
-→ supersedes parts of ADR-040
+â†’ supersedes parts of ADR-040
 
 Phase C3: Zachman updated with:
 - Row 3 Network: raas-core splits into raas-domain + raas-evaluation + raas-management
 - Row 3 Function: batch evaluation flow, condition format pluggability
 - Row 5 Technology: new operators, Map-backed fact, default SPIs
 
-Phase C4: ops/ regenerated — now contains both MVP content (ITEM-000–044)
+Phase C4: ops/ regenerated â€” now contains both MVP content (ITEM-000â€“044)
 AND new CWO-driven content
 
 Phase C5: Evolve backlog:
-- ITEM-023–035 marked [SUPERSEDED by ITEM-046–060]
-- ITEM-045–060 generated (new work orders)
+- ITEM-023â€“035 marked [SUPERSEDED by ITEM-046â€“060]
+- ITEM-045â€“060 generated (new work orders)
 - slices.md updated with SLICE-12
 - ordered-backlog.md updated with new Phase 4 milestone
 
-Phase C6: Execute ITEM-045 → 046 → ... → 060
+Phase C6: Execute ITEM-045 â†’ 046 â†’ ... â†’ 060
 
 
 ---  
@@ -418,5 +433,5 @@ Important Notes
 Do NOT modify any other files (PROCESS.md, generate-backlog.prompt.md, etc.)
 Do NOT create any Java source files
 Do NOT modify any existing prompt files
-The file content above is the COMPLETE file — create it exactly as specified
+The file content above is the COMPLETE file â€” create it exactly as specified
 Use Unix line endings (LF, not CRLF)

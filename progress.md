@@ -1,6 +1,6 @@
 ## Current Item
-ITEM-024: Add Once Off Commitments grid with inline CRUD and page-level save.
-Status: Ready for Review
+ITEM-031: Manual Transaction Loading and Commitment Matching.
+Status: In Progress (Slice 1: suggested + one-click matching delivered)
 
 ## Completed Items
 - Phase 0 archaeology completed
@@ -35,9 +35,15 @@ Status: Ready for Review
 - ITEM-022: Build planner tabs and Monthly Commitments UI slice completed
 - ITEM-023: Make the Monthly Commitments tab editable with inline CRUD actions completed
 - ITEM-024: Add Once Off Commitments grid with inline CRUD and page-level save completed
+- ITEM-025: Add CSV download/upload bulk-edit workflows for both commitment grids completed
+- ITEM-026: Use singular due dates for Once Off Commitments completed
+- ITEM-027: Convert Transaction Import tab to Account Management completed
+- ITEM-028: Add Credit Card Repayment affordability working and forecast layout adjustments completed
+- ITEM-029: Full Open Knowledge Format (OKF) Adoption completed
+- ITEM-030: Add OKF Contributor Onboarding to README completed
 
 ## Blocked Items
 (none)
 
 ## Next Item
-None (ordered backlog currently ends at ITEM-024)
+ITEM-031: Continue manual row entry and bulk paste/import flows

@@ -1,4 +1,19 @@
-# Audit Zachman Prompt
+﻿# Audit Zachman Prompt
+
+## OKF-First Context Contract (Mandatory)
+
+Before producing output, load context in this order:
+1. knowledge/okf/index.md
+2. Relevant OKF indexes under knowledge/okf/ (domain/, workflows/, ules/, decisions/, work-items/)
+3. Legacy source docs (spec/, ops/, dr/, acklog/) only when needed for gaps or verification
+
+Rules:
+- Treat OKF as the primary context source.
+- If required context is missing in OKF, fall back to legacy docs and record the gap in knowledge/okf/migration-map.md under Open Gaps.
+- For generated outputs, include an OKF Traceability section listing consulted OKF concept paths.
+- Do not contradict ADR decisions; reflect them through linked OKF decision concepts.
+
+---
 # Usage: #audit-zachman.prompt.md
 # Source: spec/zachman.md (+ spec/archaeology/scanner-existing-state.md, spec/archaeology/starter-existing-state.md if Phase 0 ran)
 # Output: spec/audit/ folder
@@ -78,7 +93,7 @@ Source: spec/zachman.md,
 - Cells whose content depends on another cell that
   is Empty, Thin, or Assumed
 
-Output as a prioritised list — highest risk gaps first.
+Output as a prioritised list â€” highest risk gaps first.
 Flag each as [BLOCKS GENERATION] or [BLOCKS BUILD].
 
 Write output to: spec/audit/zachman-greenfield.md
@@ -125,3 +140,4 @@ Output a one-line summary:
 [n] cells need resolution before generation.
 [n] cells need resolution before build.
 [n] nice-to-have improvements identified.
+

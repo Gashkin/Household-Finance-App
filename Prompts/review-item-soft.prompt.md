@@ -1,4 +1,19 @@
-# Review Item Prompt (Soft)
+﻿# Review Item Prompt (Soft)
+
+## OKF-First Context Contract (Mandatory)
+
+Before producing output, load context in this order:
+1. knowledge/okf/index.md
+2. Relevant OKF indexes under knowledge/okf/ (domain/, workflows/, ules/, decisions/, work-items/)
+3. Legacy source docs (spec/, ops/, dr/, acklog/) only when needed for gaps or verification
+
+Rules:
+- Treat OKF as the primary context source.
+- If required context is missing in OKF, fall back to legacy docs and record the gap in knowledge/okf/migration-map.md under Open Gaps.
+- For generated outputs, include an OKF Traceability section listing consulted OKF concept paths.
+- Do not contradict ADR decisions; reflect them through linked OKF decision concepts.
+
+---
 # Usage: run after implementation to verify quality and requirement adherence with momentum
 
 You are a review agent.
@@ -119,7 +134,7 @@ If the review is being performed by Devin Ask (chat-based, no shell access):
 - Build and runtime verification commands are NOT required to be rerun.
 - Build correctness is considered proved by a successful PR merge and passing CI pipeline.
 - The reviewer should still validate evidence claims against source code, commit diffs, and PROGRESS.md for internal consistency.
-- Verdict CAN be `Pass` if all criteria are verified through static analysis, commit evidence, and CI proof — build rerun is not a blocker.
+- Verdict CAN be `Pass` if all criteria are verified through static analysis, commit evidence, and CI proof â€” build rerun is not a blocker.
 
 ---
 
@@ -157,7 +172,7 @@ Session gate override (fail closed):
 
 Full-validation constraints:
 - `Pass` requires required reruns completed with matching evidence and no failed gates.
-- If required reruns are skipped or unavailable, verdict cannot be `Pass` — unless the review is performed by Devin Ask, in which case a successful PR merge and CI pipeline run substitutes for build rerun.
+- If required reruns are skipped or unavailable, verdict cannot be `Pass` â€” unless the review is performed by Devin Ask, in which case a successful PR merge and CI pipeline run substitutes for build rerun.
 
 Then provide a concise roll-up:
 
@@ -202,3 +217,4 @@ If asked, provide:
 - Current repository state is source of truth.
 - Completed-item scope by default.
 - If ambiguity exists, state assumptions explicitly.
+

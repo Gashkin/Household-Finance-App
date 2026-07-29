@@ -1,4 +1,19 @@
-# Coverage Audit Prompt  
+﻿# Coverage Audit Prompt  
+
+## OKF-First Context Contract (Mandatory)
+
+Before producing output, load context in this order:
+1. knowledge/okf/index.md
+2. Relevant OKF indexes under knowledge/okf/ (domain/, workflows/, ules/, decisions/, work-items/)
+3. Legacy source docs (spec/, ops/, dr/, acklog/) only when needed for gaps or verification
+
+Rules:
+- Treat OKF as the primary context source.
+- If required context is missing in OKF, fall back to legacy docs and record the gap in knowledge/okf/migration-map.md under Open Gaps.
+- For generated outputs, include an OKF Traceability section listing consulted OKF concept paths.
+- Do not contradict ADR decisions; reflect them through linked OKF decision concepts.
+
+---
   
 You are a coverage audit agent. Your job is to run JaCoCo coverage analysis across all modules, cross-reference the results against the testing strategy Definition of Done, and produce a structured gap report.  
   
@@ -8,7 +23,7 @@ This prompt is re-runnable. When re-running:
 1. Run `./gradlew clean test jacocoTestReport` to get fresh coverage data  
 2. REPLACE the entire contents of `backlog/coverage-gaps.md` with updated data  
 3. Use the current HEAD commit SHA in the "Base commit" field  
-4. Do NOT append — overwrite the whole file  
+4. Do NOT append â€” overwrite the whole file  
   
 ---  
   
@@ -35,7 +50,7 @@ Line Coverage %	LINE counter: covered / (covered + missed) * 100
 Branch Coverage %	BRANCH counter: covered / (covered + missed) * 100
 Missed Lines	LINE counter missed value
 Missed Branches	BRANCH counter missed value
-Report ALL production classes — do NOT filter by a threshold. Sort by line coverage ascending (lowest first).
+Report ALL production classes â€” do NOT filter by a threshold. Sort by line coverage ascending (lowest first).
 
 If a class from the Production Class Inventory (below) does not appear in any JaCoCo report, report it as 0% line / 0% branch and note "not in JaCoCo output."
 
@@ -46,25 +61,25 @@ Stub/mock implementations (Stub*.java, InMemory*.java)
 Spring Boot application class (SampleHostApplication.java)
 Configuration classes (RaasConfig.java)
 Step 3: Cross-Reference Definition of Done
-Read ops/pass2/testing-strategy.md lines 89–113. There are 18 criteria. For each criterion:
+Read ops/pass2/testing-strategy.md lines 89â€“113. There are 18 criteria. For each criterion:
 
 Search the test source files (listed below) for a test method that explicitly covers that criterion
-Mark as COVERED if a matching test exists — cite the test class and method name
-Mark as GAP if no test covers it — assign to the appropriate target item (ITEM-037 for raas-core, ITEM-038 for raas-governance + raas-testing, ITEM-044 for raas-sample-host controllers)
+Mark as COVERED if a matching test exists â€” cite the test class and method name
+Mark as GAP if no test covers it â€” assign to the appropriate target item (ITEM-037 for raas-core, ITEM-038 for raas-governance + raas-testing, ITEM-044 for raas-sample-host controllers)
 How to search: For each criterion, grep the test directories for keywords from the criterion description. For example:
 
-"cycle detection" → search for cycle in test files
-"partial results on single-rule failure" → search for partial or singleRuleFailure
-"ScriptEngine SPI absent" → search for scriptEngine or ScriptEngine
+"cycle detection" â†’ search for cycle in test files
+"partial results on single-rule failure" â†’ search for partial or singleRuleFailure
+"ScriptEngine SPI absent" â†’ search for scriptEngine or ScriptEngine
 Do NOT leave any criterion as _pending_. Every row must be COVERED or GAP.
 
 Step 4: Populate Gap Report
 Write the complete backlog/coverage-gaps.md file with these sections:
 
-Section 1: Per-class coverage table — ALL production classes, sorted by line coverage ascending
-Section 2: Untested branches — classes with branch coverage below 80%, listing specific branch descriptions where identifiable
-Section 3: Definition of Done gaps — each of the 18 criteria marked COVERED or GAP with evidence
-Section 4: Recommended test additions — grouped by target work order:
+Section 1: Per-class coverage table â€” ALL production classes, sorted by line coverage ascending
+Section 2: Untested branches â€” classes with branch coverage below 80%, listing specific branch descriptions where identifiable
+Section 3: Definition of Done gaps â€” each of the 18 criteria marked COVERED or GAP with evidence
+Section 4: Recommended test additions â€” grouped by target work order:
 ITEM-037 (raas-core): evaluation pipeline, services, entities, SPI contracts
 ITEM-038 (raas-governance + raas-testing): ChangeApplicator, ApprovalService, ImpactAnalysisService, BatchTestService, RegressionSuiteService
 ITEM-044 (raas-sample-host controllers): all controller unit tests
@@ -74,7 +89,7 @@ Step 5: Verify
  Every Definition of Done criterion is marked COVERED or GAP (none are _pending_)
  GAP items are tagged with the correct target work order (ITEM-037, ITEM-038, or ITEM-044)
  Section 4 has three sub-sections: ITEM-037, ITEM-038, ITEM-044
-Production Class Inventory (complete — audit ALL of these)
+Production Class Inventory (complete â€” audit ALL of these)
 raas-core
 Package	Class
 com.citi.raas.core.model	Rule
@@ -116,7 +131,7 @@ com.citi.raas.testing.service	BatchTestService
 com.citi.raas.testing.service	RegressionSuiteService
 com.citi.raas.testing.repository	TestExecutionRepository (interface)
 com.citi.raas.testing.repository	ImpactAnalysisResultRepository (interface)
-raas-sample-host (controllers only — for ITEM-044)
+raas-sample-host (controllers only â€” for ITEM-044)
 Package	Class
 com.citi.raas.host.controller	RuleController
 com.citi.raas.host.controller	NamespaceController
@@ -161,7 +176,7 @@ integration/slice06/ImpactAnalysisIntegrationTest.java
 integration/slice07/ShadowToEnforceIntegrationTest.java
 integration/slice11/AlertIntegrationTest.java
 Do Not
-Do not write any test code — this prompt only audits and reports
+Do not write any test code â€” this prompt only audits and reports
 Do not modify any production code
 Do not modify any existing test files
 Do not add dependencies beyond JaCoCo (already configured)
