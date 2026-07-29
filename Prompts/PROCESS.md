@@ -1,4 +1,19 @@
-# The Process
+﻿# The Process
+
+## OKF-First Context Contract (Mandatory)
+
+Before producing output, load context in this order:
+1. knowledge/okf/index.md
+2. Relevant OKF indexes under knowledge/okf/ (domain/, workflows/, ules/, decisions/, work-items/)
+3. Legacy source docs (spec/, ops/, dr/, acklog/) only when needed for gaps or verification
+
+Rules:
+- Treat OKF as the primary context source.
+- If required context is missing in OKF, fall back to legacy docs and record the gap in knowledge/okf/migration-map.md under Open Gaps.
+- For generated outputs, include an OKF Traceability section listing consulted OKF concept paths.
+- Do not contradict ADR decisions; reflect them through linked OKF decision concepts.
+
+---
 ## Spec-Driven Development with Agents
 ### A complete walkthrough for a chatbot agent to guide you through
 
@@ -62,19 +77,19 @@ ARCHAEOLOGY (run before any phase if codebase exists)
 ## Entry Points
 
 **Starting a brand new project with no Zachman:**
-→ Begin at Phase E
+â†’ Begin at Phase E
 
 **Have a Zachman already (yours or adapted):**
-→ Begin at Phase 0 if code exists, otherwise Phase 1
+â†’ Begin at Phase 0 if code exists, otherwise Phase 1
 
 **Have a Zachman and existing code:**
-→ Begin at Phase 0
+â†’ Begin at Phase 0
 
 **Have completed ops/ files:**
-→ Begin at Phase 4
+â†’ Begin at Phase 4
 
 **Have a completed backlog:**
-→ Begin at Phase 5
+â†’ Begin at Phase 5
 
 ---
 
@@ -82,71 +97,71 @@ ARCHAEOLOGY (run before any phase if codebase exists)
 
 ```
 repo/
-│
-├── PROCESS.md                        ← this file
-│
-├── spec/
-│   ├── zachman.md                    ← primary source of truth
-│   ├── elicitation/
-│   │   ├── motivation.md             ← Phase E output
-│   │   ├── domain.md                 ← Phase E output
-│   │   ├── people.md                 ← Phase E output
-│   │   ├── journeys.md               ← Phase E output
-│   │   ├── scope.md                  ← Phase E output
-│   │   └── elicitation-summary.md    ← Phase E consolidation
-│   ├── archaeology/
-│   │   ├── existing-state.md         ← Phase 0 output
-│   │   └── existing-patterns.md      ← Phase 0 output
-│   ├── audit/
-│   │   ├── zachman-completeness.md   ← Phase 1 output
-│   │   ├── zachman-conflicts.md      ← Phase 1 output
-│   │   ├── zachman-greenfield.md     ← Phase 1 output
-│   │   └── zachman-resolution.md     ← Phase 1 output
-│   └── validation/
-│       ├── elicitation-coverage.md   ← Phase V output
-│       ├── row-consistency.md        ← Phase V output
-│       ├── column-coherence.md       ← Phase V output
-│       ├── why-dominance.md          ← Phase V output
-│       └── validation-summary.md     ← Phase V output
-│
-├── adr/
-│   ├── ADR-000-template.md
-│   └── ADR-NNN.md ...                ← one per decision, Phase 2
-│
-├── ops/
-│   ├── pass1/
-│   │   ├── service-boundaries.md     ← Phase 3 Pass 1
-│   │   ├── domain-rules.md           ← Phase 3 Pass 1
-│   │   ├── data-flow.md              ← Phase 3 Pass 1
-│   │   └── decisions.md              ← Phase 3 Pass 1
-│   ├── pass2/
-│   │   ├── out-of-scope.md           ← Phase 3 Pass 2
-│   │   ├── error-handling.md         ← Phase 3 Pass 2
-│   │   └── testing-strategy.md       ← Phase 3 Pass 2
-│   └── pass3/
-│       ├── api-contracts.md          ← Phase 3 Pass 3
-│       ├── events.md                 ← Phase 3 Pass 3
-│       ├── component-patterns.md     ← Phase 3 Pass 3
-│       └── seed-data.md              ← Phase 3 Pass 3
-│
-├── agents/
-│   ├── agents.md                     ← agent roles and constraints
-│   ├── architecture.md               ← tech stack and conventions
-│   ├── principles.md                 ← build principles
-│   ├── microservice-strategy.md      ← service decomposition rules
-│   └── ui-template.md                ← UI patterns and tokens
-│
-├── backlog/
-│   ├── slices.md                     ← Phase 4 output
-│   ├── walking-skeleton.md           ← Phase 4 output
-│   ├── ordered-backlog.md            ← Phase 4 output
-│   ├── audit/
-│   │   └── backlog-audit.md          ← Phase 4A output
-│   └── work-orders/
-│       ├── ITEM-000.md               ← walking skeleton
-│       └── ITEM-NNN.md ...           ← one per item
-│
-└── progress.md                       ← live execution state
+â”‚
+â”œâ”€â”€ PROCESS.md                        â† this file
+â”‚
+â”œâ”€â”€ spec/
+â”‚   â”œâ”€â”€ zachman.md                    â† primary source of truth
+â”‚   â”œâ”€â”€ elicitation/
+â”‚   â”‚   â”œâ”€â”€ motivation.md             â† Phase E output
+â”‚   â”‚   â”œâ”€â”€ domain.md                 â† Phase E output
+â”‚   â”‚   â”œâ”€â”€ people.md                 â† Phase E output
+â”‚   â”‚   â”œâ”€â”€ journeys.md               â† Phase E output
+â”‚   â”‚   â”œâ”€â”€ scope.md                  â† Phase E output
+â”‚   â”‚   â””â”€â”€ elicitation-summary.md    â† Phase E consolidation
+â”‚   â”œâ”€â”€ archaeology/
+â”‚   â”‚   â”œâ”€â”€ existing-state.md         â† Phase 0 output
+â”‚   â”‚   â””â”€â”€ existing-patterns.md      â† Phase 0 output
+â”‚   â”œâ”€â”€ audit/
+â”‚   â”‚   â”œâ”€â”€ zachman-completeness.md   â† Phase 1 output
+â”‚   â”‚   â”œâ”€â”€ zachman-conflicts.md      â† Phase 1 output
+â”‚   â”‚   â”œâ”€â”€ zachman-greenfield.md     â† Phase 1 output
+â”‚   â”‚   â””â”€â”€ zachman-resolution.md     â† Phase 1 output
+â”‚   â””â”€â”€ validation/
+â”‚       â”œâ”€â”€ elicitation-coverage.md   â† Phase V output
+â”‚       â”œâ”€â”€ row-consistency.md        â† Phase V output
+â”‚       â”œâ”€â”€ column-coherence.md       â† Phase V output
+â”‚       â”œâ”€â”€ why-dominance.md          â† Phase V output
+â”‚       â””â”€â”€ validation-summary.md     â† Phase V output
+â”‚
+â”œâ”€â”€ adr/
+â”‚   â”œâ”€â”€ ADR-000-template.md
+â”‚   â””â”€â”€ ADR-NNN.md ...                â† one per decision, Phase 2
+â”‚
+â”œâ”€â”€ ops/
+â”‚   â”œâ”€â”€ pass1/
+â”‚   â”‚   â”œâ”€â”€ service-boundaries.md     â† Phase 3 Pass 1
+â”‚   â”‚   â”œâ”€â”€ domain-rules.md           â† Phase 3 Pass 1
+â”‚   â”‚   â”œâ”€â”€ data-flow.md              â† Phase 3 Pass 1
+â”‚   â”‚   â””â”€â”€ decisions.md              â† Phase 3 Pass 1
+â”‚   â”œâ”€â”€ pass2/
+â”‚   â”‚   â”œâ”€â”€ out-of-scope.md           â† Phase 3 Pass 2
+â”‚   â”‚   â”œâ”€â”€ error-handling.md         â† Phase 3 Pass 2
+â”‚   â”‚   â””â”€â”€ testing-strategy.md       â† Phase 3 Pass 2
+â”‚   â””â”€â”€ pass3/
+â”‚       â”œâ”€â”€ api-contracts.md          â† Phase 3 Pass 3
+â”‚       â”œâ”€â”€ events.md                 â† Phase 3 Pass 3
+â”‚       â”œâ”€â”€ component-patterns.md     â† Phase 3 Pass 3
+â”‚       â””â”€â”€ seed-data.md              â† Phase 3 Pass 3
+â”‚
+â”œâ”€â”€ agents/
+â”‚   â”œâ”€â”€ agents.md                     â† agent roles and constraints
+â”‚   â”œâ”€â”€ architecture.md               â† tech stack and conventions
+â”‚   â”œâ”€â”€ principles.md                 â† build principles
+â”‚   â”œâ”€â”€ microservice-strategy.md      â† service decomposition rules
+â”‚   â””â”€â”€ ui-template.md                â† UI patterns and tokens
+â”‚
+â”œâ”€â”€ backlog/
+â”‚   â”œâ”€â”€ slices.md                     â† Phase 4 output
+â”‚   â”œâ”€â”€ walking-skeleton.md           â† Phase 4 output
+â”‚   â”œâ”€â”€ ordered-backlog.md            â† Phase 4 output
+â”‚   â”œâ”€â”€ audit/
+â”‚   â”‚   â””â”€â”€ backlog-audit.md          â† Phase 4A output
+â”‚   â””â”€â”€ work-orders/
+â”‚       â”œâ”€â”€ ITEM-000.md               â† walking skeleton
+â”‚       â””â”€â”€ ITEM-NNN.md ...           â† one per item
+â”‚
+â””â”€â”€ progress.md                       â† live execution state
 ```
 
 ---
@@ -155,15 +170,15 @@ repo/
 
 | File | Role | Never Edit Directly? |
 |---|---|---|
-| `spec/zachman.md` | Primary source of truth | No — update via Phase 2 only |
-| `spec/elicitation/` | Raw domain material from interview | No — output of Phase E |
-| `spec/archaeology/` | Implicit decisions from existing code | No — output of Phase 0 |
-| `spec/audit/` | Zachman gap analysis | No — output of Phase 1 |
-| `spec/validation/` | Zachman internal consistency | No — output of Phase V |
-| `adr/` | Decision records | Yes — you write these |
-| `ops/` | Agent-readable specs | No — regenerate from Zachman |
-| `agents/` | Stable agent constraints | Yes — but never during execution |
-| `backlog/work-orders/` | Self-contained build tasks | Yes — annotate if blocked |
+| `spec/zachman.md` | Primary source of truth | No â€” update via Phase 2 only |
+| `spec/elicitation/` | Raw domain material from interview | No â€” output of Phase E |
+| `spec/archaeology/` | Implicit decisions from existing code | No â€” output of Phase 0 |
+| `spec/audit/` | Zachman gap analysis | No â€” output of Phase 1 |
+| `spec/validation/` | Zachman internal consistency | No â€” output of Phase V |
+| `adr/` | Decision records | Yes â€” you write these |
+| `ops/` | Agent-readable specs | No â€” regenerate from Zachman |
+| `agents/` | Stable agent constraints | Yes â€” but never during execution |
+| `backlog/work-orders/` | Self-contained build tasks | Yes â€” annotate if blocked |
 | `progress.md` | Live session state | Agent updates, you review |
 
 ---
@@ -209,15 +224,15 @@ that were never written down.
    - `spec/archaeology/existing-state.md`
    - `spec/archaeology/existing-patterns.md`
 3. You review existing-state.md and annotate every finding:
-   - ✓ Carry forward — aligns with intent
-   - ✗ Conflicts with intent — decision needed
-   - ? Not yet decided — add to resolution list
-4. ✗ and ? items feed into Phase 1 as additional audit input
+   - âœ“ Carry forward â€” aligns with intent
+   - âœ— Conflicts with intent â€” decision needed
+   - ? Not yet decided â€” add to resolution list
+4. âœ— and ? items feed into Phase 1 as additional audit input
 
 ## Gate
 - [ ] existing-state.md exists and is fully annotated
 - [ ] existing-patterns.md exists
-- [ ] All ✗ items noted for Phase 1 resolution
+- [ ] All âœ— items noted for Phase 1 resolution
 
 ---
 
@@ -225,7 +240,7 @@ that were never written down.
 
 # PHASE E: ELICITATION
 *Run this when starting a new project with no Zachman.*
-*This is a structured interview — the agent asks, you answer.*
+*This is a structured interview â€” the agent asks, you answer.*
 
 ## Purpose
 Extract domain knowledge from your head into structured raw
@@ -245,30 +260,30 @@ It captures your answers verbatim without interpretation.
 **Area 1: Purpose and Motivation**
 Why does this system exist? What problem does it solve?
 What must it never get wrong?
-→ Output: `spec/elicitation/motivation.md`
+â†’ Output: `spec/elicitation/motivation.md`
 
 **Area 2: The Domain**
 What things does the system track or act on?
 What rules must always be true? Where do the numbers come from?
-→ Output: `spec/elicitation/domain.md`
+â†’ Output: `spec/elicitation/domain.md`
 
 **Area 3: The People**
 Who uses it? Who owns what data? Who is responsible when
 things go wrong?
-→ Output: `spec/elicitation/people.md`
+â†’ Output: `spec/elicitation/people.md`
 
 **Area 4: The Journeys**
 Walk through the most important things users do.
 What can go wrong mid-journey?
-→ Output: `spec/elicitation/journeys.md`
+â†’ Output: `spec/elicitation/journeys.md`
 
 **Area 5: Scope and Boundaries**
 What does v1 explicitly not do? What is the irreducible core?
 Where are you uncertain?
-→ Output: `spec/elicitation/scope.md`
+â†’ Output: `spec/elicitation/scope.md`
 
 **Consolidation**
-→ Output: `spec/elicitation/elicitation-summary.md`
+â†’ Output: `spec/elicitation/elicitation-summary.md`
 
 ## Gate
 - [ ] All five area files exist
@@ -299,27 +314,27 @@ Rows must be populated in this sequence. Do not skip ahead.
 
 ```
 Row 1: Scope (Contextual)
-  → You review before Row 2 begins
+  â†’ You review before Row 2 begins
 
-Row 2: Business (Conceptual)    ← most important row
-  → You review carefully before Row 3 begins
-  → Weaknesses here propagate into all system design
+Row 2: Business (Conceptual)    â† most important row
+  â†’ You review carefully before Row 3 begins
+  â†’ Weaknesses here propagate into all system design
 
 Row 3: System (Logical)
-  → You review before Row 4 begins
+  â†’ You review before Row 4 begins
 
 Row 4: Technology (Physical)
-  → Partial population acceptable
-  → Undecided cells marked [NEEDS DECISION]
+  â†’ Partial population acceptable
+  â†’ Undecided cells marked [NEEDS DECISION]
 
 Rows 5-6
-  → Placeholder only
-  → Completed during Phase 2 as decisions are made
+  â†’ Placeholder only
+  â†’ Completed during Phase 2 as decisions are made
 ```
 
 Within each row, columns populate in this order:
 ```
-Why → What → How → Where → Who → When
+Why â†’ What â†’ How â†’ Where â†’ Who â†’ When
 ```
 
 ## What the Agent Does Per Row
@@ -330,10 +345,10 @@ Why → What → How → Where → Who → When
 5. Waits for confirmation before next row
 
 ## Gate
-- [ ] spec/zachman.md exists with Rows 1–4 populated
+- [ ] spec/zachman.md exists with Rows 1â€“4 populated
 - [ ] Rows 1, 2, 3 reviewed and confirmed by you
 - [ ] Row 4 has [NEEDS DECISION] tags where appropriate
-- [ ] Rows 5–6 have placeholder sections
+- [ ] Rows 5â€“6 have placeholder sections
 
 ---
 
@@ -358,26 +373,26 @@ audit output. Fix structural issues here first.
 **Validation 1: Elicitation Coverage**
 Every item in elicitation-summary.md must be represented
 in spec/zachman.md.
-→ Output: `spec/validation/elicitation-coverage.md`
+â†’ Output: `spec/validation/elicitation-coverage.md`
 
 **Validation 2: Row Consistency**
 Every cell in a row must be at the correct abstraction level.
 Nothing in Row 2 should assume system implementation detail.
-Nothing in Row 3 should introduce scope not in Rows 1–2.
-→ Output: `spec/validation/row-consistency.md`
+Nothing in Row 3 should introduce scope not in Rows 1â€“2.
+â†’ Output: `spec/validation/row-consistency.md`
 
 **Validation 3: Column Coherence**
 Each column must tell a coherent story top to bottom.
 Row 1 entities should evolve into Row 2 entities into Row 3.
-→ Output: `spec/validation/column-coherence.md`
+â†’ Output: `spec/validation/column-coherence.md`
 
 **Validation 4: Why Column Dominance**
 The Why column governs all other columns at each row.
 Every cell must serve the Why of its row.
-→ Output: `spec/validation/why-dominance.md`
+â†’ Output: `spec/validation/why-dominance.md`
 
 **Consolidation**
-→ Output: `spec/validation/validation-summary.md`
+â†’ Output: `spec/validation/validation-summary.md`
 
 ## Note
 [NEEDS DECISION] tags are not validation failures.
@@ -411,23 +426,23 @@ working list for Phase 2.
 **Audit 1a: Cell Completeness**
 Identifies every cell that is Empty, Thin, or Assumed.
 Assumed means language like "standard", "typical", "TBD",
-"as needed" — these are vibe placeholders.
-→ Output: `spec/audit/zachman-completeness.md`
+"as needed" â€” these are vibe placeholders.
+â†’ Output: `spec/audit/zachman-completeness.md`
 
 **Audit 1b: Cross-Cell Conflicts**
-Identifies contradictions — row conflicts, column conflicts,
+Identifies contradictions â€” row conflicts, column conflicts,
 motivation conflicts.
-→ Output: `spec/audit/zachman-conflicts.md`
+â†’ Output: `spec/audit/zachman-conflicts.md`
 
 **Audit 1c: Greenfield Gaps**
 Identifies cells that assume things that do not exist yet.
 Flags each as [BLOCKS GENERATION] or [BLOCKS BUILD].
-→ Output: `spec/audit/zachman-greenfield.md`
+â†’ Output: `spec/audit/zachman-greenfield.md`
 
 **Audit 1d: Consolidation**
 Single prioritised resolution list ordered by dependency.
 Cells that unblock other cells listed first.
-→ Output: `spec/audit/zachman-resolution.md`
+â†’ Output: `spec/audit/zachman-resolution.md`
 
 If Phase 0 ran, include existing-state.md as additional
 source in all four audit steps.
@@ -454,7 +469,7 @@ You choose. The agent records. Nothing is invented.
 #complete-zachman.prompt.md
 ```
 
-## The Loop — Run Once Per Gap
+## The Loop â€” Run Once Per Gap
 
 ```
 1. Take first unresolved item from
@@ -463,7 +478,7 @@ You choose. The agent records. Nothing is invented.
 2. Run #complete-zachman.prompt.md
    Agent reads: relevant Zachman cells + agents/ constraints
 
-3. Agent presents 2–3 options. Per option:
+3. Agent presents 2â€“3 options. Per option:
    - What is decided
    - What it locks in
    - What it rules out
@@ -473,7 +488,7 @@ You choose. The agent records. Nothing is invented.
 
 5. Agent updates spec/zachman.md
    Agent writes adr/ADR-NNN.md
-   Agent marks item ✓ Resolved in zachman-resolution.md
+   Agent marks item âœ“ Resolved in zachman-resolution.md
 
 6. Repeat until list is empty
 ```
@@ -506,11 +521,11 @@ Run this check after each detail-row ADR is written,
 before marking the item resolved.
 
 If mismatches are found, fix the sub-document to match
-the Zachman source — the Zachman matrix is authoritative.
+the Zachman source â€” the Zachman matrix is authoritative.
 
 This prevents field name drift from propagating into
 ops/ generation, where it surfaces as CONFLICT tags
-in Pass 3 Audit D — much more expensive to fix.
+in Pass 3 Audit D â€” much more expensive to fix.
 
 ## Gate
 - [ ] Zero items in Must Resolve Before Generation
@@ -528,7 +543,7 @@ in Pass 3 Audit D — much more expensive to fix.
 ## Purpose
 ops/ files are what build agents read. They must be flat,
 declarative, unambiguous, and traceable to Zachman.
-They are never edited directly — fix Zachman and regenerate.
+They are never edited directly â€” fix Zachman and regenerate.
 
 ## Prompt
 ```
@@ -543,17 +558,17 @@ Conflicts become [CONFLICT] tags.
 
 ---
 
-## Pass 1 — Extract from Zachman
+## Pass 1 â€” Extract from Zachman
 
 Source: spec/zachman.md
 
 **service-boundaries.md**
 What each service owns and explicitly does not own.
-Derived from: Zachman Network + Data columns, Rows 3–4
+Derived from: Zachman Network + Data columns, Rows 3â€“4
 
 **domain-rules.md**
 Invariants, state transitions, validation rules, calculations.
-Derived from: Zachman Motivation + Data columns, Rows 2–3
+Derived from: Zachman Motivation + Data columns, Rows 2â€“3
 
 **data-flow.md**
 Runtime sequence per user journey from trigger to end state.
@@ -581,7 +596,7 @@ Per file: Blocking Issues, Non-blocking Issues, Ready: yes/no
 
 ---
 
-## Pass 2 — Author Fresh
+## Pass 2 â€” Author Fresh
 
 Source: reviewed ops/pass1/ files
 
@@ -597,7 +612,7 @@ logging standard. Prevents inconsistent failure patterns.
 What to test at what layer per service type.
 Definition of done checklist. Gates what agents mark complete.
 
-### Pass 2 Audit — same three audits as Pass 1
+### Pass 2 Audit â€” same three audits as Pass 1
 
 ## Pass 2 Gate
 - [ ] All three files exist in ops/pass2/
@@ -606,7 +621,7 @@ Definition of done checklist. Gates what agents mark complete.
 
 ---
 
-## Pass 3 — Derive from Pass 1 + 2
+## Pass 3 â€” Derive from Pass 1 + 2
 
 Source: all reviewed ops/pass1/ and ops/pass2/ files
 
@@ -625,7 +640,7 @@ Which UI pattern to use when. Prevents template drift.
 Minimal realistic dataset for dev and test.
 Prevents agents generating nonsense fixtures.
 
-### Pass 3 Audit — same three audits
+### Pass 3 Audit â€” same three audits
 
 ## Pass 3 Gate
 - [ ] All four files exist in ops/pass3/
@@ -655,38 +670,38 @@ by a build agent without needing to read anything else.
 **Step 4a: Slice Identification**
 Identifies all vertical slices from data-flow.md.
 A slice is one complete user journey from trigger to end state.
-Orders slices by dependency — lowest dependency first.
-→ Output: `backlog/slices.md`
+Orders slices by dependency â€” lowest dependency first.
+â†’ Output: `backlog/slices.md`
 
 **Step 4b: Walking Skeleton**
-Identifies ITEM-000 — the minimum end-to-end path that
+Identifies ITEM-000 â€” the minimum end-to-end path that
 proves the architecture is real before any feature is built.
-→ Output: `backlog/walking-skeleton.md`
+â†’ Output: `backlog/walking-skeleton.md`
 
 **Step 4c: Item Generation**
 Generates items per slice in this order:
-Schema → Logic → Endpoint → Integration → UI → Tests
+Schema â†’ Logic â†’ Endpoint â†’ Integration â†’ UI â†’ Tests
 
 **Step 4d: Context Packaging**
 Wraps each item as a fully self-contained work order.
 The work order must contain everything a build agent needs.
-→ Output: `backlog/work-orders/ITEM-NNN.md` per item
+â†’ Output: `backlog/work-orders/ITEM-NNN.md` per item
 
 **Step 4e: Backlog Ordering**
 Master ordered list with dependency map.
 Identifies immediately unblocked items.
-→ Output: `backlog/ordered-backlog.md`
+â†’ Output: `backlog/ordered-backlog.md`
 
 ## Recommended Approach for Medium-Large Projects
 
 ```
 Session A: Steps 4a + 4b only
-  → Review slices.md before proceeding
-  → Wrong slice boundaries create misaligned work orders downstream
+  â†’ Review slices.md before proceeding
+  â†’ Wrong slice boundaries create misaligned work orders downstream
 
 Session B: Steps 4c + 4d + 4e
-  → Run per slice if model starts to drift
-  → Each slice run is bounded and verifiable
+  â†’ Run per slice if model starts to drift
+  â†’ Each slice run is bounded and verifiable
 ```
 
 ## Gate
@@ -732,13 +747,13 @@ No items blocked later than necessary.
 
 **Audit 4: Walking Skeleton Integrity**
 ITEM-000 proves architecture end-to-end.
-ITEM-000 is minimal — no feature scope.
+ITEM-000 is minimal â€” no feature scope.
 
 **Audit 5: Spec Coverage**
 Every spec reference in every work order points to
 a real section in a real ops/ file.
 
-→ Output: `backlog/audit/backlog-audit.md`
+â†’ Output: `backlog/audit/backlog-audit.md`
 
 ## Gate
 - [ ] backlog/audit/backlog-audit.md exists
@@ -760,8 +775,8 @@ Progress is always recoverable because state lives in files.
 
 ## Prompts
 ```
-#execute-item.prompt.md    ← start of every session
-#review-item.prompt.md     ← end of every session
+#execute-item.prompt.md    â† start of every session
+#review-item.prompt.md     â† end of every session
 ```
 
 ---
@@ -802,7 +817,7 @@ ITEM-001: [title from ordered-backlog.md]
 7. Agent builds
 8. Agent self-reviews against acceptance criteria
 9. Agent updates progress.md
-10. Agent stops — does not begin next item
+10. Agent stops â€” does not begin next item
 ```
 
 ### End of Session
@@ -811,11 +826,11 @@ ITEM-001: [title from ordered-backlog.md]
 12. Provide: completed work order + what agent produced
 13. Agent returns verdict:
 
-    ✓ Pass →
+    âœ“ Pass â†’
       Confirm progress.md is updated
       Start next session on next item
 
-    ✗ Blocked →
+    âœ— Blocked â†’
       Do NOT update progress.md
       Annotate work order with the issues
       Start new session with #execute-item.prompt.md
@@ -841,7 +856,7 @@ Ignore all previous conversation output.
 progress.md is the only state that matters.
 
 **Prevention for older or smaller models:**
-- Only paste the work order — not full spec files
+- Only paste the work order â€” not full spec files
 - Add at the end of every prompt:
   "Reminder: your only job is ITEM-[n].
    Stop when acceptance criteria are met.
@@ -860,11 +875,11 @@ ITEM-[n]: [title]
 Status: In Progress | Ready for Review | Not Started
 
 ## Completed Items
-- ITEM-000: Walking Skeleton ✓
-- ITEM-001: [title] ✓
+- ITEM-000: Walking Skeleton âœ“
+- ITEM-001: [title] âœ“
 
 ## Blocked Items
-- ITEM-[n]: [reason] → [NEEDS DECISION: what must be resolved]
+- ITEM-[n]: [reason] â†’ [NEEDS DECISION: what must be resolved]
 
 ## Next Item
 ITEM-[n+1]: [title]
@@ -890,10 +905,10 @@ ITEM-[n+1]: [title]
 These apply at all times across all phases.
 
 1. No agent sees more than one work order at a time
-2. No agent resolves ambiguity — it writes [BLOCKED]
+2. No agent resolves ambiguity â€” it writes [BLOCKED]
 3. No phase starts until the previous gate is passed
 4. State lives in files, not conversation history
-5. ops/ files are never edited directly — fix Zachman and regenerate
+5. ops/ files are never edited directly â€” fix Zachman and regenerate
 6. agents/ files are never modified during execution
 7. Every work order is self-contained
 8. Every item traces to a spec reference
@@ -914,7 +929,7 @@ Do not edit ops/ files directly.
 ## A work order is wrong or incomplete
 Annotate the work order file with the issue.
 Re-run #generate-backlog.prompt.md for that slice only.
-Do not edit work orders to add scope — fix the ops/ source first.
+Do not edit work orders to add scope â€” fix the ops/ source first.
 
 ## An ADR needs to change
 Write a new ADR that supersedes the old one.
@@ -985,7 +1000,7 @@ I am in and what the next step is."
 |---|---|
 | 0 Archaeology | existing-state.md annotated, existing-patterns.md exists |
 | E Elicitation | All five areas Complete, summary exists |
-| P Population | Rows 1–3 reviewed, Row 4 populated with NEEDS DECISION tags |
+| P Population | Rows 1â€“3 reviewed, Row 4 populated with NEEDS DECISION tags |
 | V Validation | validation-summary.md Ready for audit: yes |
 | 1 Audit | zachman-resolution.md exists and prioritised |
 | 2 Complete | Zero items in Must Resolve Before Generation |
@@ -1001,3 +1016,4 @@ I am in and what the next step is."
 *This process is a living document.
 If a phase reveals a gap in this process, update this file.
 The process should reflect reality, not aspiration.*
+

@@ -1,4 +1,19 @@
-# Execute Item Prompt (Soft)
+﻿# Execute Item Prompt (Soft)
+
+## OKF-First Context Contract (Mandatory)
+
+Before producing output, load context in this order:
+1. knowledge/okf/index.md
+2. Relevant OKF indexes under knowledge/okf/ (domain/, workflows/, ules/, decisions/, work-items/)
+3. Legacy source docs (spec/, ops/, dr/, acklog/) only when needed for gaps or verification
+
+Rules:
+- Treat OKF as the primary context source.
+- If required context is missing in OKF, fall back to legacy docs and record the gap in knowledge/okf/migration-map.md under Open Gaps.
+- For generated outputs, include an OKF Traceability section listing consulted OKF concept paths.
+- Do not contradict ADR decisions; reflect them through linked OKF decision concepts.
+
+---
 # Usage: start of a build session when you want structure without rigid stops
 
 You are a build agent.
@@ -14,9 +29,9 @@ Mandatory process controls:
 
 ## 0) Environment Constraints (read before any command)
 
-- **Artifactory / repository auth:** If any `mvn` command fails with 401 or 403, STOP. Do not retry, do not attempt workarounds. Record `[ENV BLOCKED: Artifactory auth — deferring to CI]` and skip all local build/test steps. CI pipeline is the authoritative build verification.
+- **Artifactory / repository auth:** If any `mvn` command fails with 401 or 403, STOP. Do not retry, do not attempt workarounds. Record `[ENV BLOCKED: Artifactory auth â€” deferring to CI]` and skip all local build/test steps. CI pipeline is the authoritative build verification.
 - **Local tooling:** If a required CLI tool is missing, record `[ENV BLOCKED: <tool> not found]` and continue with what is available.
-- **Branch freshness:** Before creating a feature branch, run `git pull origin main` and `git log -1 origin/main`. Confirm the HEAD commit message references the most recently completed item in PROGRESS.md. If it doesn't match, re-pull — do not branch from a stale ref.
+- **Branch freshness:** Before creating a feature branch, run `git pull origin main` and `git log -1 origin/main`. Confirm the HEAD commit message references the most recently completed item in PROGRESS.md. If it doesn't match, re-pull â€” do not branch from a stale ref.
 
 ---
 
@@ -84,7 +99,7 @@ Guidelines:
 ### Test co-authoring rule
 - For every new or modified production file, write or update a corresponding test file in the same commit.
 - Coverage targets are class-type-dependent (see table below).
-- Do NOT defer test writing to a follow-up item — tests ship with the code they cover.
+- Do NOT defer test writing to a follow-up item â€” tests ship with the code they cover.
 
 | Class type | Min line% | Min branch% | Notes |
 |---|---|---|---|
@@ -207,3 +222,4 @@ Fail-closed rule:
 - Use [BLOCKED] when needed; do not guess silently.
 - Prioritize repository state as the source of truth (progress.md + work order + code).
 - If a prior session drifted, re-read progress.md and current work order, then continue pragmatically.
+

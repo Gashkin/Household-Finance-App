@@ -24,3 +24,10 @@
 22. Build planner tabbed navigation with a dedicated Monthly Commitments grid slice while preserving current forecast and import workflows as separate tabs.
 23. Make the Monthly Commitments tab fully editable with inline add/save/delete actions wired to planner commitment CRUD endpoints.
 24. Add Once Off Commitments grid with inline add/edit/delete and page-level save-all against future one-off transaction rows.
+25. Add CSV download/upload bulk-edit workflows for both Monthly Commitments and Once Off Commitments grids.
+26. Change Once Off Commitments from month-based due labels to singular due dates (YYYY-MM-DD) across API and UI.
+27. Convert Transaction Import tab to Account Management with account toggle (Current Account, Credit card, Revolut), balance view/edit, transaction import/history, and manual mapping of imported rows to future one-off transactions.
+28. Add Credit Card Repayment affordability calculation to Forecast and Current Month, remove verbose Total Incomes/Expenses working descriptions, remove Categories working column, stack Categories under Accounts in left column, and place Credit Card Repayment in middle column.
+29. Adopt Open Knowledge Format (OKF) across spec/ops/adr/backlog with standardized frontmatter, linked concept indexes, validation checks, and prompt alignment for OKF-first context.
+30. Add README onboarding for OKF-first contributor flow, including direct links to OKF index/quickstart and validation command guidance.
+31. Implement manual transaction loading workflows and robust matching of loaded history rows to future one-off commitments with visible match status and validation handling.

@@ -1,5 +1,20 @@
-# Archaeology Prompt
-# Usage: #archaeology.prompt.md — run against the current codebase
+﻿# Archaeology Prompt
+
+## OKF-First Context Contract (Mandatory)
+
+Before producing output, load context in this order:
+1. knowledge/okf/index.md
+2. Relevant OKF indexes under knowledge/okf/ (domain/, workflows/, ules/, decisions/, work-items/)
+3. Legacy source docs (spec/, ops/, dr/, acklog/) only when needed for gaps or verification
+
+Rules:
+- Treat OKF as the primary context source.
+- If required context is missing in OKF, fall back to legacy docs and record the gap in knowledge/okf/migration-map.md under Open Gaps.
+- For generated outputs, include an OKF Traceability section listing consulted OKF concept paths.
+- Do not contradict ADR decisions; reflect them through linked OKF decision concepts.
+
+---
+# Usage: #archaeology.prompt.md â€” run against the current codebase
 # Output: spec/archaeology/existing-state.md
 
 You are a codebase archaeology agent.
@@ -108,7 +123,7 @@ spec/archaeology/existing-patterns.md
 For existing-patterns.md use this structure:
 
 ### Patterns Agents Must Follow
-- [pattern]: [where it applies] [why — reference existing-state]
+- [pattern]: [where it applies] [why â€” reference existing-state]
 
 ### Patterns Agents Must Not Introduce
 - [pattern]: [would conflict with] [reference]
@@ -118,9 +133,10 @@ For existing-patterns.md use this structure:
 ## After You Are Done
 
 List every finding that requires a human annotation decision:
-- ✓ Carry forward — aligns with intent
-- ✗ Conflicts with Zachman — decision needed
-- ? Not in Zachman — add to resolution list
+- âœ“ Carry forward â€” aligns with intent
+- âœ— Conflicts with Zachman â€” decision needed
+- ? Not in Zachman â€” add to resolution list
 
 Output this as a numbered checklist only.
 Do not make the annotation decisions yourself.
+

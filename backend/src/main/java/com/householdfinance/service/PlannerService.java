@@ -77,7 +77,7 @@ public class PlannerService {
                 entity.getId(),
                 entity.getTitle(),
                 entity.getAmount(),
-                toDueMonthLabel(entity.getTxnDate()),
+                toDueDateString(entity.getTxnDate()),
                 entity.getCategory(),
                 null
             ))
@@ -188,7 +188,7 @@ public class PlannerService {
             return new Commitment(saved.getId(), saved.getTitle(), saved.getAmount(), "Recurring", saved.getCategory(), saved.getDayOfMonth());
         }
 
-        var dueDate = parseDueMonthLabel(request.dueDate());
+        var dueDate = parseNonRecurringDueDate(request.dueDate());
         var saved = transactionRepository.save(
                 new TransactionEntity(
                         requestId,
@@ -200,7 +200,7 @@ public class PlannerService {
                         null
                 )
         );
-        return new Commitment(saved.getId(), saved.getTitle(), saved.getAmount(), toDueMonthLabel(saved.getTxnDate()), saved.getCategory(), null);
+            return new Commitment(saved.getId(), saved.getTitle(), saved.getAmount(), toDueDateString(saved.getTxnDate()), saved.getCategory(), null);
     }
 
     @Transactional
@@ -225,17 +225,17 @@ public class PlannerService {
                 .orElseThrow(() -> new IllegalArgumentException("Commitment not found: " + id));
 
         if (isRecurringDueDate(request.dueDate())) {
-            throw new IllegalArgumentException("One-off or future transaction commitments must use a month label dueDate (for example Jul26).");
+            throw new IllegalArgumentException("One-off or future transaction commitments must use a dueDate like YYYY-MM-DD.");
         }
 
         entity.setTitle(request.title());
         entity.setAmount(request.amount());
         entity.setCategory(request.category());
-        entity.setTxnDate(parseDueMonthLabel(request.dueDate()));
+        entity.setTxnDate(parseNonRecurringDueDate(request.dueDate()));
         entity.setTxnType(TransactionType.ONE_OFF_FUTURE);
 
         var saved = transactionRepository.save(entity);
-        return new Commitment(saved.getId(), saved.getTitle(), saved.getAmount(), toDueMonthLabel(saved.getTxnDate()), saved.getCategory(), null);
+        return new Commitment(saved.getId(), saved.getTitle(), saved.getAmount(), toDueDateString(saved.getTxnDate()), saved.getCategory(), null);
     }
 
     @Transactional
@@ -298,7 +298,7 @@ public class PlannerService {
             throw new IllegalArgumentException("Commitment dueDate is required.");
         }
         if (!isRecurringDueDate(request.dueDate())) {
-            parseDueMonthLabel(request.dueDate());
+            parseNonRecurringDueDate(request.dueDate());
         }
     }
 
@@ -306,17 +306,22 @@ public class PlannerService {
         return dueDate != null && "Recurring".equalsIgnoreCase(dueDate.trim());
     }
 
-    private LocalDate parseDueMonthLabel(String dueDate) {
+    private LocalDate parseNonRecurringDueDate(String dueDate) {
         try {
-            var monthYear = java.time.YearMonth.parse(dueDate, DUE_MONTH_LABEL);
+            return LocalDate.parse(dueDate.trim());
+        } catch (DateTimeParseException ignored) {
+        }
+
+        try {
+            var monthYear = java.time.YearMonth.parse(dueDate.trim(), DUE_MONTH_LABEL);
             return monthYear.atDay(1);
         } catch (DateTimeParseException exception) {
-            throw new IllegalArgumentException("Commitment dueDate must be 'Recurring' or a month label like Jul26.");
+            throw new IllegalArgumentException("Commitment dueDate must be 'Recurring' or an ISO date like 2026-07-14.");
         }
     }
 
-    private String toDueMonthLabel(LocalDate date) {
-        return date.format(DUE_MONTH_LABEL);
+    private String toDueDateString(LocalDate date) {
+        return date.toString();
     }
 
     private int normalizeDayOfMonth(Integer dayOfMonth) {

@@ -1,4 +1,19 @@
-# Generate Backlog Prompt
+﻿# Generate Backlog Prompt
+
+## OKF-First Context Contract (Mandatory)
+
+Before producing output, load context in this order:
+1. knowledge/okf/index.md
+2. Relevant OKF indexes under knowledge/okf/ (domain/, workflows/, ules/, decisions/, work-items/)
+3. Legacy source docs (spec/, ops/, dr/, acklog/) only when needed for gaps or verification
+
+Rules:
+- Treat OKF as the primary context source.
+- If required context is missing in OKF, fall back to legacy docs and record the gap in knowledge/okf/migration-map.md under Open Gaps.
+- For generated outputs, include an OKF Traceability section listing consulted OKF concept paths.
+- Do not contradict ADR decisions; reflect them through linked OKF decision concepts.
+
+---
 # Usage: #generate-backlog.prompt.md
 # Source: all ops/ files (must all be marked Ready: yes)
 # Output: backlog/ folder
@@ -43,7 +58,7 @@ Identify the walking skeleton before any slice work begins.
 The walking skeleton is the minimum viable end-to-end path
 that proves the architecture is real.
 
-  ## Walking Skeleton — ITEM-000
+  ## Walking Skeleton â€” ITEM-000
   ### Minimum Services
   - services that must exist for any slice to run
   ### Minimum Infrastructure
@@ -69,7 +84,7 @@ Source: current slice from slices.md,
         ops/pass2/testing-strategy.md
 
 Run once per slice. Generate items in this order within each slice:
-Schema → Logic → Endpoint → Integration → UI → Tests
+Schema â†’ Logic â†’ Endpoint â†’ Integration â†’ UI â†’ Tests
 
 Structure per item:
   ## ITEM-[n]: [Title]
@@ -101,7 +116,7 @@ For each item listed under Inputs:
 - If it does not exist in a completed work order, do not list it as an input
 - If it is needed but not yet created, either add it to the current item's file list or create a blocking dependency on a prior item
 - Never list an input that exists only in the spec but not in a completed work order
-- Entity field names used in acceptance criteria must match specs/what/data-model.md exactly — not business-language aliases
+- Entity field names used in acceptance criteria must match specs/what/data-model.md exactly â€” not business-language aliases
 
 Write to: backlog/work-orders/ITEM-[n].md
 
@@ -122,7 +137,7 @@ Structure:
     - It is listed as another file in THIS item's file list  
     - It is a JDK or declared-dependency class  
     If a type does not satisfy any of the above, add it to the file list with a description of what it is and why it is needed.  
-    Do not assume the agent will infer implicit types — they will write [BLOCKED] instead.  
+    Do not assume the agent will infer implicit types â€” they will write [BLOCKED] instead.  
   
   ### Module Bootstrap Rule  
     If this is the FIRST item targeting a new Gradle module (e.g., `raas-governance`):  
@@ -133,7 +148,7 @@ Structure:
   
   ### Host Wiring Rule  
     If the item's Type is Endpoint, or if it introduces new service classes that must be injected into the Spring host:  
-    - The file list MUST include `raas-sample-host/src/main/java/com/citi/raas/host/config/RaasConfig.java` as a modify entry — new @Bean methods are needed for new services  
+    - The file list MUST include `raas-sample-host/src/main/java/com/citi/raas/host/config/RaasConfig.java` as a modify entry â€” new @Bean methods are needed for new services  
     - If the new module's entities/repositories need scanning, the file list MUST include `SampleHostApplication.java` for @EntityScan/@EnableJpaRepositories updates  
     The agent cannot modify files not in the file list. If wiring files are omitted, the application will not start.  
 
@@ -144,9 +159,9 @@ Structure:
     - The file list MUST include every file containing those methods as a modify entry  
     - The work order MUST describe the dispatch logic for the new entity type in EVERY affected method  
     - Example: if `ApprovalService` has `submitForApproval()`, `approve()`, and `reject()` all with Rule-specific logic,  
-      and the new item adds ScopeOverride support, all three methods must be listed — not just `submitForApproval()`  
+      and the new item adds ScopeOverride support, all three methods must be listed â€” not just `submitForApproval()`  
     - If a prior item stubbed/no-oped the new entity type in one method, the consuming item MUST un-stub ALL methods, not just the one it directly calls  
-    Do not assume upstream services are entity-agnostic — check every method body for hardcoded entity assumptions.
+    Do not assume upstream services are entity-agnostic â€” check every method body for hardcoded entity assumptions.
 
   ### Build Dependency Rule  
     If the item introduces usage of a library not currently in the module's `build.gradle` (e.g., Drools, a new Spring starter, a test library):  
@@ -157,7 +172,7 @@ Structure:
   ### Algorithm Guidance Rule  
     If the item requires non-trivial algorithmic logic (DRL generation, graph traversal, scoring/ranking, state machines, transpilation):  
     - The work order MUST include pseudo-code or an exact code skeleton for the critical method bodies  
-    - Method signatures alone are insufficient — agents cannot reliably infer correct algorithms from prose descriptions  
+    - Method signatures alone are insufficient â€” agents cannot reliably infer correct algorithms from prose descriptions  
     - For third-party DSLs (Drools DRL, SQL, MVEL), provide an exact example of the expected output format  
   
   ### Third-Party API Rule  
@@ -168,7 +183,7 @@ Structure:
     - Do not assume the agent knows which APIs exist in which versions
 
   ### Rules That Apply
-  [extract only the lines from ops/ files relevant to this item —
+  [extract only the lines from ops/ files relevant to this item â€”
    do not paste entire files]
 
   ### Inputs
@@ -179,9 +194,9 @@ Structure:
   - [ ] verifiable statement
 
   ### Do Not
-  - do not modify [file] — owned by [service]
-  - do not add [feature] — out of scope per out-of-scope.md
-  - do not invent [thing] — not in spec
+  - do not modify [file] â€” owned by [service]
+  - do not add [feature] â€” out of scope per out-of-scope.md
+  - do not invent [thing] â€” not in spec
 
   ### Done When
   [single unambiguous statement of completion]
@@ -225,7 +240,7 @@ Coverage floor: 90% line coverage and 90% branch coverage per module.
 Measurement tool: JaCoCo (configured in pom.xml).
 
 Structure per item:
-  ## ITEM-[n]: Coverage — [Module Name]
+  ## ITEM-[n]: Coverage â€” [Module Name]
   - Type: Test
   - Service: [module name]
   - Spec reference: ops/pass2/testing-strategy.md
@@ -237,7 +252,7 @@ Structure per item:
   - Done When: CI gate fails the build if coverage drops below 90% for this module.
 
 Add a summary item ITEM-COV-ALL:
-  ## ITEM-COV-ALL: Coverage Gate — Full Suite
+  ## ITEM-COV-ALL: Coverage Gate â€” Full Suite
   - Type: Test
   - Spec reference: ops/pass2/testing-strategy.md
   - Acceptance criteria:
@@ -251,7 +266,7 @@ Write output to: backlog/ordered-backlog.md under milestone "Coverage Hardening"
 
 ## Step 4g: Logging Hardening
 
-Source: ops/pass2/error-handling.md § Logging Standard,
+Source: ops/pass2/error-handling.md Â§ Logging Standard,
         ops/pass3/component-patterns.md
 
 Generate a dedicated milestone that enforces the logging standard defined in
@@ -265,10 +280,10 @@ Rules to enforce (from error-handling.md):
 - No stack traces logged above WARNING level without a structured context envelope
 
 Structure per item:
-  ## ITEM-[n]: Logging Hardening — [Module Name]
+  ## ITEM-[n]: Logging Hardening â€” [Module Name]
   - Type: Logic
   - Service: [module name]
-  - Spec reference: ops/pass2/error-handling.md § Logging Standard
+  - Spec reference: ops/pass2/error-handling.md Â§ Logging Standard
   - Acceptance criteria:
     - [ ] All log call sites in the module use structured key=value fields
     - [ ] No `print()` calls remain in production code paths
@@ -284,7 +299,7 @@ Write output to: backlog/ordered-backlog.md under milestone "Logging Hardening".
 
 Before finishing, verify every item has:
 - [ ] Spec reference pointing to a real ops/ file and section
-- [ ] Defined inputs — each input is traceable to a specific completed work order output, not just a spec reference
+- [ ] Defined inputs â€” each input is traceable to a specific completed work order output, not just a spec reference
 - [ ] Defined outputs
 - [ ] At least two verifiable acceptance criteria
 - [ ] No unresolved [NEEDS DECISION] tags
@@ -297,13 +312,14 @@ Before finishing, verify every item has:
   - [ ] Every Endpoint item includes host wiring files (RaasConfig.java, SampleHostApplication.java) if depending on a new module or new service classes  
   - [ ] Every item that introduces new library imports includes the relevant build.gradle with dependency coordinates
 
-  - [ ] Every item that introduces a new entity type into an existing generic interface lists ALL methods on that interface that contain entity-specific logic — not just the one the item directly calls  
-    - [ ] Every stub/no-op deferred to a future item (e.g., "ScopeOverride: stub — ITEM-015") has a corresponding un-stub entry in the consuming item's file list and acceptance criteria
+  - [ ] Every item that introduces a new entity type into an existing generic interface lists ALL methods on that interface that contain entity-specific logic â€” not just the one the item directly calls  
+    - [ ] Every stub/no-op deferred to a future item (e.g., "ScopeOverride: stub â€” ITEM-015") has a corresponding un-stub entry in the consuming item's file list and acceptance criteria
 
 Report:
 - Total items generated: [n]
-- Items with [NEEDS DECISION]: [n] — list them
-- Items with [SPEC INCOMPLETE]: [n] — list them
+- Items with [NEEDS DECISION]: [n] â€” list them
+- Items with [SPEC INCOMPLETE]: [n] â€” list them
 - Coverage Hardening milestone present: yes / no
 - Logging Hardening milestone present: yes / no
 - Ready to execute: yes / no
+

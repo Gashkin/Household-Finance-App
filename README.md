@@ -2,6 +2,17 @@
 
 Household-Finance-App
 
+## OKF Knowledge Model
+
+This repository uses an OKF-first knowledge model for contributor and agent context.
+
+- Start here: `knowledge/okf/index.md`
+- Day-to-day usage: `knowledge/okf/quickstart.md`
+- Validation command: `.venv/Scripts/python.exe AnalysisScripts/validate_okf.py`
+
+Rule of use:
+- Use OKF concepts first, then consult legacy docs (`spec/`, `ops/`, `adr/`, `backlog/`) only when verification or gap resolution is needed.
+
 ## Loader script (one-off import)
 
 Prepare a manual JSON file with the values you want loaded, then run the loader script to write accounts/commitments into the backend planner store.

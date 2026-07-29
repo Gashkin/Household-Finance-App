@@ -42,10 +42,29 @@ interface ImportAcceptResult {
   skippedCount: number;
 }
 
+interface TransactionHistoryItem {
+  historyId: string;
+  importId: string;
+  rowId: string;
+  date: string;
+  description: string;
+  amount: number;
+  account: string;
+  duplicate: boolean;
+  mappedFutureCommitmentId?: string | null;
+  category?: string | null;
+  resolution?: string | null;
+}
+
 interface PlannerData {
   accounts: Account[];
   categories: Category[];
   commitments: Commitment[];
+}
+
+interface SuggestedMatch {
+  commitmentId: string;
+  score: number;
 }
 
 interface EditableMonthlyCommitment {
@@ -79,7 +98,7 @@ interface OneOffCommitmentPayload {
 }
 
 type ForecastPeriod = 'this-month';
-type PlannerTab = 'forecast-current-month' | 'monthly-commitments' | 'once-off-commitments' | 'transaction-import';
+type PlannerTab = 'forecast-current-month' | 'monthly-commitments' | 'once-off-commitments' | 'account-management';
 
 const commitmentCategoryLookup: Record<string, string> = {
   salary: 'Income',
@@ -118,6 +137,22 @@ function normalizeCommitmentTitle(title: string) {
   return title.toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
+function normalizeText(value: string) {
+  return (value || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function extractCategoryTagFromDescription(description: string) {
+  const match = description.match(/\[([^\]]+)\]\s*$/);
+  if (!match) {
+    return '';
+  }
+  return normalizeText(match[1]);
+}
+
+function stripCategoryTagFromDescription(description: string) {
+  return description.replace(/\s*\[[^\]]+\]\s*$/, '').trim();
+}
+
 function getCommitmentCategory(commitment: Commitment) {
   const category = commitment.category?.trim();
   if (category) {
@@ -125,6 +160,17 @@ function getCommitmentCategory(commitment: Commitment) {
   }
 
   return commitmentCategoryLookup[normalizeCommitmentTitle(commitment.title)] ?? 'Uncategorized';
+}
+
+function getCommitmentAmountByTitle(commitments: Commitment[], title: string) {
+  const target = normalizeCommitmentTitle(title);
+  return commitments
+    .filter((commitment) => normalizeCommitmentTitle(commitment.title) === target)
+    .reduce((sum, commitment) => sum + Math.abs(commitment.amount), 0);
+}
+
+function getCommitmentAmountByAnyTitle(commitments: Commitment[], titles: string[]) {
+  return titles.reduce((sum, title) => sum + getCommitmentAmountByTitle(commitments, title), 0);
 }
 
 function formatCurrency(value: number) {
@@ -137,6 +183,101 @@ function getCurrentMonthLabel(referenceDate: Date) {
   return `${month}${year}`;
 }
 
+function getTodayIsoDate(referenceDate: Date) {
+  return referenceDate.toISOString().slice(0, 10);
+}
+
+function isIsoDate(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value.trim());
+}
+
+function isCurrentMonthIsoDate(value: string, referenceDate: Date) {
+  if (!isIsoDate(value)) {
+    return false;
+  }
+  const parsed = new Date(`${value}T00:00:00`);
+  return parsed.getUTCFullYear() === referenceDate.getUTCFullYear() && parsed.getUTCMonth() === referenceDate.getUTCMonth();
+}
+
+function toCsvRow(values: Array<string | number | null | undefined>) {
+  return values
+    .map((value) => {
+      const text = value == null ? '' : String(value);
+      if (text.includes(',') || text.includes('"') || text.includes('\n')) {
+        return `"${text.replace(/"/g, '""')}"`;
+      }
+      return text;
+    })
+    .join(',');
+}
+
+function parseCsvText(text: string) {
+  const rows: string[][] = [];
+  let currentRow: string[] = [];
+  let currentCell = '';
+  let inQuotes = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        currentCell += '"';
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === ',' && !inQuotes) {
+      currentRow.push(currentCell);
+      currentCell = '';
+      continue;
+    }
+
+    if ((char === '\n' || char === '\r') && !inQuotes) {
+      if (char === '\r' && next === '\n') {
+        index += 1;
+      }
+      currentRow.push(currentCell);
+      if (currentRow.some((cell) => cell.trim() !== '')) {
+        rows.push(currentRow);
+      }
+      currentRow = [];
+      currentCell = '';
+      continue;
+    }
+
+    currentCell += char;
+  }
+
+  if (currentCell.length > 0 || currentRow.length > 0) {
+    currentRow.push(currentCell);
+    if (currentRow.some((cell) => cell.trim() !== '')) {
+      rows.push(currentRow);
+    }
+  }
+
+  return rows;
+}
+
+function downloadCsvFile(fileName: string, header: string[], dataRows: string[][]) {
+  const csvContent = [toCsvRow(header), ...dataRows.map((row) => toCsvRow(row))].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+async function readFileAsText(file: File) {
+  return file.text();
+}
+
 function PlannerWorkspace() {
   const [plannerData, setPlannerData] = useState<PlannerData>({ accounts: [], categories: [], commitments: [] });
   const [forecastPeriod, setForecastPeriod] = useState<ForecastPeriod>('this-month');
@@ -145,6 +286,10 @@ function PlannerWorkspace() {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [importStatus, setImportStatus] = useState('');
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [accountBalanceInput, setAccountBalanceInput] = useState('');
+  const [transactionHistory, setTransactionHistory] = useState<TransactionHistoryItem[]>([]);
+  const [historyMapSelection, setHistoryMapSelection] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPlannerLoading, setIsPlannerLoading] = useState(false);
   const [plannerError, setPlannerError] = useState('');
@@ -156,19 +301,22 @@ function PlannerWorkspace() {
     dayOfMonth: '1',
     category: '',
   });
+  const [monthlyCsvUploadText, setMonthlyCsvUploadText] = useState('');
   const [oneOffCommitmentStatus, setOneOffCommitmentStatus] = useState('');
   const [oneOffCommitmentEdits, setOneOffCommitmentEdits] = useState<Record<string, EditableOneOffCommitment>>({});
   const [newOneOffCommitment, setNewOneOffCommitment] = useState<EditableOneOffCommitment>({
     title: '',
     amount: '',
-    dueDate: getCurrentMonthLabel(new Date()),
+    dueDate: getTodayIsoDate(new Date()),
     category: '',
   });
+  const [oneOffCsvUploadText, setOneOffCsvUploadText] = useState('');
 
   const currentMonthLabel = getCurrentMonthLabel(new Date());
+  const todayIsoDate = getTodayIsoDate(new Date());
   const visibleCommitments = plannerData.commitments.filter((commitment) => {
     if (forecastPeriod === 'this-month') {
-      return commitment.dueDate === currentMonthLabel;
+      return commitment.dueDate === currentMonthLabel || isCurrentMonthIsoDate(commitment.dueDate, new Date());
     }
 
     return true;
@@ -197,7 +345,64 @@ function PlannerWorkspace() {
     }))
     .sort((left, right) => left.dueDate.localeCompare(right.dueDate) || left.title.localeCompare(right.title));
 
+  const oneOffCommitmentOptions = oneOffCommitments.map((commitment) => ({
+    id: commitment.id,
+    label: `${commitment.title} (${commitment.dueDate})`,
+  }));
+
   const oneOffCommitmentTotal = oneOffCommitments.reduce((sum, commitment) => sum + commitment.amount, 0);
+
+  const suggestedMatchesByHistoryId = transactionHistory.reduce<Record<string, SuggestedMatch>>((result, item) => {
+    if (item.mappedFutureCommitmentId) {
+      return result;
+    }
+
+    const itemTitle = normalizeText(stripCategoryTagFromDescription(item.description));
+    const itemCategoryTag = extractCategoryTagFromDescription(item.description);
+    const itemAmountAbs = Math.abs(item.amount);
+
+    let best: SuggestedMatch | null = null;
+
+    for (const commitment of oneOffCommitments) {
+      const commitmentTitle = normalizeText(commitment.title);
+      const commitmentCategory = normalizeText(commitment.resolvedCategory ?? commitment.category ?? '');
+      const commitmentAmountAbs = Math.abs(commitment.amount);
+      const amountDelta = Math.abs(itemAmountAbs - commitmentAmountAbs);
+
+      let score = 0;
+
+      if (amountDelta < 0.01) {
+        score += 5;
+      } else if (amountDelta <= 2) {
+        score += 2;
+      }
+
+      if (Math.sign(item.amount) === Math.sign(commitment.amount)) {
+        score += 1;
+      }
+
+      if (itemTitle && commitmentTitle && (itemTitle.includes(commitmentTitle) || commitmentTitle.includes(itemTitle))) {
+        score += 4;
+      }
+
+      if (itemCategoryTag && commitmentCategory && itemCategoryTag === commitmentCategory) {
+        score += 2;
+      }
+
+      if (!best || score > best.score) {
+        best = {
+          commitmentId: commitment.id,
+          score,
+        };
+      }
+    }
+
+    if (best && best.score >= 4) {
+      result[item.historyId] = best;
+    }
+
+    return result;
+  }, {});
 
   const monthlyDirtyIds = monthlyCommitments
     .filter((commitment) => {
@@ -251,6 +456,37 @@ function PlannerWorkspace() {
     .reduce((sum, commitment) => sum + commitment.amount, 0);
   const endOfPeriodTotal = openingAccountTotal + totalIncomes + totalExpenses;
   const netMovement = totalIncomes + totalExpenses;
+  const monthlyOngoingIncome = getCommitmentAmountByAnyTitle(monthlyCommitments, [
+    'Salary',
+    'Monthly Ongoing Commitment Income',
+  ]);
+  const monthlyEom = Math.abs(endOfPeriodTotal);
+  const monthlyBecky = getCommitmentAmountByAnyTitle(monthlyCommitments, [
+    'Becky',
+    'Monthly Ongoing Commitment Becky',
+  ]);
+  const monthlyMortgage = getCommitmentAmountByAnyTitle(monthlyCommitments, [
+    'Mortgage',
+    'Morgage',
+    'Monthly Ongoing Commitment Morgage',
+    'Monthly Ongoing Commitment Mortgage',
+  ]);
+  const monthlyCu = getCommitmentAmountByAnyTitle(monthlyCommitments, [
+    'CU',
+    'Monthly Ongoing Commitment CU',
+  ]);
+  const overdraftAllowance = 1000;
+  const lifeInsuranceAdjustment = getCommitmentAmountByAnyTitle(monthlyCommitments, [
+    'Life Insurance',
+    'Monthly Ongoing Commitment Life Insurance',
+  ]) || 75;
+  const creditCardRepaymentCapacity = monthlyOngoingIncome
+    - monthlyEom
+    - monthlyBecky
+    - monthlyMortgage
+    - monthlyCu
+    + overdraftAllowance
+    - lifeInsuranceAdjustment;
 
   const loadPlannerData = async () => {
     setIsPlannerLoading(true);
@@ -273,6 +509,44 @@ function PlannerWorkspace() {
 
   useEffect(() => {
     void loadPlannerData();
+  }, []);
+
+  useEffect(() => {
+    if (plannerData.accounts.length === 0) {
+      setSelectedAccountId('');
+      setAccountBalanceInput('');
+      return;
+    }
+
+    if (!selectedAccountId || !plannerData.accounts.some((account) => account.id === selectedAccountId)) {
+      const preferredNames = ['Current Account', 'Credit card', 'Revolut'];
+      const preferred = plannerData.accounts.find((account) => preferredNames.includes(account.name)) ?? plannerData.accounts[0];
+      setSelectedAccountId(preferred.id);
+      setAccountBalanceInput(String(preferred.balance));
+      return;
+    }
+
+    const selected = plannerData.accounts.find((account) => account.id === selectedAccountId);
+    if (selected) {
+      setAccountBalanceInput(String(selected.balance));
+    }
+  }, [plannerData.accounts, selectedAccountId]);
+
+  const loadTransactionHistory = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/imports/history');
+      if (!response.ok) {
+        throw new Error('History request failed.');
+      }
+      const data = (await response.json()) as TransactionHistoryItem[];
+      setTransactionHistory(data);
+    } catch {
+      setImportStatus('Unable to load transaction history. Ensure backend is running on port 8080.');
+    }
+  };
+
+  useEffect(() => {
+    void loadTransactionHistory();
   }, []);
 
   useEffect(() => {
@@ -365,8 +639,83 @@ function PlannerWorkspace() {
 
       const result = (await response.json()) as ImportAcceptResult;
       setImportStatus(`Import accepted: ${result.acceptedCount} rows from batch ${result.importId}.`);
+      await loadTransactionHistory();
     } catch {
       setImportStatus('Unable to accept import. Ensure backend is running on port 8080.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const saveSelectedAccountBalance = async () => {
+    const selected = plannerData.accounts.find((account) => account.id === selectedAccountId);
+    if (!selected) {
+      setImportStatus('Select an account first.');
+      return;
+    }
+
+    const parsedBalance = Number(accountBalanceInput);
+    if (Number.isNaN(parsedBalance)) {
+      setImportStatus('Account balance must be numeric.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`http://localhost:8080/planner/accounts/${selected.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: selected.id,
+          name: selected.name,
+          type: selected.type,
+          balance: parsedBalance,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Account update failed.');
+      }
+
+      setImportStatus(`Balance updated for ${selected.name}.`);
+      await loadPlannerData();
+    } catch {
+      setImportStatus('Unable to update account balance. Ensure backend is running on port 8080.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const mapHistoryToFuture = async (historyId: string, explicitCommitmentId?: string) => {
+    const futureCommitmentId = explicitCommitmentId ?? historyMapSelection[historyId];
+    if (!futureCommitmentId) {
+      setImportStatus('Select a future one-off commitment before mapping.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch('http://localhost:8080/imports/map-to-future', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          historyId,
+          futureCommitmentId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Map to future failed.');
+      }
+
+      setImportStatus('Transaction mapped to future commitment.');
+      await loadTransactionHistory();
+    } catch {
+      setImportStatus('Unable to map transaction to future commitment. Ensure backend is running on port 8080.');
     } finally {
       setIsSubmitting(false);
     }
@@ -561,21 +910,132 @@ function PlannerWorkspace() {
     }
   };
 
+  const downloadMonthlyCommitmentsCsv = () => {
+    const rows = monthlyCommitments.map((commitment) => [
+      commitment.id,
+      commitment.title,
+      String(commitment.amount),
+      String(commitment.dayOfMonth ?? 1),
+      commitment.category ?? '',
+    ]);
+    downloadCsvFile('monthly-commitments.csv', ['id', 'title', 'amount', 'dayOfMonth', 'category'], rows);
+    setMonthlyCommitmentStatus(`Downloaded ${rows.length} monthly commitment row(s) as CSV.`);
+  };
+
+  const onMonthlyCsvSelected = async (file: File | null) => {
+    if (!file) {
+      return;
+    }
+    try {
+      const text = await readFileAsText(file);
+      setMonthlyCsvUploadText(text);
+      setMonthlyCommitmentStatus('Monthly CSV loaded. Click Upload CSV to apply changes.');
+    } catch {
+      setMonthlyCommitmentStatus('Unable to read monthly CSV file.');
+    }
+  };
+
+  const uploadMonthlyCommitmentsCsv = async () => {
+    if (!monthlyCsvUploadText.trim()) {
+      setMonthlyCommitmentStatus('Select a monthly CSV file before upload.');
+      return;
+    }
+
+    const rows = parseCsvText(monthlyCsvUploadText);
+    if (rows.length < 2) {
+      setMonthlyCommitmentStatus('Monthly CSV must include header and at least one row.');
+      return;
+    }
+
+    const header = rows[0].map((cell) => cell.trim());
+    const expectedHeader = ['id', 'title', 'amount', 'dayOfMonth', 'category'];
+    if (header.join(',') !== expectedHeader.join(',')) {
+      setMonthlyCommitmentStatus('Invalid monthly CSV header. Expected: id,title,amount,dayOfMonth,category');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMonthlyCommitmentStatus('');
+    let created = 0;
+    let updated = 0;
+    let failed = 0;
+
+    try {
+      for (const row of rows.slice(1)) {
+        const [idCell = '', title = '', amount = '', dayOfMonth = '', category = ''] = row;
+        const payload = buildMonthlyCommitmentPayload({
+          title,
+          amount,
+          dayOfMonth,
+          category,
+        });
+
+        if (!payload) {
+          failed += 1;
+          continue;
+        }
+
+        const normalizedId = idCell.trim();
+        if (normalizedId) {
+          const response = await fetch(`http://localhost:8080/planner/commitments/${normalizedId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+          });
+
+          if (response.ok) {
+            updated += 1;
+          } else {
+            failed += 1;
+          }
+          continue;
+        }
+
+        const response = await fetch('http://localhost:8080/planner/commitments', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: `MC-${Date.now()}-${created + updated + failed}`,
+            ...payload,
+          }),
+        });
+
+        if (response.ok) {
+          created += 1;
+        } else {
+          failed += 1;
+        }
+      }
+
+      setMonthlyCommitmentStatus(`Monthly CSV upload complete. Created ${created}, updated ${updated}, failed ${failed}.`);
+      setMonthlyCsvUploadText('');
+      await loadPlannerData();
+    } catch {
+      setMonthlyCommitmentStatus('Unable to upload monthly CSV. Check backend and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const setOneOffField = (id: string, field: keyof EditableOneOffCommitment, value: string) => {
     setOneOffCommitmentEdits((current) => ({
       ...current,
       [id]: {
-        ...(current[id] ?? { title: '', amount: '', dueDate: currentMonthLabel, category: '' }),
+        ...(current[id] ?? { title: '', amount: '', dueDate: todayIsoDate, category: '' }),
         [field]: value,
       },
     }));
   };
 
-  const isValidDueMonthLabel = (value: string) => /^[A-Za-z]{3}\d{2}$/.test(value.trim());
+  const isValidDueDate = (value: string) => isIsoDate(value);
 
   const buildOneOffCommitmentPayload = (edit: EditableOneOffCommitment): OneOffCommitmentPayload | null => {
     const parsedAmount = Number(edit.amount);
-    if (!edit.title.trim() || Number.isNaN(parsedAmount) || !isValidDueMonthLabel(edit.dueDate)) {
+    if (!edit.title.trim() || Number.isNaN(parsedAmount) || !isValidDueDate(edit.dueDate)) {
       return null;
     }
 
@@ -596,7 +1056,7 @@ function PlannerWorkspace() {
 
     const payload = buildOneOffCommitmentPayload(edit);
     if (!payload) {
-      setOneOffCommitmentStatus('One-off commitment requires title, numeric amount, and due month label like Jul26.');
+      setOneOffCommitmentStatus('One-off commitment requires title, numeric amount, and due date like YYYY-MM-DD.');
       return;
     }
 
@@ -643,7 +1103,7 @@ function PlannerWorkspace() {
     });
 
     if (payloads.some((entry) => entry === null)) {
-      setOneOffCommitmentStatus('Fix invalid one-off rows before page-level save (title, numeric amount, due month like Jul26).');
+      setOneOffCommitmentStatus('Fix invalid one-off rows before page-level save (title, numeric amount, due date YYYY-MM-DD).');
       return;
     }
 
@@ -710,7 +1170,7 @@ function PlannerWorkspace() {
   const createOneOffCommitment = async () => {
     const payload = buildOneOffCommitmentPayload(newOneOffCommitment);
     if (!payload) {
-      setOneOffCommitmentStatus('New one-off commitment requires title, numeric amount, and due month label like Jul26.');
+      setOneOffCommitmentStatus('New one-off commitment requires title, numeric amount, and due date like YYYY-MM-DD.');
       return;
     }
 
@@ -733,10 +1193,121 @@ function PlannerWorkspace() {
       }
 
       setOneOffCommitmentStatus('One-off commitment created.');
-      setNewOneOffCommitment({ title: '', amount: '', dueDate: currentMonthLabel, category: '' });
+      setNewOneOffCommitment({ title: '', amount: '', dueDate: todayIsoDate, category: '' });
       await loadPlannerData();
     } catch {
       setOneOffCommitmentStatus('Unable to create one-off commitment. Check backend and try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const downloadOneOffCommitmentsCsv = () => {
+    const rows = oneOffCommitments.map((commitment) => [
+      commitment.id,
+      commitment.title,
+      String(commitment.amount),
+      commitment.dueDate,
+      commitment.category ?? '',
+    ]);
+    downloadCsvFile('onceoff-commitments.csv', ['id', 'title', 'amount', 'dueDate', 'category'], rows);
+    setOneOffCommitmentStatus(`Downloaded ${rows.length} one-off commitment row(s) as CSV.`);
+  };
+
+  const onOneOffCsvSelected = async (file: File | null) => {
+    if (!file) {
+      return;
+    }
+    try {
+      const text = await readFileAsText(file);
+      setOneOffCsvUploadText(text);
+      setOneOffCommitmentStatus('One-off CSV loaded. Click Upload CSV to apply changes.');
+    } catch {
+      setOneOffCommitmentStatus('Unable to read one-off CSV file.');
+    }
+  };
+
+  const uploadOneOffCommitmentsCsv = async () => {
+    if (!oneOffCsvUploadText.trim()) {
+      setOneOffCommitmentStatus('Select a one-off CSV file before upload.');
+      return;
+    }
+
+    const rows = parseCsvText(oneOffCsvUploadText);
+    if (rows.length < 2) {
+      setOneOffCommitmentStatus('One-off CSV must include header and at least one row.');
+      return;
+    }
+
+    const header = rows[0].map((cell) => cell.trim());
+    const expectedHeader = ['id', 'title', 'amount', 'dueDate', 'category'];
+    if (header.join(',') !== expectedHeader.join(',')) {
+      setOneOffCommitmentStatus('Invalid one-off CSV header. Expected: id,title,amount,dueDate,category');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setOneOffCommitmentStatus('');
+    let created = 0;
+    let updated = 0;
+    let failed = 0;
+
+    try {
+      for (const row of rows.slice(1)) {
+        const [idCell = '', title = '', amount = '', dueDate = '', category = ''] = row;
+        const payload = buildOneOffCommitmentPayload({
+          title,
+          amount,
+          dueDate,
+          category,
+        });
+
+        if (!payload) {
+          failed += 1;
+          continue;
+        }
+
+        const normalizedId = idCell.trim();
+        if (normalizedId) {
+          const response = await fetch(`http://localhost:8080/planner/commitments/${normalizedId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+          });
+
+          if (response.ok) {
+            updated += 1;
+          } else {
+            failed += 1;
+          }
+          continue;
+        }
+
+        const response = await fetch('http://localhost:8080/planner/commitments', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: `OF-${Date.now()}-${created + updated + failed}`,
+            ...payload,
+          }),
+        });
+
+        if (response.ok) {
+          created += 1;
+        } else {
+          failed += 1;
+        }
+      }
+
+      setOneOffCommitmentStatus(`One-off CSV upload complete. Created ${created}, updated ${updated}, failed ${failed}.`);
+      setOneOffCsvUploadText('');
+      await loadPlannerData();
+    } catch {
+      setOneOffCommitmentStatus('Unable to upload one-off CSV. Check backend and try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -778,11 +1349,11 @@ function PlannerWorkspace() {
         <button
           type="button"
           role="tab"
-          aria-selected={activeTab === 'transaction-import'}
-          className={activeTab === 'transaction-import' ? 'active' : ''}
-          onClick={() => setActiveTab('transaction-import')}
+          aria-selected={activeTab === 'account-management'}
+          className={activeTab === 'account-management' ? 'active' : ''}
+          onClick={() => setActiveTab('account-management')}
         >
-          Transaction Import
+          Account Management
         </button>
       </div>
 
@@ -836,64 +1407,111 @@ function PlannerWorkspace() {
           </div>
 
           <div className="planner-grid">
-            <div className="workspace-card">
-              <h3>Accounts</h3>
-              {isPlannerLoading && <p>Loading real account data...</p>}
-              {!isPlannerLoading && plannerError && <p>{plannerError}</p>}
-              <p className="ledger-caption">Opening balances + current month income and expenses = end of period total.</p>
+            <div className="planner-left-column">
+              <div className="workspace-card">
+                <h3>Accounts</h3>
+                {isPlannerLoading && <p>Loading real account data...</p>}
+                {!isPlannerLoading && plannerError && <p>{plannerError}</p>}
+                <p className="ledger-caption">Opening balances + current month income and expenses = end of period total.</p>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Working line</th>
+                      <th>Amount</th>
+                      <th>Maths</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Opening account balances</td>
+                      <td>{formatCurrency(openingAccountTotal)}</td>
+                      <td>{plannerData.accounts.map((account) => `${account.name} ${formatCurrency(account.balance)}`).join(' + ')}</td>
+                    </tr>
+                    <tr>
+                      <td>Total incomes</td>
+                      <td className="cashflow-positive">{formatCurrency(totalIncomes)}</td>
+                      <td>-</td>
+                    </tr>
+                    <tr>
+                      <td>Total expenses</td>
+                      <td className="cashflow-negative">{formatCurrency(totalExpenses)}</td>
+                      <td>-</td>
+                    </tr>
+                    <tr className="ledger-total-row">
+                      <td>End of period total</td>
+                      <td>{formatCurrency(endOfPeriodTotal)}</td>
+                      <td>{formatCurrency(openingAccountTotal)} + {formatCurrency(totalIncomes)} + {formatCurrency(totalExpenses)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="workspace-card">
+                <h3>Categories</h3>
+                {isPlannerLoading && <p>Loading real category data...</p>}
+                <p className="ledger-caption">Each category is the sum of the commitments assigned to it in the selected period.</p>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Category</th>
+                      <th>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categoryTotals.map(([categoryName, total]) => (
+                      <tr key={categoryName}>
+                        <td>{categoryName}</td>
+                        <td>{formatCurrency(total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="workspace-card credit-card-repayment-card">
+              <h3>Credit Card Repayment</h3>
+              <p className="ledger-caption">Salary - End of period total - Becky - Mortgage - CU + Overdraft - Life insurance.</p>
               <table>
                 <thead>
                   <tr>
                     <th>Working line</th>
                     <th>Amount</th>
-                    <th>Maths</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td>Opening account balances</td>
-                    <td>{formatCurrency(openingAccountTotal)}</td>
-                    <td>{plannerData.accounts.map((account) => `${account.name} ${formatCurrency(account.balance)}`).join(' + ')}</td>
+                    <td>Monthly Ongoing Commitment Income</td>
+                    <td>{formatCurrency(monthlyOngoingIncome)}</td>
                   </tr>
                   <tr>
-                    <td>Total incomes</td>
-                    <td className="cashflow-positive">{formatCurrency(totalIncomes)}</td>
-                    <td>Positive commitments in the selected period</td>
+                    <td>Minus Monthly EOM</td>
+                    <td className="cashflow-negative">{formatCurrency(-monthlyEom)}</td>
                   </tr>
                   <tr>
-                    <td>Total expenses</td>
-                    <td className="cashflow-negative">{formatCurrency(totalExpenses)}</td>
-                    <td>Negative commitments in the selected period</td>
+                    <td>Minus Monthly Ongoing Commitment Becky</td>
+                    <td className="cashflow-negative">{formatCurrency(-monthlyBecky)}</td>
+                  </tr>
+                  <tr>
+                    <td>Minus Monthly Ongoing Commitment Morgage</td>
+                    <td className="cashflow-negative">{formatCurrency(-monthlyMortgage)}</td>
+                  </tr>
+                  <tr>
+                    <td>Minus Monthly Ongoing Commitment CU</td>
+                    <td className="cashflow-negative">{formatCurrency(-monthlyCu)}</td>
+                  </tr>
+                  <tr>
+                    <td>Plus overdraft</td>
+                    <td className="cashflow-positive">{formatCurrency(overdraftAllowance)}</td>
+                  </tr>
+                  <tr>
+                    <td>Minus life insurance</td>
+                    <td className="cashflow-negative">{formatCurrency(-lifeInsuranceAdjustment)}</td>
                   </tr>
                   <tr className="ledger-total-row">
-                    <td>End of period total</td>
-                    <td>{formatCurrency(endOfPeriodTotal)}</td>
-                    <td>{formatCurrency(openingAccountTotal)} + {formatCurrency(totalIncomes)} + {formatCurrency(totalExpenses)}</td>
+                    <td>Credit card repayment capacity</td>
+                    <td>{formatCurrency(creditCardRepaymentCapacity)}</td>
                   </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div className="workspace-card">
-              <h3>Categories</h3>
-              {isPlannerLoading && <p>Loading real category data...</p>}
-              <p className="ledger-caption">Each category is the sum of the commitments assigned to it in the selected period.</p>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Category</th>
-                    <th>Working</th>
-                    <th>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {categoryTotals.map(([categoryName, total]) => (
-                    <tr key={categoryName}>
-                      <td>{categoryName}</td>
-                      <td>{`Sum of commitments for ${categoryName}`}</td>
-                      <td>{formatCurrency(total)}</td>
-                    </tr>
-                  ))}
                 </tbody>
               </table>
             </div>
@@ -944,9 +1562,24 @@ function PlannerWorkspace() {
 
           <div className="monthly-commitment-toolbar">
             <span>{monthlyDirtyIds.length} unsaved change(s)</span>
-            <button type="button" className="grid-action" onClick={saveAllMonthlyCommitments} disabled={isSubmitting || monthlyDirtyIds.length === 0}>
-              Save all changes
-            </button>
+            <div className="bulk-csv-actions">
+              <button type="button" className="grid-action" onClick={saveAllMonthlyCommitments} disabled={isSubmitting || monthlyDirtyIds.length === 0}>
+                Save all changes
+              </button>
+              <button type="button" className="grid-action" onClick={downloadMonthlyCommitmentsCsv} disabled={isSubmitting}>
+                Download CSV
+              </button>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="csv-file-input"
+                onChange={(event) => void onMonthlyCsvSelected(event.target.files?.[0] ?? null)}
+                disabled={isSubmitting}
+              />
+              <button type="button" className="grid-action" onClick={uploadMonthlyCommitmentsCsv} disabled={isSubmitting}>
+                Upload CSV
+              </button>
+            </div>
           </div>
 
           <div className="monthly-commitment-create-row">
@@ -1049,10 +1682,41 @@ function PlannerWorkspace() {
         </div>
       )}
 
-      {activeTab === 'transaction-import' && (
+      {activeTab === 'account-management' && (
         <div className="workspace-card import-card">
-          <h3>Transaction import and review</h3>
-          <p>Paste your CSV content, preview duplicates, then accept selected rows.</p>
+          <h3>Account management</h3>
+          <p>Toggle account balances, import transactions, review transaction history, and map imported rows to future one-off commitments.</p>
+
+          <div className="account-management-panel">
+            <label htmlFor="account-select">Account</label>
+            <select
+              id="account-select"
+              value={selectedAccountId}
+              onChange={(event) => {
+                const nextId = event.target.value;
+                setSelectedAccountId(nextId);
+                const nextAccount = plannerData.accounts.find((account) => account.id === nextId);
+                setAccountBalanceInput(nextAccount ? String(nextAccount.balance) : '');
+              }}
+            >
+              {plannerData.accounts.map((account) => (
+                <option key={account.id} value={account.id}>{account.name}</option>
+              ))}
+            </select>
+            <label htmlFor="account-balance">Balance</label>
+            <input
+              id="account-balance"
+              className="grid-input"
+              value={accountBalanceInput}
+              onChange={(event) => setAccountBalanceInput(event.target.value)}
+            />
+            <button type="button" className="grid-action" onClick={saveSelectedAccountBalance} disabled={isSubmitting || !selectedAccountId}>
+              Save balance
+            </button>
+          </div>
+
+          <h4>Import transactions</h4>
+          <p>Paste CSV content, preview duplicates, and accept selected rows.</p>
 
           <textarea
             className="import-input"
@@ -1104,6 +1768,60 @@ function PlannerWorkspace() {
               </tbody>
             </table>
           )}
+
+          <h4>Transaction history</h4>
+          {transactionHistory.length === 0 && <p className="ledger-caption">No imported transaction history yet.</p>}
+          {transactionHistory.length > 0 && (
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Description</th>
+                  <th>Amount</th>
+                  <th>Account</th>
+                  <th>Mapped future</th>
+                  <th>Suggested</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transactionHistory.map((item) => (
+                  <tr key={item.historyId}>
+                    <td>{item.date}</td>
+                    <td>{item.description}</td>
+                    <td>{formatCurrency(item.amount)}</td>
+                    <td>{item.account}</td>
+                    <td>{item.mappedFutureCommitmentId ?? 'Not mapped'}</td>
+                    <td>{suggestedMatchesByHistoryId[item.historyId]?.commitmentId ?? 'No suggestion'}</td>
+                    <td>
+                      <div className="grid-action-row">
+                        <select
+                          value={historyMapSelection[item.historyId] ?? suggestedMatchesByHistoryId[item.historyId]?.commitmentId ?? ''}
+                          onChange={(event) => setHistoryMapSelection((current) => ({ ...current, [item.historyId]: event.target.value }))}
+                        >
+                          <option value="">Select future one-off</option>
+                          {oneOffCommitmentOptions.map((option) => (
+                            <option key={option.id} value={option.id}>{option.label}</option>
+                          ))}
+                        </select>
+                        <button type="button" className="grid-action" onClick={() => void mapHistoryToFuture(item.historyId)} disabled={isSubmitting}>
+                          Map
+                        </button>
+                        <button
+                          type="button"
+                          className="grid-action"
+                          onClick={() => void mapHistoryToFuture(item.historyId, suggestedMatchesByHistoryId[item.historyId]?.commitmentId)}
+                          disabled={isSubmitting || !suggestedMatchesByHistoryId[item.historyId]}
+                        >
+                          Use suggestion
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 
@@ -1117,9 +1835,24 @@ function PlannerWorkspace() {
 
           <div className="monthly-commitment-toolbar">
             <span>{oneOffDirtyIds.length} unsaved change(s)</span>
-            <button type="button" className="grid-action" onClick={saveAllOneOffCommitments} disabled={isSubmitting || oneOffDirtyIds.length === 0}>
-              Save all changes
-            </button>
+            <div className="bulk-csv-actions">
+              <button type="button" className="grid-action" onClick={saveAllOneOffCommitments} disabled={isSubmitting || oneOffDirtyIds.length === 0}>
+                Save all changes
+              </button>
+              <button type="button" className="grid-action" onClick={downloadOneOffCommitmentsCsv} disabled={isSubmitting}>
+                Download CSV
+              </button>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="csv-file-input"
+                onChange={(event) => void onOneOffCsvSelected(event.target.files?.[0] ?? null)}
+                disabled={isSubmitting}
+              />
+              <button type="button" className="grid-action" onClick={uploadOneOffCommitmentsCsv} disabled={isSubmitting}>
+                Upload CSV
+              </button>
+            </div>
           </div>
 
           <div className="onceoff-commitment-create-row">
@@ -1138,7 +1871,8 @@ function PlannerWorkspace() {
             <input
               className="grid-input"
               value={newOneOffCommitment.dueDate}
-              placeholder="Due month (Jul26)"
+              placeholder="Due date (YYYY-MM-DD)"
+              type="date"
               onChange={(event) => setNewOneOffCommitment((current) => ({ ...current, dueDate: event.target.value }))}
             />
             <input
@@ -1182,7 +1916,8 @@ function PlannerWorkspace() {
                   <td>
                     <input
                       className="grid-input"
-                      value={oneOffCommitmentEdits[commitment.id]?.dueDate ?? currentMonthLabel}
+                      type="date"
+                      value={oneOffCommitmentEdits[commitment.id]?.dueDate ?? todayIsoDate}
                       onChange={(event) => setOneOffField(commitment.id, 'dueDate', event.target.value)}
                     />
                   </td>
