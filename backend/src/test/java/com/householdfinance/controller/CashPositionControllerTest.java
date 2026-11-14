@@ -1,6 +1,7 @@
 package com.householdfinance.controller;
 
 import com.householdfinance.repository.CashPositionSnapshotRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 class CashPositionControllerTest {
     @Autowired private MockMvc mvc;
+    @Autowired private ObjectMapper mapper;
     @Autowired private CashPositionSnapshotRepository repository;
 
     @BeforeEach void clear() { repository.deleteAll(); }
@@ -88,5 +90,30 @@ class CashPositionControllerTest {
         rejected("{\"asOfDate\":\"" + today() + "\",\"verification\":\"REVIEWED\",\"cashBalances\":[]}");
         rejected(payload(today(), "9007199254740992", "1000", "REVIEWED"));
         mvc.perform(get("/api/cash-position/latest")).andExpect(status().isNoContent());
+    }
+
+    @Test void linksSavedEvidenceToDebtComparisonAndRejectsMismatchedCash() throws Exception {
+        String response = mvc.perform(post("/api/cash-position/snapshots")
+                .contentType("application/json").content(payload(today(), "500000", "120000", "REVIEWED")))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String id = mapper.readTree(response).get("id").asText();
+
+        String scenario = "{\"balanceMinor\":6000,\"annualRatePercent\":0.7,"
+                + "\"monthlyPaymentMinor\":6000,\"extraPaymentMinor\":0,"
+                + "\"liquidCashMinor\":580000,\"minimumReserveMinor\":150000,"
+                + "\"cashPositionSnapshotId\":\"" + id + "\"}";
+        mvc.perform(post("/api/debt-scenarios/compare")
+                .contentType("application/json").content(scenario))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.remainingCashMinor").value(580000));
+
+        rejectedScenario(scenario.replace("\"liquidCashMinor\":580000", "\"liquidCashMinor\":580001"));
+        rejectedScenario(scenario.replace(id, "not-a-real-snapshot"));
+    }
+
+    private void rejectedScenario(String json) throws Exception {
+        mvc.perform(post("/api/debt-scenarios/compare")
+                .contentType("application/json").content(json))
+                .andExpect(status().isBadRequest());
     }
 }
