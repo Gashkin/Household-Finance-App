@@ -53,7 +53,7 @@
     {
       "path": "backend/src/main/java/com/householdfinance/bank/SandboxGateway.java",
       "contains": [
-        "production is blocked",
+        "void verifySandbox()",
         "BoundedBody"
       ]
     },

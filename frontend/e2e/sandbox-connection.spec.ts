@@ -26,6 +26,7 @@ test("connect synthetic read-only accounts, review paginated activity and discon
   expect(created.ok()).toBeTruthy();
   const local = await created.json();
   await page.reload();
+  await page.getByRole("button", { name: "Money position", exact: true }).click();
   const panel = page.getByRole("region", {
     name: "Enable Banking sandbox connection",
     exact: true,
@@ -51,7 +52,7 @@ test("connect synthetic read-only accounts, review paginated activity and discon
   await page
     .getByRole("link", { name: "Authorise synthetic read-only accounts" })
     .click();
-  await expect(panel).toContainText("CONNECTED");
+  await expect(panel.getByText("CONNECTED", { exact: true })).toBeVisible();
   expect(new URL(page.url()).search).toBe("");
   expect(
     await page.evaluate(
@@ -87,6 +88,12 @@ test("connect synthetic read-only accounts, review paginated activity and discon
   await expect(
     page.getByRole("region", { name: "Account balance evidence" }),
   ).toContainText("€990.00");
+  await page.getByLabel("Statement closing balance (€)", { exact: true }).fill("990");
+  await page.getByLabel("Statement evidence source", { exact: true }).fill("Synthetic provider CLBD statement");
+  await page.getByRole("button", { name: "Check statement balance", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Statement difference" })).toContainText("€0.00");
+  await page.getByRole("button", { name: "Confirm reconciliation", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Account balance evidence" })).toContainText("Reconciled for this date and activity.");
   await panel
     .getByRole("button", { name: "Disconnect and revoke sandbox session" })
     .click();
