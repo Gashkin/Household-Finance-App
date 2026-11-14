@@ -70,6 +70,11 @@ public class CashPositionService {
     }
 
     @Transactional(readOnly = true)
+    public Optional<Snapshot> byId(String id) {
+        return repository.findById(id).map(this::toSnapshot);
+    }
+
+    @Transactional(readOnly = true)
     public Optional<Snapshot> latest() {
         return repository.findFirstByOrderByRecordedAtDescIdDesc().map(this::toSnapshot);
     }
