@@ -65,7 +65,7 @@ export default function EvidenceIntakePanel({ onApproved }: { onApproved: (snaps
   return <details className="workspace-card evidence-intake">
     <summary>Paste evidence and review suggested facts</summary>
     <h3>From source text to a reviewed cash position</h3>
-    <p>Review every suggestion before saving. Excerpts stay in memory for at most 10 minutes and are discarded on approval. Only approved facts and your source reference are stored.</p>
+    <p>Review every suggestion before saving. Drafts expire after 10 minutes. Source excerpts are not saved to the database; approve or lock intake to clear yours. Only approved facts and your source reference are stored.</p>
     {!capabilities ? <p>Checking intake availability…</p> : !capabilities.enabled ? <p>Evidence intake is not enabled on this instance. Its owner must configure an intake access key.</p> : !unlocked ? <div className="intake-unlock">
       <label>Intake access key<input type="password" autoComplete="off" value={accessKey} onChange={e => setAccessKey(e.target.value)} /></label>
       <button type="button" className="debt-primary" disabled={!!busy || !accessKey} onClick={unlock}>Unlock evidence intake</button>
