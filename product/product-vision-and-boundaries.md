@@ -6,6 +6,21 @@ Help households understand their complete financial position, make informed deci
 
 This is not an expense tracker with a chatbot. It is a household financial operating system built around a trusted financial record, deterministic financial models, explicit goals and decisions, and an AI companion that makes the system easier to understand and use.
 
+## Product discovery rule: greenfield functionality
+
+This product is being designed from scratch at the functional level.
+
+Existing repositories, boards, specifications, data models, backlogs, screens and workflows are reference material only. They may reveal useful domain knowledge, implementation patterns, constraints or reusable code, but they do not define the product, its feature set, user journeys, terminology, priorities or acceptance criteria.
+
+Do not:
+- Port existing features merely because they exist.
+- Treat an existing backlog or board as the product roadmap.
+- Preserve current workflows when a better household experience can be designed.
+- Assume existing entities or service boundaries are the correct domain model.
+- Let current technical limitations determine the product experience.
+
+Instead, discover the actual household jobs, user needs, decisions, risks and desired outcomes. Design the coherent end-to-end product first. Then assess existing assets objectively for reuse, replacement or retirement. Reuse is an engineering optimisation, never a product requirement.
+
 ## Product thesis
 
 A household's financial decisions are connected. Debt repayment affects liquidity; liquidity affects pension contributions; pension contributions affect retirement outcomes and tax; mortgage choices compete with savings and home investment. Existing tools commonly expose fragments of this picture.
@@ -14,48 +29,49 @@ The product brings those fragments into one coherent household model and helps u
 
 ## Target customer and initial market
 
-- Initial proving ground: one household with multiple income sources, dependants, a mortgage, consumer debt, employment-linked pension benefits, insurance and home-investment goals.
-- Initial market: households in Ireland, with euro currency, Irish income/tax/pension context and local financial product terminology.
+- Initial proving ground: a real family household with multiple income sources, dependants, a mortgage, consumer debt, employment-linked pension benefits, insurance and home-investment goals.
+- Initial market hypothesis: households in Ireland, with euro currency, Irish income/tax/pension context and local financial product terminology. Validate this as a market choice; it is not a functional constraint.
 - Expansion: other household types and jurisdictions through localised rules, tax parameters, data connectors and product configuration—not hard-coded country assumptions.
 
-## Core product experience
+## Product discovery questions the product must answer
 
-1. Establish a household financial baseline from manual entry, spreadsheets and source documents.
-2. Reconcile income, spending, accounts, assets, liabilities, commitments and benefits.
-3. Set household goals and priorities with target amounts, dates, constraints and dependencies.
-4. Explore scenarios using deterministic financial calculations.
-5. Record options, assumptions, evidence, risks, decisions and review dates.
-6. Receive understandable, evidence-linked explanations and alerts about material changes.
-7. Review progress periodically and update the plan as circumstances change.
+- What does a household need to know to feel in control of its finances?
+- How do partners understand, agree and manage shared and individual finances?
+- How should the product represent uncertainty, incomplete records and conflicting evidence?
+- How do users express goals in life terms and translate them into financial plans?
+- How should the product surface conflicts between goals, liquidity, risk and time?
+- Which decisions need a guided workflow, and which are better served by a flexible workspace?
+- What should the product proactively notice, and when should it stay quiet?
+- How can users trust a calculation, recommendation or AI-generated explanation?
+- What can be fully standardised across households, and what requires jurisdiction-specific rules or personal context?
 
-## Core capabilities
+## Candidate product capabilities
 
-### Household financial record
-A multi-person household model covering members, income sources, accounts, transactions, recurring commitments, assets, liabilities, pensions, insurance, properties, benefits and supporting evidence. Every material value carries an as-at date, source, confidence/status and ownership.
+These are hypotheses to investigate and refine, not a fixed inherited feature list.
 
-### Budget and cash-flow
-Budget periods, planned versus actual, recurring and one-off commitments, account-level balances, available-to-spend and multi-period cash-flow forecasts.
+### Household financial picture
+A coherent, explainable view of income, spending, cash, accounts, assets, debts, commitments, benefits and financial obligations. Every material value should have an owner, as-at date, source and confidence/verification state.
 
-### Financial planning domains
-- Family protection and insurance
-- Debt strategy and repayment sequencing
-- Mortgage strategy and affordability
-- Pension and retirement planning
-- Savings and emergency reserves
-- Household tax and income treatment
-- Property and home-energy investments
-- Major purchases and life-event planning
+### Cash-flow and financial resilience
+Understand what is coming in and going out, what is committed, what is genuinely available, how resilient the household is to shocks, and how the position may change over time.
 
-Domains share a common planning lifecycle and data model, with specialist calculation modules where required.
+### Family goals and life planning
+Express goals in household language—security, education, home, experiences, flexibility, retirement—and connect them to funding, timing, trade-offs and measurable progress.
+
+### Decision workspaces
+Help a household investigate meaningful decisions such as debt repayment, pension contributions, mortgage choices, insurance adequacy, savings, home improvements and major purchases. Each workspace should adapt to the decision rather than forcing every problem into an identical form.
 
 ### Scenario and projection engine
 Reproducible, versioned calculations for cash flow, debt amortisation, savings, mortgage repayment and retirement projections. Scenarios are isolated from the live baseline and never mutate source financial data. Inputs, assumptions, calculation version and outputs are retained for audit and comparison.
 
-### Evidence and document management
-Import statements, payslips, policy schedules, pension documents, mortgage letters and spreadsheets. Extracted values remain proposed until reviewed or reconciled. Preserve source references and extraction confidence.
+### Evidence and document intelligence
+Import statements, payslips, policy schedules, pension documents, mortgage letters and spreadsheets. Extracted values remain proposed until reviewed or reconciled. Preserve source references, dates and extraction confidence.
 
-### Goals, decisions and review
-Goals have measurable outcomes, target dates, priority, funding needs and dependencies. Plans record current position, options, assumptions, scenario results, risks, recommendation status, user decision, actions and next review. A recommendation is never silently treated as an authorised action.
+### Household collaboration
+Support appropriate visibility, ownership and decision-making between household members. Do not assume every household has the same structure or that every member should see or edit every record.
+
+### Ongoing financial companion
+Answer questions, explain changes, identify missing information, prepare reviews and help users revisit decisions as circumstances change. The companion must distinguish facts, estimates, assumptions and suggestions.
 
 ## AI strategy
 
@@ -79,8 +95,8 @@ All model access is server-side through a provider-neutral gateway. Route tasks 
 
 ## Standardisation and extensibility
 
-Standardise the following shared primitives:
-- Household, member, ownership and permissions
+Standardise reusable primitives only after validating them against real household jobs and decision workflows. Likely shared concepts include:
+- Household, person, ownership and permissions
 - Financial account and instrument
 - Income, expense, transaction and commitment
 - Asset, liability and valuation
@@ -88,34 +104,26 @@ Standardise the following shared primitives:
 - Goal, plan, assumption, scenario, projection and decision
 - Review schedule, notification and audit event
 
-Standardise a planning lifecycle:
-1. Define objective and constraints.
-2. Establish current position and evidence.
-3. Identify missing information.
-4. Build options and assumptions.
-5. Run reproducible scenarios.
-6. Compare outcomes, affordability, liquidity and risks.
-7. Present findings and recommendation status.
-8. Capture the household's explicit decision.
-9. Track actions and review triggers.
+A common planning lifecycle may be useful, but it must not become a rigid workflow imposed on every domain. Different decisions have different evidence needs, calculations, risks and approval steps.
 
 Keep jurisdiction-specific rules, tax treatment, pension rules, product constraints and integrations behind versioned domain modules. Never assume Irish rules apply to another market.
 
-## Architecture direction
+## Architecture principles
 
-Retain and reuse the existing Household-Finance-App domain knowledge, budgeting concepts, import workflows and deterministic calculations where they are sound. Do not assume the current local-first architecture is sufficient for a commercial multi-household product.
+Architecture should be selected and evolved to support the discovered product—not inherited from an existing repository.
 
-Target architecture:
-- Responsive web application.
-- API-first backend with explicit household/tenant boundaries.
-- Relational database with tenant-scoped access controls and auditable financial records.
-- Domain services for ledger, cash flow, goals, debt, mortgage, pension and scenario calculations.
-- Document ingestion pipeline with review queues.
-- Provider-neutral AI gateway and constrained tool execution.
-- Background jobs for imports, scheduled reviews and notifications.
-- Integration adapters for bank data and external providers, added only where legal, commercial and reliability requirements are satisfied.
+Candidate principles:
+- Responsive, accessible user experience.
+- Explicit household/tenant security boundaries.
+- Auditable financial records and reproducible calculations.
+- Clear separation between source facts, derived values, assumptions and AI interpretations.
+- Domain boundaries that reflect actual financial capabilities and change independently.
+- Provider-neutral AI gateway with constrained tool execution.
+- Reliable document ingestion and human review.
+- Integration adapters for external providers, subject to legal, commercial and reliability requirements.
+- Operational security, observability, backups, export, deletion and recovery.
 
-A private, local-first family deployment can remain a useful proving ground. Commercial multi-tenant hosting, secure identity, tenant isolation, backups, data export/deletion, operational monitoring and disaster recovery are required before broad public launch.
+Existing technical architecture may be reused where it meets these needs. Re-evaluate technology choices where product scale, security, deployment or user experience requires it. A local family deployment can be a proving ground, but it must not dictate the commercial architecture.
 
 ## Trust, privacy and safety
 
@@ -138,32 +146,17 @@ Before enabling personalised product recommendations, arranging products, facili
 
 Product language, feature gates, model prompts and user journeys must preserve this boundary. Disclaimers alone are not a substitute for analysing the actual service.
 
-## Product sequencing
+## Product development approach
 
-### Foundation
-- Establish a reliable household financial record and provenance model.
-- Deliver reconciled budget, account positions, commitments and cash-flow forecasts.
-- Deliver reproducible debt, mortgage and savings calculations.
-- Support manual and spreadsheet/document-assisted onboarding.
-- Implement household access control, audit and backup/export.
+1. Discover the real household jobs, pain points, decisions and desired outcomes from the family use case.
+2. Map the end-to-end experience without assuming existing screens, features or data structures.
+3. Identify the smallest coherent product that delivers meaningful household value.
+4. Define the domain model, calculations, evidence and safety requirements needed for that experience.
+5. Evaluate existing code and knowledge against the target; reuse, adapt, replace or discard each part deliberately.
+6. Build and test complete user journeys with realistic data and edge cases.
+7. Expand into broader household needs and markets based on validated value.
 
-### Planning
-- Deliver goals, priorities, planning lifecycle and review management.
-- Add debt, mortgage, protection and pension planning domains.
-- Add scenario comparison across competing household priorities.
-- Add evidence-linked financial insights.
-
-### AI assistance
-- Add document extraction with review and reconciliation.
-- Add conversational financial context and explanation.
-- Add natural-language scenario requests routed to deterministic tools.
-- Add proactive insight generation with clear evidence and user controls.
-
-### Scale
-- Add bank-data integrations through appropriately authorised providers.
-- Add jurisdiction packs and configurable financial rules.
-- Add secure multi-household SaaS operations, subscription management and customer support.
-- Consider adviser collaboration only after the regulatory and commercial model is established.
+The roadmap is owned by product outcomes and dependencies, not by the structure of an inherited board or repository.
 
 ## Explicit non-goals for the initial product
 
@@ -177,3 +170,5 @@ Product language, feature gates, model prompts and user journeys must preserve t
 ## Product success test
 
 A household can build a trustworthy picture of its finances, understand what is uncertain, compare realistic options against its actual constraints, agree priorities, and revisit decisions with the evidence and assumptions intact—without needing an AI model for the underlying numbers.
+
+The product feels like one coherent system designed around how a family actually lives and makes decisions, not a collection of existing finance-app features joined together.
