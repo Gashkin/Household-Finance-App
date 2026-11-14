@@ -12,7 +12,6 @@ the comparison itself is not saved. See [the journey and API notes](product/date
 
 **Security boundary:** the current app has no real authentication or household isolation. It is for local
 development only; do not expose the backend publicly or enter sensitive data into an internet-facing instance.
-Household-Finance-App
 
 ## OKF Knowledge Model
 
