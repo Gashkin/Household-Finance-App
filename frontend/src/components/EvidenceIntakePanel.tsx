@@ -28,7 +28,7 @@ export default function EvidenceIntakePanel({ onApproved }: { onApproved: (snaps
   function discard(id: string, key = accessKey) { void intakeRequest<void>('/drafts/' + encodeURIComponent(id), key, 'DELETE').catch(() => {}); }
   function invalidate() {
     version.current++; if (draft) discard(draft.id);
-    setDraft(null); setRows([]); setAcknowledged(false); setError(''); setNotice(''); setBusy('');
+    setDraft(null); setRows([]); setAcknowledged(false); setAllowModel(false); setError(''); setNotice(''); setBusy('');
   }
   async function unlock() {
     setError(''); setBusy('unlock');
@@ -39,10 +39,11 @@ export default function EvidenceIntakePanel({ onApproved }: { onApproved: (snaps
   function lock() { invalidate(); setUnlocked(false); setAccessKey(''); setSource(''); setReference(''); setReserve(''); setAllowModel(false); }
   async function extract() {
     if (draft) discard(draft.id);
-    const current = ++version.current; const key = accessKey;
+    const current = ++version.current; const key = accessKey; const consent = allowModel;
+    setAllowModel(false);
     setDraft(null); setRows([]); setAcknowledged(false); setNotice(''); setError(''); setBusy('extract');
     try {
-      const response = await intakeRequest<IntakeDraft>('/drafts', key, 'POST', { source, reference, allowModel });
+      const response = await intakeRequest<IntakeDraft>('/drafts', key, 'POST', { source, reference, allowModel: consent });
       if (current !== version.current) { discard(response.id, key); return; }
       setDraft(response); setRows(response.proposals.map(({ lineNumber, kind, label, amountEuro }) => ({ lineNumber, kind, label, amountEuro })));
     } catch (e) { if (current === version.current) setError(e instanceof Error ? e.message : 'Unable to extract evidence'); }
@@ -72,7 +73,7 @@ export default function EvidenceIntakePanel({ onApproved }: { onApproved: (snaps
       <button type="button" className="cash-secondary" onClick={lock} disabled={busy === 'approve'}>Lock and clear excerpt</button>
       <div className="intake-source-fields">
         <label>Evidence reference<input maxLength={100} value={reference} disabled={busy === 'approve'} placeholder="e.g. Bank statement, 14 November" onChange={e => { invalidate(); setReference(e.target.value); }} /></label>
-        <label>Source excerpt<textarea rows={6} maxLength={4000} value={source} disabled={busy === 'approve'} placeholder={'Current account: EUR 1,000.00\nElectricity bill due: EUR 100.00'} onChange={e => { invalidate(); setSource(e.target.value); }} /></label>
+        <label><span id="intake-source-label">Source excerpt</span><textarea aria-labelledby="intake-source-label" rows={6} maxLength={4000} value={source} disabled={busy === 'approve'} placeholder={'Current account: EUR 1,000.00\nElectricity bill due: EUR 100.00'} onChange={e => { invalidate(); setSource(e.target.value); }} /></label>
       </div>
       {capabilities.modelConfigured ? <label className="intake-check"><input type="checkbox" checked={allowModel} disabled={busy === 'approve'} onChange={e => { invalidate(); setAllowModel(e.target.checked); }} />Send this excerpt to the configured model for assistance. Common identifiers are redacted, but remove personal details yourself. Provider charges may apply; up to {capabilities.modelDailyLimit} requests per day on this running instance, at most {capabilities.maxOutputTokens} output tokens each.</label>
         : <p className="debt-caption">Local suggestions are available without a model or subscription. No source text is sent to a provider.</p>}

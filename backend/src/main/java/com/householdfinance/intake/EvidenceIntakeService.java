@@ -70,13 +70,14 @@ public class EvidenceIntakeService {
     private List<Proposal> local(List<String> lines) {
         var result = new ArrayList<Proposal>();
         for (int i = 0; i < lines.size(); i++) {
-            String line = lines.get(i); Matcher match = EURO.matcher(line);
+            String line = lines.get(i);
+            if (unsupportedLine(line)) continue;
+            Matcher match = EURO.matcher(line);
             while (match.find()) {
                 String label = line.substring(0, match.start()).replaceAll("[:|\\s]+$", "").strip();
                 if (label.isEmpty()) label = "Source line " + (i + 1);
                 if (label.length() > 100) label = label.substring(0, 100);
                 String lower = line.toLowerCase(Locale.ROOT);
-                if (lower.matches(".*\\b(credit limit|available credit|overdraft limit|salary|income)\\b.*")) continue;
                 String kind = lower.matches(".*\\b(bill|due|commitment|invoice)\\b.*") ? "COMMITMENT" : "CASH";
                 String amount = match.group(1).replace(",", "");
                 try { minor(amount); } catch (IllegalArgumentException ignored) { continue; }
@@ -86,11 +87,18 @@ public class EvidenceIntakeService {
         }
         return result;
     }
+    private boolean unsupportedLine(String line) {
+        String lower = line.toLowerCase(Locale.ROOT);
+        // Be conservative: negative balances and credit/income are not supported cash.
+        return lower.matches(".*\\b(credit limit|available credit|overdraft limit|salary|income)\\b.*")
+            || Pattern.compile("(?i)(?:[-−]\\s*(?:EUR|€)|(?:EUR|€)\\s*[-−]|\\([^)]*(?:EUR|€)|(?:EUR|€).*\\bDR\\b)").matcher(line).find();
+    }
     private Proposal validateModel(EvidenceModelGateway.Candidate candidate, List<String> lines) {
         if (candidate.lineNumber() < 1 || candidate.lineNumber() > lines.size() || !Set.of("CASH", "COMMITMENT").contains(candidate.kind())
             || candidate.label().isBlank() || candidate.label().length() > 100)
             throw new IllegalArgumentException("Invalid suggested fact");
         String quote = lines.get(candidate.lineNumber() - 1);
+        if (unsupportedLine(quote)) throw new IllegalArgumentException("Unsupported cash source");
         if (!quote.toLowerCase(Locale.ROOT).contains(candidate.label().toLowerCase(Locale.ROOT))) throw new IllegalArgumentException("Label absent from source");
         long amount = minor(candidate.amountEuro()); boolean found = false;
         Matcher matcher = EURO.matcher(quote);

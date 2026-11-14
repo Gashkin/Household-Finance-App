@@ -68,6 +68,13 @@ class EvidenceIntakeServiceTest {
         assertThrows(IllegalArgumentException.class, () -> EvidenceIntakeService.minor("-1"));
         assertTrue(service.create("Account: EUR 1.001", "Source", false).proposals().isEmpty());
     }
+    @Test void negativeBalancesAndCreditLimitsAreNeverPositiveCashSuggestions() throws Exception {
+        String source = "Overdrawn: -€100\nAccount: (EUR 200)\nAccount: EUR 300 DR\nCredit limit: EUR 400\nSalary: EUR 500";
+        assertTrue(service.create(source, "Source", false).proposals().isEmpty());
+        when(model.extract(anyString(), eq(true))).thenReturn(Optional.of(List.of(new EvidenceModelGateway.Candidate(4,"CASH","Credit limit","400"))));
+        var rejected = service.create(source, "Source", true);
+        assertEquals("LOCAL", rejected.method()); assertTrue(rejected.proposals().isEmpty());
+    }
     @Test void capacityAndRepeatedFactsAreBounded() {
         var draft = service.create("Account: EUR 10", "Source", false);
         var row = new EvidenceIntakeService.Row(1, "CASH", "Account", 1000);
