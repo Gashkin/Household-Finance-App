@@ -455,7 +455,7 @@ export default function MoneyPositionWorkspace({
               <>
                 <label>
                   Review account
-                  <select
+                  <select aria-label="Review account"
                     value={selected}
                     onChange={(e) => setSelected(e.target.value)}
                   >
