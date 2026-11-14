@@ -42,3 +42,12 @@ The Debt decision workspace can turn a short source excerpt into editable, cited
 ## Private records and recovery
 
 Unlock once to access financial workspaces; lock when finished. **Backup & recovery** downloads a passphrase-encrypted archive and restores it into an empty local workspace without overwriting existing records. [Configuration, restart/recovery walkthrough and limits](product/stories/private-workspace.md).
+
+## Reviewed household money position
+
+Open **Money position** to record account evidence, review manual/CSV activity, reconcile a closing statement, and reuse reconciled cash in the debt report. Pending payments, transfers, overdrafts and corrections stay explicit. [Workflow, import format, backup compatibility and banking boundary](product/stories/reviewed-money-position.md). Live bank connectivity is not included or claimed.
+
+
+## GBD-10 sandbox connection
+
+Read-only Enable Banking SANDBOX / Mock ASPSP connection is included in the same GBD-10 PR: [setup, consent, review and protection details](product/stories/enable-banking-sandbox.md). Synthetic protocol/browser evidence is distinct from an owner-run external sandbox smoke test. Production/AIB is tracked by [GBD-14](https://www.notion.so/418d3419fef081808864ca465d4eff7a), after GBD-10 integration and production security readiness/consent. No production access is enabled.

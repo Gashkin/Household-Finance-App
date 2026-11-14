@@ -60,6 +60,12 @@ def validate_definition(story):
         needles = item.get('contains')
         require(isinstance(path, str) and path and not path.startswith('/') and '..' not in path.split('/'), 'Unsafe artifact path')
         require(isinstance(needles, list) and bool(needles) and all(isinstance(value, str) and value.strip() for value in needles), 'contains must be a nonempty list of nonblank marker strings')
+    exception = story.get('copilot_review_exception')
+    if exception is not None:
+        require(story['work_id'] == 'GBD-10' and exception == {
+            'count': 2, 'authorised_by': 'owner',
+            'reason': 'One premature ledger review; final review only after sandbox integration and tests'
+        }, 'Only the explicit owner-authorised GBD-10 two-review exception is allowed')
     return story
 
 
@@ -154,13 +160,14 @@ class Coordinator:
         self.sync(story, token)
         return pr
 
-    def review_gate(self, number):
+    def review_gate(self, number, story=None):
         actors = {'copilot', 'copilot-pull-request-reviewer', 'copilot-pull-request-reviewer[bot]'}
         reviews = [r for r in self.git.reviews(number) if r['user']['login'].lower() in actors
                    and r['user'].get('type') == 'Bot' and r['state'] != 'PENDING']
-        require(len(reviews) == 1, f"Expected exactly one independent Copilot review, found {len(reviews)}. Never request incremental re-reviews")
+        expected = (story or {}).get('copilot_review_exception', {}).get('count', 1)
+        require(len(reviews) == expected, f"Expected exactly {'one' if expected == 1 else 'two'} independent Copilot review(s), found {len(reviews)}. No additional re-reviews")
         require(not any(not t['isResolved'] for t in self.git.threads(number)), "Review conversations remain open; assess, reply with evidence and resolve them")
-        return reviews[0]['id']
+        return reviews[-1]['id']
 
     def pr_gate(self, story, number):
         validate_definition(story)
@@ -171,7 +178,7 @@ class Coordinator:
         require(claim['branch'] == story['branch'] and claim['work_id'] == story['work_id'], 'PR claim does not belong to this story')
         self.owned(story, claim['token'])
         require(len(self.matching_prs(story)) == 1, "Duplicate story PR detected")
-        self.review_gate(number)
+        self.review_gate(number, story)
         return pr
 
     def verify(self, story, number, expected_main=None):
@@ -188,7 +195,7 @@ class Coordinator:
         main = self.git.head('main')
         require(expected_main is None or expected_main == main, "Main advanced; verify the latest main CI, not a stale event")
         require(self.git.reachable(pr['merge_commit_sha'], main), "Merged away from main (PR #16 failure mode). Retarget/integrate under human control; do not mark Done")
-        review = self.review_gate(number)
+        review = self.review_gate(number, story)
         check = self.git.required_check(main)
         require(check and check['status'] == 'completed' and check['conclusion'] == 'success', "Required build-and-test has not passed on this main SHA")
         hashes = {}

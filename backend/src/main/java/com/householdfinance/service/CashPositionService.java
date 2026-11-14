@@ -38,7 +38,13 @@ public class CashPositionService {
     }
 
     @Transactional
-    public Snapshot save(Input input) {
+    public Snapshot save(Input input) { return saveInput(input, false); }
+
+    /** Ledger accounts may be overdrawn; signed balances never represent borrowing headroom. */
+    @Transactional
+    public Snapshot saveLedger(Input input) { return saveInput(input, true); }
+
+    private Snapshot saveInput(Input input, boolean signedCash) {
         if (input == null || input.asOfDate() == null || input.asOfDate().isAfter(LocalDate.now(clock)))
             throw new IllegalArgumentException("asOfDate must be today or an earlier date");
         if (input.sourceNote() == null || input.sourceNote().isBlank() || input.sourceNote().trim().length() > 200)
@@ -54,7 +60,10 @@ public class CashPositionService {
         List<CashPositionLine> lines = new ArrayList<>();
         long cash = 0, committed = 0;
         for (Line line : input.cashBalances()) {
-            validateLine(line);
+            if (signedCash) {
+                if (line == null || line.label() == null || line.label().isBlank() || line.label().length() > 100 || line.amountMinor() < -MAX_SAFE_INTEGER || line.amountMinor() > MAX_SAFE_INTEGER)
+                    throw new IllegalArgumentException("Invalid signed ledger cash balance");
+            } else validateLine(line);
             cash = checkedSum(cash, line.amountMinor());
             lines.add(new CashPositionLine(CashPositionLine.Kind.CASH, line.label().trim(), line.amountMinor()));
         }
@@ -93,7 +102,7 @@ public class CashPositionService {
                 committedTotal = checkedSum(committedTotal, value.amountMinor());
             }
         }
-        long afterCommitments = cashTotal - committedTotal;
+        long afterCommitments = checkedSum(cashTotal, -committedTotal);
         long discretionary = Math.max(0, afterCommitments - entity.getMinimumReserveMinor());
         boolean stale = ChronoUnit.DAYS.between(entity.getAsOfDate(), LocalDate.now(clock)) > 30;
         List<String> warnings = new ArrayList<>();
@@ -120,7 +129,7 @@ public class CashPositionService {
 
     private static long checkedSum(long a, long b) {
         long sum = Math.addExact(a, b);
-        if (sum > MAX_SAFE_INTEGER) throw new IllegalArgumentException("Cash totals exceed the safe integer range");
+        if (sum < -MAX_SAFE_INTEGER || sum > MAX_SAFE_INTEGER) throw new IllegalArgumentException("Cash totals exceed the safe integer range");
         return sum;
     }
 }

@@ -1,0 +1,37 @@
+package com.householdfinance.ledger;
+
+import jakarta.persistence.*;
+
+@Entity
+@Table(
+    name = "ledger_entries",
+    uniqueConstraints = @UniqueConstraint(columnNames = {"account_id", "reference"}))
+public class LedgerEntry {
+  @Id
+  @Column(length = 36)
+  public String id;
+
+  @Column(nullable = false, length = 36, name = "account_id")
+  public String accountId;
+
+  @Column(nullable = false, length = 100)
+  public String reference;
+
+  @Column(nullable = false, name = "activity_date")
+  public java.time.LocalDate date;
+
+  @Column(nullable = false, length = 160)
+  public String description;
+
+  @Column(nullable = false)
+  public long amountMinor;
+
+  @Column(nullable = false, length = 8)
+  public String status;
+
+  @Column(nullable = false, length = 12)
+  public String kind;
+
+  @Column(nullable = false, length = 200)
+  public String source;
+}

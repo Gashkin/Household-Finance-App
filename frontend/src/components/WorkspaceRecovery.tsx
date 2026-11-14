@@ -26,7 +26,7 @@ export default function WorkspaceRecovery(){
     }catch(e){setError((e as Error).message);}finally{setPassword('');setRepeat('');setBusy(false);}
   }
   return <section className="recovery-panel"><h2>Backup & recovery</h2><p>Return to your saved records after restarting the app, or recover them on a fresh local workspace.</p>
-    <p>Backups contain all saved financial records and migration history. Unsaved comparisons and temporary intake drafts are excluded. Downloaded decision JSON reports are separate, unencrypted files.</p>
+    <p>Backups contain all saved financial records, reviewed ledger activity, correction history and migration history. Unsaved comparisons and temporary intake drafts are excluded. Downloaded decision JSON reports are separate, unencrypted files.</p>
     {counts&&<p>Saved records: {Object.values(counts).reduce((a,b)=>a+b,0)}. {empty?'This workspace is empty and can receive a backup.':'Recovery is blocked here to protect existing records.'}</p>}
     <label>Backup passphrase<input type="password" autoComplete="new-password" minLength={16} maxLength={256} value={password} onChange={e=>setPassword(e.target.value)} disabled={busy}/></label>
     <label>Repeat backup passphrase<input type="password" autoComplete="new-password" maxLength={256} value={repeat} onChange={e=>setRepeat(e.target.value)} disabled={busy}/></label>

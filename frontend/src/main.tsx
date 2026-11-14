@@ -1,6 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { captureSandboxCallback } from './api/bankSandbox';
+captureSandboxCallback();
 import WorkspaceGate from './components/WorkspaceGate';
 import { installWorkspaceTransport } from './api/workspace';
 installWorkspaceTransport();
