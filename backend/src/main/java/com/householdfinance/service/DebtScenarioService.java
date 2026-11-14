@@ -1,12 +1,14 @@
 package com.householdfinance.service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
 @Service
 public class DebtScenarioService {
-    public record Input(long balanceMinor, double annualRatePercent, long monthlyPaymentMinor,
+    public record Input(long balanceMinor, BigDecimal annualRatePercent, long monthlyPaymentMinor,
                         long extraPaymentMinor, long liquidCashMinor, long minimumReserveMinor) {}
     public record Schedule(int months, long interestMinor, long totalPaidMinor, long finalPaymentMinor) {}
     public record Result(Schedule baseline, Schedule withExtraPayment, long interestSavedMinor,
@@ -21,13 +23,13 @@ public class DebtScenarioService {
         requireNonNegative(input.minimumReserveMinor(), "minimumReserveMinor");
         if (input.balanceMinor() == 0 || input.monthlyPaymentMinor() == 0)
             throw new IllegalArgumentException("Balance and monthly payment must be greater than zero");
-        if (!Double.isFinite(input.annualRatePercent()) || input.annualRatePercent() < 0 || input.annualRatePercent() > 100)
+        if (input.annualRatePercent() == null || input.annualRatePercent().compareTo(BigDecimal.ZERO) < 0 || input.annualRatePercent().compareTo(BigDecimal.valueOf(100)) > 0)
             throw new IllegalArgumentException("annualRatePercent must be between 0 and 100");
         if (input.extraPaymentMinor() > input.balanceMinor())
             throw new IllegalArgumentException("extraPaymentMinor cannot exceed outstanding balance");
         if (input.extraPaymentMinor() > input.liquidCashMinor())
             throw new IllegalArgumentException("extraPaymentMinor cannot exceed available liquid cash");
-        double monthlyRate = input.annualRatePercent() / 1200d;
+        BigDecimal monthlyRate = input.annualRatePercent().divide(BigDecimal.valueOf(1200), 24, RoundingMode.HALF_UP);
         Schedule baseline = simulate(input.balanceMinor(), input.monthlyPaymentMinor(), monthlyRate);
         Schedule extra = input.extraPaymentMinor() == input.balanceMinor()
                 ? new Schedule(0, 0, 0, 0)
@@ -36,7 +38,7 @@ public class DebtScenarioService {
         long shortfall = Math.max(0, input.minimumReserveMinor() - remainingCash);
         List<String> warnings = new ArrayList<>();
         if (shortfall > 0) warnings.add("Extra repayment would leave cash below the stated minimum reserve");
-        if (input.annualRatePercent() == 0) warnings.add("Interest savings are zero at a 0% rate");
+        if (input.annualRatePercent().signum() == 0) warnings.add("Interest savings are zero at a 0% rate");
         return new Result(baseline, extra, baseline.interestMinor() - extra.interestMinor(),
                 baseline.months() - extra.months(), remainingCash, shortfall, warnings, List.of(
                 "Annual interest rate stays fixed and is divided by 12 for monthly interest",
@@ -50,14 +52,12 @@ public class DebtScenarioService {
         if (value < 0 || value > Number.MAX_SAFE_INTEGER) throw new IllegalArgumentException(field + " must be a non-negative safe integer");
     }
 
-    private static Schedule simulate(long balance, long payment, double monthlyRate) {
+    private static Schedule simulate(long balance, long payment, BigDecimal monthlyRate) {
         long remaining = balance, interestTotal = 0, paidTotal = 0, finalPayment = 0;
         int months = 0;
         while (remaining > 0) {
             if (months >= 1200) throw new IllegalArgumentException("Debt is not repaid within 1200 months");
-            double rawInterest = remaining * monthlyRate;
-            if (rawInterest > Number.MAX_SAFE_INTEGER) throw new IllegalArgumentException("Interest exceeds safe integer range");
-            long interest = Math.round(rawInterest);
+            long interest = BigDecimal.valueOf(remaining).multiply(monthlyRate).setScale(0, RoundingMode.HALF_UP).longValueExact();
             if (payment <= interest) throw new IllegalArgumentException("Monthly payment does not cover interest and reduce principal");
             long due = Math.addExact(remaining, interest);
             long actual = Math.min(payment, due);
