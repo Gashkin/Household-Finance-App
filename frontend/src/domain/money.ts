@@ -16,5 +16,7 @@ export function parseMoney(value: string, label: string): number {
 
 export function minorToInput(minor: number): string {
   if (!Number.isSafeInteger(minor) || minor < 0) throw new RangeError('Cash amount is not usable');
-  return (minor / 100).toFixed(2);
+  const euros = Math.floor(minor / 100);
+  const cents = String(minor % 100).padStart(2, '0');
+  return euros + '.' + cents;
 }
