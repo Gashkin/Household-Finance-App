@@ -63,10 +63,10 @@ public class CashPositionService {
             committed = checkedSum(committed, line.amountMinor());
             lines.add(new CashPositionLine(CashPositionLine.Kind.COMMITMENT, line.label().trim(), line.amountMinor()));
         }
-        repository.saveAndFlush(new CashPositionSnapshotEntity(UUID.randomUUID().toString(), input.asOfDate(),
-                Instant.now(clock), input.sourceNote().trim(), input.verification(),
-                input.minimumReserveMinor(), lines));
-        return latest().orElseThrow();
+        CashPositionSnapshotEntity saved = repository.saveAndFlush(new CashPositionSnapshotEntity(
+                UUID.randomUUID().toString(), input.asOfDate(), Instant.now(clock),
+                input.sourceNote().trim(), input.verification(), input.minimumReserveMinor(), lines));
+        return toSnapshot(saved);
     }
 
     @Transactional(readOnly = true)
