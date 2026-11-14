@@ -21,6 +21,19 @@ Do not:
 
 Instead, discover the actual household jobs, user needs, decisions, risks and desired outcomes. Design the coherent end-to-end product first. Then assess existing assets objectively for reuse, replacement or retirement. Reuse is an engineering optimisation, never a product requirement.
 
+## Operational input: preserve the real household workflows as evidence
+
+Greenfield functionality does not mean discarding the operational knowledge embedded in the existing Household Budget Manager (HBM) and Financial Planner board. These are important primary research inputs because they show how the household actually operates today.
+
+Two workflows are especially valuable:
+
+1. **Household expense management in HBM.** How expenses are captured, organised, reviewed and managed; how recurring commitments and irregular costs are understood; what needs attention; and how the household turns day-to-day financial activity into a reliable view of its position.
+2. **Financial plan review in the Financial Planner board.** How the household reviews its financial plans, gathers and checks evidence, considers assumptions, evaluates options and trade-offs, records decisions, tracks follow-up actions and revisits plans as circumstances change.
+
+Treat these workflows as observed operational behaviour and domain evidence—not as screens or feature specifications to clone. Extract the underlying jobs, decisions, information needs, hand-offs, pain points, workarounds, controls and successful outcomes. Preserve what genuinely works, challenge what creates friction, and redesign the experience where a more coherent product can do better.
+
+The intended product should connect these two modes of household financial management: the ongoing operational reality of managing money, and the periodic/triggered work of reviewing and changing financial plans. They should not become disconnected applications or separate data silos. Actual household activity should inform planning; plans and decisions should in turn inform what the household monitors and manages.
+
 ## Product thesis
 
 A household's financial decisions are connected. Debt repayment affects liquidity; liquidity affects pension contributions; pension contributions affect retirement outcomes and tax; mortgage choices compete with savings and home investment. Existing tools commonly expose fragments of this picture.
@@ -140,7 +153,7 @@ Existing technical architecture may be reused where it meets these needs. Re-eva
 
 ## Regulatory product boundary
 
-The initial product is a financial organisation, education, calculation and decision-support tool. It must not cross into regulated investment, insurance or mortgage intermediation/advice by implication or by AI-generated wording.
+The initial product is a financial organisation, education, calculation and decision-support tool. It must not cross into regulated investment, insurance or mortgage product recommendations/intermediation by implication or by AI-generated wording.
 
 Before enabling personalised product recommendations, arranging products, facilitating transactions or offering regulated advice, obtain specialist Irish/EU regulatory advice and determine the required authorisation, permissions, controls and operating model. Open-banking account access must also be assessed against applicable payment-services authorisation requirements and partner models.
 
@@ -148,13 +161,15 @@ Product language, feature gates, model prompts and user journeys must preserve t
 
 ## Product development approach
 
-1. Discover the real household jobs, pain points, decisions and desired outcomes from the family use case.
-2. Map the end-to-end experience without assuming existing screens, features or data structures.
-3. Identify the smallest coherent product that delivers meaningful household value.
-4. Define the domain model, calculations, evidence and safety requirements needed for that experience.
-5. Evaluate existing code and knowledge against the target; reuse, adapt, replace or discard each part deliberately.
-6. Build and test complete user journeys with realistic data and edge cases.
-7. Expand into broader household needs and markets based on validated value.
+1. Study the real HBM expense-management workflow and Financial Planner review workflow as operational research.
+2. Extract the underlying household jobs, decisions, information, evidence, controls, friction and desired outcomes.
+3. Discover adjacent needs and gaps that those current workflows do not address.
+4. Design the end-to-end experience from scratch, connecting day-to-day money management with longer-term planning.
+5. Identify the smallest coherent product that delivers meaningful household value.
+6. Define the domain model, calculations, evidence and safety requirements needed for that experience.
+7. Evaluate existing code and knowledge against the target; reuse, adapt, replace or discard each part deliberately.
+8. Build and test complete user journeys with realistic data and edge cases.
+9. Expand into broader household needs and markets based on validated value.
 
 The roadmap is owned by product outcomes and dependencies, not by the structure of an inherited board or repository.
 
