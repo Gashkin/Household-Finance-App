@@ -1,9 +1,9 @@
 # Public repository data hygiene
 
 ## Tracked files and exposure
-The repository historically included a local H2 database, its trace file, a household workbook and generated analysis artifacts. This cleanup prevents those files from remaining in the latest source tree or being accidentally recommitted. **It does not remove them from the earlier Git history or copies already downloaded.**
+The repository historically included a local H2 database, its trace file, a household workbook, manually supplied SQL account/payment fixtures and generated analysis artifacts. This cleanup prevents those files from remaining in the latest source tree or being accidentally recommitted. **It does not remove them from the earlier Git history or copies already downloaded.**
 
-Do not commit live financial records, statements, bank exports, credentials, private workbook extracts, .env files, or database files. Use synthetic test fixtures when examples are needed.
+Do not commit live financial records, statements, bank exports, credentials, private workbook extracts, payment/commitment SQL fixtures, .env files, or database files. Workbook inspection scripts require an explicit local --input path; private source workbooks are never loaded from the repository by default. Use synthetic test fixtures when examples are needed.
 
 ## Important before merging or pulling the cleanup
 Back up local copies of the database and workbook outside the repository first. When Git removes tracked files on checkout/pull, those local files may also be removed. The application will create a new local H2 store when started after cleanup.
