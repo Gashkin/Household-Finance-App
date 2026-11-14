@@ -1,13 +1,80 @@
 {
-  "work_id":"GBD-10",
-  "page_id":"418d3419-fef0-8115-af0b-fa34604f8494",
-  "branch":"story/10-delivery",
-  "artifacts":[
-    {"path":"backend/src/main/java/com/householdfinance/ledger/LedgerService.java","contains":["SETTLE_PENDING","afterCommit()","PUBLISH_EVIDENCE","Reconcile every cash account"]},
-    {"path":"backend/src/main/java/com/householdfinance/ledger/LedgerController.java","contains":["ACCEPT_FLOAT_AS_INT","/publish","CoercionAction.Fail"]},
-    {"path":"frontend/src/components/MoneyPositionWorkspace.tsx","contains":["Household money position","Confirm reconciliation","Save position and open debt decision"]},
-    {"path":"backend/src/main/java/com/householdfinance/workspace/WorkspaceBackupService.java","contains":["LEDGER_ACCOUNTS","V1_TABLES","restoreTables"]},
-    {"path":"backend/src/test/java/com/householdfinance/ledger/LedgerJourneyTest.java","contains":["approvalRetryDoesNotCacheARolledBackTransaction","ledgerAuditAndPublishedEvidenceSurviveEncryptedRecoveryAndV1StillRestores"]},
-    {"path":"frontend/e2e/money-position.spec.ts","contains":["pending-safe cash position","report.cashEvidence.id"]}
-  ]
+  "work_id": "GBD-10",
+  "page_id": "418d3419-fef0-8115-af0b-fa34604f8494",
+  "branch": "story/10-delivery",
+  "artifacts": [
+    {
+      "path": "backend/src/main/java/com/householdfinance/ledger/LedgerService.java",
+      "contains": [
+        "SETTLE_PENDING",
+        "afterCommit()",
+        "PUBLISH_EVIDENCE",
+        "Reconcile every cash account"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/householdfinance/ledger/LedgerController.java",
+      "contains": [
+        "ACCEPT_FLOAT_AS_INT",
+        "/publish",
+        "CoercionAction.Fail"
+      ]
+    },
+    {
+      "path": "frontend/src/components/MoneyPositionWorkspace.tsx",
+      "contains": [
+        "Household money position",
+        "Confirm reconciliation",
+        "Save position and open debt decision"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/householdfinance/workspace/WorkspaceBackupService.java",
+      "contains": [
+        "LEDGER_ACCOUNTS",
+        "V1_TABLES",
+        "restoreTables"
+      ]
+    },
+    {
+      "path": "backend/src/test/java/com/householdfinance/ledger/LedgerJourneyTest.java",
+      "contains": [
+        "approvalRetryDoesNotCacheARolledBackTransaction",
+        "ledgerAuditAndPublishedEvidenceSurviveEncryptedRecoveryAndV1StillRestores"
+      ]
+    },
+    {
+      "path": "frontend/e2e/money-position.spec.ts",
+      "contains": [
+        "pending-safe cash position",
+        "report.cashEvidence.id"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/householdfinance/bank/SandboxGateway.java",
+      "contains": [
+        "production is blocked",
+        "BoundedBody"
+      ]
+    },
+    {
+      "path": "backend/src/test/java/com/householdfinance/bank/SandboxProtocolTest.java",
+      "contains": [
+        "callbackStateIsBoundToOriginalWorkspaceAndSingleUse",
+        "failedPaginationMissingIdentityAndOversizeNeverProducePartialImports"
+      ]
+    },
+    {
+      "path": "frontend/e2e/sandbox-connection.spec.ts",
+      "contains": [
+        "synthetic read-only accounts",
+        "Approve selected activity"
+      ]
+    }
+  ],
+  "copilot_review_exception": {
+    "count": 2,
+    "authorised_by": "owner",
+    "reason": "One premature ledger review; final review only after sandbox integration and tests"
+  }
 }

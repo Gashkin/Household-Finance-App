@@ -1,3 +1,4 @@
+import BankSandboxPanel from "./BankSandboxPanel";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ledger,
@@ -315,6 +316,32 @@ export default function MoneyPositionWorkspace({
       {message && <p role="status">{message}</p>}
       {busy && <p role="status">Saving or checking reviewed facts…</p>}
       <fieldset disabled={busy} className="ledger-controls">
+        <BankSandboxPanel
+          ledgerAccountId={selected}
+          openingDate={account?.openingDate}
+          onBusy={setBusy}
+          onPreview={(value) => {
+            setPreview(value.preview);
+            setProposals(
+              value.preview.proposals.map((p) => ({
+                ...p,
+                include:
+                  p.disposition !== "DUPLICATE" && p.disposition !== "CONFLICT",
+              })),
+            );
+            setReviewed(false);
+            setMessage(
+              "Sandbox activity fetched. Review proposed facts before approval.",
+            );
+            setTimeout(
+              () =>
+                document
+                  .getElementById("ledger-import-review")
+                  ?.setAttribute("open", ""),
+              0,
+            );
+          }}
+        />
         <button type="button" onClick={() => run(refresh)}>
           Reload reviewed position
         </button>
@@ -417,7 +444,9 @@ export default function MoneyPositionWorkspace({
                 <p>
                   The opening figure is before that day’s activity. Use the
                   previous day’s closing statement figure. Do not enter a credit
-                  limit.
+                  limit. A positive debt balance means an actual statement
+                  credit or overpayment, never an unused borrowing limit; it is
+                  excluded from spendable cash.
                 </p>
                 <button>Create ledger account</button>
               </form>
@@ -463,7 +492,7 @@ export default function MoneyPositionWorkspace({
                           `Last statement ${account.reconciledDate}: ${account.reconciledSource}`}
                       </p>
                     </section>
-                    <details className="ledger-card">
+                    <details id="ledger-import-review" className="ledger-card">
                       <summary>Preview and review CSV activity</summary>
                       <p>
                         Use this exact header:{" "}
@@ -496,18 +525,17 @@ export default function MoneyPositionWorkspace({
                           }}
                         />
                       </label>
-                      <label>
-                        Activity CSV
-                        <textarea
-                          rows={7}
-                          value={csv}
-                          onChange={(e) => {
-                            setCsv(e.target.value);
-                            setPreview(null);
-                          }}
-                          maxLength={100000}
-                        />
-                      </label>
+                      <label htmlFor="ledger-csv">Activity CSV</label>
+                      <textarea
+                        id="ledger-csv"
+                        rows={7}
+                        value={csv}
+                        onChange={(e) => {
+                          setCsv(e.target.value);
+                          setPreview(null);
+                        }}
+                        maxLength={100000}
+                      />
                       <label>
                         CSV source reference
                         <input

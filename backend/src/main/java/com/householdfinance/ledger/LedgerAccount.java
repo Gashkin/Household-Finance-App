@@ -24,6 +24,9 @@ public class LedgerAccount {
   @Column(nullable = false, length = 200)
   public String source;
 
+  @Column(length = 64, unique = true)
+  public String sandboxIdentity;
+
   @Column(nullable = false)
   public long revision;
 

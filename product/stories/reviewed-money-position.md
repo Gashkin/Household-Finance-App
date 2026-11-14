@@ -33,7 +33,7 @@ Limits: 30 accounts, 500 rows/import, 100,000 CSV characters, 32 active ten-minu
 
 ## Private storage, retention and recovery
 
-All ledger endpoints inherit the whole-app authenticated loopback/Host/origin/request-header boundary; there is no unauthenticated banking bypass or client-side financial authority. New input handling rejects fractional/string revisions, coerced numeric money fields, string booleans, null/incomplete requests and unknown properties. Error messages do not echo source rows or private account data. There is no provider client, external HTTP fetch, automatic AI forwarding, payment endpoint, background bank refresh, credential-entry form, or bank token/key storage in this feature.
+All ledger endpoints inherit the whole-app authenticated loopback/Host/origin/request-header boundary; there is no unauthenticated banking bypass or client-side financial authority. New input handling rejects fractional/string revisions, coerced numeric money fields, string booleans, null/incomplete requests and unknown properties. Error messages do not echo source rows or private account data. The sandbox connector uses explicit bounded AIS requests and in-memory provider references with a protected server key file. There is no automatic AI forwarding, payment endpoint, background bank refresh or credential-entry form.
 
 | Boundary | Data and control |
 | --- | --- |
@@ -53,8 +53,13 @@ The owner's Enable Banking registration and MFA are complete in **SANDBOX**. The
 
 Official [personal-use terms](https://enablebanking.com/terms/) and [linked-account activation](https://enablebanking.com/docs/api/linked-accounts/) support investigating restricted own-account production use. [Sandbox documentation](https://enablebanking.com/docs/api/sandbox/) describes synthetic Mock ASPSPs. [Registration](https://enablebanking.com/docs/api/control-panel/) requires local key management and provider-specific application details. This research is part of this story; no extra research PR.
 
-**Selected boundary:** finish the coherent reviewed ledger and offline import/reconciliation capability now. A live provider connection is not implemented or validated by this PR. It needs a separately assessed complete connection capability: AIS-only endpoints/scopes, server-side protected secrets, state-bound consent callback, account selection, expiry/status, stable IDs/pagination, refresh/retry, disconnect/revoke/local deletion and negative security tests. Do not collect bank credentials or use payment endpoints. Actual AIB current/card/joint coverage, usage limits/costs and local callback acceptance remain unverified. Owner-controlled production registration/consent and a passed readiness review are prerequisites to a narrowly scoped real-account smoke test; they do not block this synthetic ledger delivery.
+**Selected boundary:** the same GBD-10 PR includes reviewed ledger/manual/CSV and a read-only synthetic Enable Banking sandbox connection; see the sandbox setup below. External sandbox authentication remains owner-run and unverified without local key provisioning. Production/AIB is the separate concrete GBD-14 story, requiring readiness and personal bank consent.
 
 ## Verification
 
 Backend domain/real-filter HTTP cases cover review → cash/debt/net position → reconciliation → snapshot → debt report; stable-ID duplicates/settlement, overlap acknowledgement, atomic conflict rollback, correction/VOID history, explicit adjustment, stale revisions/types, negative cash, encrypted new/legacy recovery and approval rollback/retry. File-backed application-context tests close/reopen both source and recovered databases including ledger entries/audits. Frontend transport tests preserve exact signed amounts/server authority and explain uncertain outcomes. Real desktop/mobile browser journeys edit proposed facts, replay approval, identify duplicates, correct a saved entry, acknowledge a statement difference and download the resulting evidence-linked debt report. CI uses only synthetic records and GitHub-hosted runners; no external banking or model calls.
+
+
+## GBD-10 sandbox connection
+
+Read-only Enable Banking SANDBOX / Mock ASPSP connection is included in the same GBD-10 PR: [setup, consent, review and protection details](enable-banking-sandbox.md). Synthetic protocol/browser evidence is distinct from an owner-run external sandbox smoke test. Production/AIB is tracked by [GBD-14](https://www.notion.so/418d3419fef081808864ca465d4eff7a), after GBD-10 integration and production security readiness/consent. No production access is enabled.

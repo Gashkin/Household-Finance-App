@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { minorToInput, parseMoney } from '../src/domain/money.ts';
+import { money, minorToInput, parseMoney } from '../src/domain/money.ts';
 
 test('parses euros as exact minor units', () => {
   assert.equal(parseMoney('0', 'Cash'), 0);
@@ -14,4 +14,10 @@ test('rejects invalid and unsafe money values before an HTTP call', () => {
     assert.throws(() => parseMoney(invalid, 'Cash'));
   }
   assert.throws(() => minorToInput(-1));
+});
+
+test('renders signed cent precision at safe integer limits without floating point loss', () => {
+  assert.equal(money(9007199254740991), '€90,071,992,547,409.91');
+  assert.equal(money(-9007199254740991), '-€90,071,992,547,409.91');
+  assert.equal(money(-1), '-€0.01');
 });

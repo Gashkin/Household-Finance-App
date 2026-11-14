@@ -80,6 +80,21 @@ class LedgerJourneyTest {
             "Synthetic opening statement"));
   }
 
+  @Test
+  void positiveDebtStatementCreditIncreasesNetButNeverSpendableCash() {
+    var credit = account("DEBT", "25.00");
+    var position = service.position(today);
+    assertEquals(
+        2500,
+        position.accounts().stream()
+            .filter(a -> a.id().equals(credit.id()))
+            .findFirst()
+            .orElseThrow()
+            .bookedMinor());
+    assertEquals(0, position.cashMinor());
+    assertEquals(2500, position.netMinor());
+  }
+
   LedgerService.Row row(String reference, String amount, String state, String kind) {
     return new LedgerService.Row(reference, today, "Synthetic " + reference, amount, state, kind);
   }

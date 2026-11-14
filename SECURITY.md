@@ -24,4 +24,9 @@ Whole-app loopback-only password sessions now protect every financial backend ro
 
 ## Reviewed ledger (GBD-10)
 
-The ledger retains reviewed financial facts/correction history behind the existing local session gate and includes them in encrypted backup/recovery. This slice has no banking transport or provider credential fields, no payment calls and no automatic financial-data forwarding. Sandbox registration/MFA is not live-bank readiness. [Trust boundaries, retention, recovery and remaining bank-readiness requirements](product/stories/reviewed-money-position.md).
+The ledger retains reviewed financial facts/correction history behind the existing local session gate and includes them in encrypted backup/recovery. The sandbox extension uses protected server-side signing material and bounded AIS transport, with no payment calls or automatic financial-data forwarding. Sandbox registration/MFA is not live-bank readiness. [Trust boundaries, retention, recovery and remaining bank-readiness requirements](product/stories/reviewed-money-position.md).
+
+
+## GBD-10 sandbox connection
+
+Read-only Enable Banking SANDBOX / Mock ASPSP connection is included in the same GBD-10 PR: [setup, consent, review and protection details](product/stories/enable-banking-sandbox.md). Synthetic protocol/browser evidence is distinct from an owner-run external sandbox smoke test. Production/AIB is tracked by [GBD-14](https://www.notion.so/418d3419fef081808864ca465d4eff7a), after GBD-10 integration and production security readiness/consent. No production access is enabled.

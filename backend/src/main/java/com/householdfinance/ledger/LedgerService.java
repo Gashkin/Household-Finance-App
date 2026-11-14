@@ -247,6 +247,29 @@ public class LedgerService {
     return view(a, today());
   }
 
+  @Transactional
+  public void bindSandboxIdentity(String id, String identity) {
+    check(identity != null && identity.matches("[0-9a-f]{64}"), "Invalid sandbox account identity");
+    var a = account(id);
+    check(
+        a.sandboxIdentity == null || a.sandboxIdentity.equals(identity),
+        "This ledger is already linked to a different sandbox account");
+    check(
+        accounts.findAll().stream()
+            .noneMatch(other -> !other.id.equals(id) && identity.equals(other.sandboxIdentity)),
+        "This sandbox account is already mapped to another ledger; reuse that ledger");
+    if (a.sandboxIdentity == null) {
+      a.sandboxIdentity = identity;
+      accounts.saveAndFlush(a);
+    }
+  }
+
+  @Transactional
+  public synchronized Preview sandboxPreview(String id, String identity, PreviewInput input) {
+    bindSandboxIdentity(id, identity);
+    return preview(id, input);
+  }
+
   private Row row(LedgerEntry e) {
     return new Row(
         e.reference,

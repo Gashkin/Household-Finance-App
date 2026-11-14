@@ -7,7 +7,7 @@ import MigraterWorkspace from './components/MigraterWorkspace';
 import PlannerWorkspace from './components/PlannerWorkspace';
 
 function App() {
-  const [role, setRole] = useState<'decision' | 'planner' | 'migrater' | 'consumer' | 'recovery' | 'money'>('decision');
+  const [role, setRole] = useState<'decision' | 'planner' | 'migrater' | 'consumer' | 'recovery' | 'money'>(location.pathname === '/bank/callback' ? 'money' : 'decision');
 
   return (
     <div className="app-shell">

@@ -52,6 +52,11 @@ public class WorkspaceFilter extends OncePerRequestFilter {
     private boolean expired(Session s, Instant now) {
         return !now.isBefore(s.seen().plusSeconds(1800)) || !now.isBefore(s.created().plusSeconds(28800));
     }
+    public synchronized String sessionBinding(HttpServletRequest request) {
+        if (!authenticated(request)) throw new IllegalArgumentException("Unlock the workspace before connecting");
+        try { return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token(request).getBytes(StandardCharsets.UTF_8))); }
+        catch (java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
+    }
     private String token(HttpServletRequest request) {
         if (request.getCookies() != null) for (Cookie c : request.getCookies()) if (c.getName().equals("workspace_session")) return c.getValue();
         return "";

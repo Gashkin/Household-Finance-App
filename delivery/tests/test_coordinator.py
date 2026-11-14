@@ -201,6 +201,19 @@ class CoordinationIntegrationTests(unittest.TestCase):
         self.git.thread_items[0]['isResolved'] = True
         self.assertEqual(self.c.pr_gate(STORY, 1)['number'], 1)
 
+    def test_owner_exception_is_limited_to_two_reviews_for_gbd10(self):
+        self.ready_pr()
+        story = {**STORY, 'copilot_review_exception': {'count': 2, 'authorised_by': 'owner',
+            'reason': 'One premature ledger review; final review only after sandbox integration and tests'}}
+        with self.assertRaisesRegex(Blocked, 'exactly two'): self.c.pr_gate(story, 1)
+        self.git.review_items.append({**self.git.review_items[0], 'id': 124})
+        self.assertEqual(self.c.pr_gate(story, 1)['number'], 1)
+        with self.assertRaisesRegex(Blocked, 'found 2'): self.c.pr_gate(STORY, 1)
+        self.git.review_items.append({**self.git.review_items[0], 'id': 125})
+        with self.assertRaisesRegex(Blocked, 'found 3'): self.c.pr_gate(story, 1)
+        with self.assertRaises(Blocked): validate_definition({**story, 'work_id': 'GBD-14', 'branch': 'story/14-delivery'})
+        with self.assertRaises(Blocked): validate_definition({**story, 'copilot_review_exception': {'count': 3}})
+
     def test_closed_pr_cannot_be_bypassed_and_slug_cannot_change_claim_identity(self):
         self.ready_pr(); self.git.prs[0]['state'] = 'closed'
         with self.assertRaises(Blocked): self.c.publish(STORY, 'owner-A', 'Replacement', 'No')
