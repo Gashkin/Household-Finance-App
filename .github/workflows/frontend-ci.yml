@@ -1,15 +1,9 @@
-name: Frontend CI
+name: Required CI
 
 on:
   pull_request:
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/frontend-ci.yml'
   push:
     branches: [main]
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/frontend-ci.yml'
   workflow_dispatch:
 
 permissions:
@@ -17,11 +11,9 @@ permissions:
 
 jobs:
   build-and-test:
+    name: build-and-test
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: frontend
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,14 +21,29 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Install dependencies
+      - name: Install frontend dependencies
+        working-directory: frontend
         run: npm ci
-      - name: Run domain tests
+      - name: Run frontend domain tests
+        working-directory: frontend
+        shell: bash
         run: |
-          if compgen -G "tests/*.test.ts" > /dev/null; then
-            node --experimental-strip-types --test tests/*.test.ts
+          shopt -s nullglob
+          tests=(tests/*.test.ts)
+          if (( ${#tests[@]} > 0 )); then
+            node --experimental-strip-types --test "${tests[@]}"
           else
             echo "No domain tests yet"
           fi
-      - name: Typecheck and build
+      - name: Typecheck and build frontend
+        working-directory: frontend
         run: npm run build
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - name: Test and package backend
+        working-directory: backend
+        run: mvn --batch-mode --no-transfer-progress verify
