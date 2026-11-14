@@ -5,6 +5,7 @@ export type DebtScenarioInput = {
   extraPaymentMinor: number;
   liquidCashMinor: number;
   minimumReserveMinor: number;
+  cashPositionSnapshotId?: string;
 };
 export type DebtSchedule = {
   months: number;
