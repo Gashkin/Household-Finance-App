@@ -32,10 +32,8 @@ class DebtScenarioServiceTest {
         assertEquals(0, result.interestSavedMinor());
     }
     @Test void roundsHalfCentInterestUpExactly() {
-        var result = service.compare(new DebtScenarioService.Input(6000, new BigDecimal("0.7"), 100, 0, 0, 0));
-        assertEquals(4, result.baseline().interestMinor() > 0 ? 4 : 0);
-        assertEquals(4, new BigDecimal("6000").multiply(new BigDecimal("0.7"))
-                .divide(new BigDecimal("1200"), 0, java.math.RoundingMode.HALF_UP).longValueExact());
+        var result = service.compare(new DebtScenarioService.Input(6000, new BigDecimal("0.7"), 6000, 0, 0, 0));
+        assertEquals(4, result.baseline().interestMinor());
     }
 
     @Test void rejectsPaymentThatDoesNotCoverRoundedInterest() {
