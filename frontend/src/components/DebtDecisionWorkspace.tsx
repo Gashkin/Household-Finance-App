@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { compareDebtScenario, type DebtScenarioInput, type DebtScenarioResult } from '../api/debtScenarios';
 
 const euro = new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' });
@@ -24,6 +24,7 @@ function parseMoney(value: string, label: string): number {
 
 export default function DebtDecisionWorkspace() {
   const [values, setValues] = useState(defaults);
+  const requestVersion = useRef(0);
   const [result, setResult] = useState<DebtScenarioResult | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,6 +34,7 @@ export default function DebtDecisionWorkspace() {
     event.preventDefault();
     setError('');
     setResult(null);
+    const version = ++requestVersion.current;
     try {
       const rate = Number(values.rate);
       if (!/^\d+(?:\.\d+)?$/.test(values.rate) || !Number.isFinite(rate))
@@ -46,11 +48,12 @@ export default function DebtDecisionWorkspace() {
         minimumReserveMinor: parseMoney(values.reserve, 'Minimum cash reserve'),
       };
       setLoading(true);
-      setResult(await compareDebtScenario(input));
+      const response = await compareDebtScenario(input);
+      if (version === requestVersion.current) setResult(response);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unable to calculate scenario');
+      if (version === requestVersion.current) setError(e instanceof Error ? e.message : 'Unable to calculate scenario');
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
   }
 
@@ -69,7 +72,7 @@ export default function DebtDecisionWorkspace() {
               <label key={key} className="debt-field">
                 <span>{label}</span>
                 <small>{hint}</small>
-                <input inputMode="decimal" value={values[key]} onChange={(event) => setValues(current => ({ ...current, [key]: event.target.value }))} aria-label={label} />
+                <input inputMode="decimal" value={values[key]} onChange={(event) => { requestVersion.current++; setResult(null); setError(''); setLoading(false); setValues(current => ({ ...current, [key]: event.target.value })); }} aria-label={label} />
               </label>
             ))}
           </div>
