@@ -80,7 +80,7 @@ public class WorkspaceBackupService {
         try { archive = json.readValue(plain,Archive.class); }
         catch (Exception e) { throw new IllegalArgumentException("Invalid backup contents"); }
         finally { Arrays.fill(plain,(byte)0); }
-        if (archive.version()!=1 || archive.createdAt()==null || archive.tables()==null || !archive.tables().keySet().equals(new HashSet<>(TABLES))) throw new IllegalArgumentException("Incomplete or unsupported backup");
+        if (archive==null || archive.version()!=1 || archive.createdAt()==null || archive.tables()==null || !archive.tables().keySet().equals(new HashSet<>(TABLES))) throw new IllegalArgumentException("Incomplete or unsupported backup");
         try { Instant.parse(archive.createdAt()); } catch (Exception e) { throw new IllegalArgumentException("Invalid backup timestamp"); }
         // Validate the entire manifest before the first insert. A later constraint error rolls back all tables.
         for (String table : TABLES) {

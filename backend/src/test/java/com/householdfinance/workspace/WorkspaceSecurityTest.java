@@ -66,6 +66,9 @@ class WorkspaceSecurityTest {
         assertThrows(IllegalArgumentException.class,()->backups.restore(encrypted,"wrong-password-123456","RESTORE INTO EMPTY WORKSPACE"));
         byte[] damaged=encrypted.clone();damaged[damaged.length-1]^=1;
         assertThrows(IllegalArgumentException.class,()->backups.restore(damaged,"separate-synthetic-backup-passphrase","RESTORE INTO EMPTY WORKSPACE"));
+        byte[] nullArchive=BackupCrypto.encrypt("null".getBytes(java.nio.charset.StandardCharsets.UTF_8),"separate-synthetic-backup-passphrase");
+        mvc.perform(postJson("/api/workspace/restore",Map.of("password","separate-synthetic-backup-passphrase","backup",Base64.getEncoder().encodeToString(nullArchive),"confirmation","RESTORE INTO EMPTY WORKSPACE"))).andExpect(status().isBadRequest());
+        assertTrue(backups.counts().values().stream().allMatch(n->n==0));
         var archive=json.readValue(BackupCrypto.decrypt(encrypted,"separate-synthetic-backup-passphrase"),WorkspaceBackupService.Archive.class);
         var missing=new LinkedHashMap<>(archive.tables());missing.remove("TRANSACTIONS");
         byte[] incomplete=BackupCrypto.encrypt(json.writeValueAsBytes(new WorkspaceBackupService.Archive(1,archive.createdAt(),missing)),"separate-synthetic-backup-passphrase");
