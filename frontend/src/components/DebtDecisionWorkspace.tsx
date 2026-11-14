@@ -54,6 +54,7 @@ export default function DebtDecisionWorkspace() {
         extraPaymentMinor: parseMoney(values.extra, 'Extra repayment'),
         liquidCashMinor: parseMoney(values.cash, 'Available cash'),
         minimumReserveMinor: parseMoney(values.reserve, 'Minimum cash reserve'),
+        ...(sourceSnapshot ? { cashPositionSnapshotId: sourceSnapshot.id } : {}),
       };
       setLoading(true);
       const response = await compareDebtScenario(input);
