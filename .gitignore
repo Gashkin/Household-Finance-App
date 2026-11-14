@@ -38,7 +38,13 @@ frontend/dist/
 /data/
 /**/data/*.mv.db
 /**/data/*.trace.db
-/Docs/*.xlsx
+**/*.xlsx
+**/*.xlsm
+**/*.xls
+**/*.ods
+/backend/sql/*.sql
+/AnalysisScripts/*.csv
+/Docs/*.csv
 **/__pycache__/
 *.py[cod]
 .env
