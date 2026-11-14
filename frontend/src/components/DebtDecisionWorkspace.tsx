@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { calculateDebtScenario, type DebtScenarioInput } from '../domain/debtScenario';
+import { useState, type FormEvent } from 'react';
+import { compareDebtScenario, type DebtScenarioInput, type DebtScenarioResult } from '../api/debtScenarios';
 
 const euro = new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' });
 const money = (minor: number) => euro.format(minor / 100);
@@ -24,24 +24,34 @@ function parseMoney(value: string, label: string): number {
 
 export default function DebtDecisionWorkspace() {
   const [values, setValues] = useState(defaults);
-  const [submitted, setSubmitted] = useState(defaults);
+  const [result, setResult] = useState<DebtScenarioResult | null>(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [showAssumptions, setShowAssumptions] = useState(false);
-  let result: ReturnType<typeof calculateDebtScenario> | null = null;
-  let error = '';
-  try {
-    const rate = Number(submitted.rate);
-    if (!/^\d+(?:\.\d+)?$/.test(submitted.rate) || !Number.isFinite(rate)) throw new RangeError('Annual interest rate must be a non-negative number');
-    const input: DebtScenarioInput = {
-      balanceMinor: parseMoney(submitted.balance, 'Debt outstanding'),
-      annualRatePercent: rate,
-      monthlyPaymentMinor: parseMoney(submitted.payment, 'Monthly repayment'),
-      extraPaymentMinor: parseMoney(submitted.extra, 'Extra repayment'),
-      liquidCashMinor: parseMoney(submitted.cash, 'Available cash'),
-      minimumReserveMinor: parseMoney(submitted.reserve, 'Minimum cash reserve'),
-    };
-    result = calculateDebtScenario(input);
-  } catch (e) {
-    error = e instanceof Error ? e.message : 'Unable to calculate scenario';
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError('');
+    setResult(null);
+    try {
+      const rate = Number(values.rate);
+      if (!/^\\d+(?:\\.\\d+)?$/.test(values.rate) || !Number.isFinite(rate))
+        throw new RangeError('Annual interest rate must be a non-negative number');
+      const input: DebtScenarioInput = {
+        balanceMinor: parseMoney(values.balance, 'Debt outstanding'),
+        annualRatePercent: rate,
+        monthlyPaymentMinor: parseMoney(values.payment, 'Monthly repayment'),
+        extraPaymentMinor: parseMoney(values.extra, 'Extra repayment'),
+        liquidCashMinor: parseMoney(values.cash, 'Available cash'),
+        minimumReserveMinor: parseMoney(values.reserve, 'Minimum cash reserve'),
+      };
+      setLoading(true);
+      setResult(await compareDebtScenario(input));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to calculate scenario');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -52,7 +62,7 @@ export default function DebtDecisionWorkspace() {
         <p>Compare the cost of keeping your repayment schedule with making an extra payment today. Figures are illustrative and stay in this browser session.</p>
       </div>
       <div className="debt-layout">
-        <form className="workspace-card debt-form" onSubmit={(event) => { event.preventDefault(); setSubmitted({ ...values }); }}>
+        <form className="workspace-card debt-form" onSubmit={submit}>
           <h3>Model your decision</h3>
           <div className="debt-fields">
             {fields.map(({ key, label, hint }) => (
@@ -63,7 +73,7 @@ export default function DebtDecisionWorkspace() {
               </label>
             ))}
           </div>
-          <button className="debt-primary" type="submit">Compare scenarios</button>
+          <button className="debt-primary" type="submit" disabled={loading}>{loading ? "Comparing…" : "Compare scenarios"}</button>
           <p className="debt-caption">No bank connection, saved records or payment instructions.</p>
         </form>
         <div className="debt-results" aria-live="polite">
