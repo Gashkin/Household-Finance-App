@@ -16,6 +16,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Validate local-only analysis scripts
+        run: python3 -m py_compile AnalysisScripts/inspect_workbook.py AnalysisScripts/inspect_budget.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
