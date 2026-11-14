@@ -649,3 +649,13 @@ body {
 .intake-warning { background: #fff7ed; color: #7c2d12; padding: .7rem; border-radius: .5rem; }
 .evidence-intake :is(input, textarea, select, button):focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
 @media (max-width: 850px) { .intake-review-layout { grid-template-columns: minmax(0,1fr); } }
+
+.workspace-gate { max-width: 560px; margin: 8vh auto; padding: 1.5rem; }
+.workspace-gate form, .recovery-panel { display: grid; gap: 1rem; }
+.workspace-gate label, .recovery-panel label { display: grid; gap: .4rem; }
+.workspace-gate input, .recovery-panel input { width: 100%; max-width: 32rem; box-sizing: border-box; padding: .65rem; }
+.workspace-toolbar { display:flex; justify-content:space-between; gap:1rem; padding: .7rem 1.5rem; background:#e7f0ec; color:#183d32; }
+.recovery-panel { max-width: 760px; margin: auto; }
+.recovery-panel .restore-confirm { display:flex; align-items:center; }
+.restore-confirm input { width:auto; }
+.recovery-panel button { justify-self: start; }

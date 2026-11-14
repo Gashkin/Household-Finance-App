@@ -232,7 +232,7 @@ function MigraterWorkspace() {
     setMigrationStatus('');
 
     try {
-      const response = await fetch('http://localhost:8080/migration/preview', {
+      const response = await fetch('/migration/preview', {
         method: 'POST',
         headers: {
           'Content-Type': 'text/csv',
@@ -271,7 +271,7 @@ function MigraterWorkspace() {
 
     setIsMigrationSubmitting(true);
     try {
-      const response = await fetch('http://localhost:8080/migration/reconcile', {
+      const response = await fetch('/migration/reconcile', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -305,7 +305,7 @@ function MigraterWorkspace() {
 
     setIsReportLoading(true);
     try {
-      const response = await fetch(`http://localhost:8080/migration/report/${migrationPreview.importId}`);
+      const response = await fetch(`/migration/report/${migrationPreview.importId}`);
       if (!response.ok) {
         throw new Error('Report request failed.');
       }
@@ -328,7 +328,7 @@ function MigraterWorkspace() {
 
     setIsHistoryLoading(true);
     try {
-      const response = await fetch(`http://localhost:8080/migration/history/${migrationPreview.importId}`);
+      const response = await fetch(`/migration/history/${migrationPreview.importId}`);
       if (!response.ok) {
         throw new Error('History request failed.');
       }
@@ -356,7 +356,7 @@ function MigraterWorkspace() {
       const formData = new FormData();
       formData.append('file', workbookFile);
 
-      const response = await fetch('http://localhost:8080/migration/workbook/preview', {
+      const response = await fetch('/migration/workbook/preview', {
         method: 'POST',
         body: formData,
       });
@@ -395,7 +395,7 @@ function MigraterWorkspace() {
       const formData = new FormData();
       formData.append('file', workbookFile);
 
-      const response = await fetch('http://localhost:8080/migration/workbook/map', {
+      const response = await fetch('/migration/workbook/map', {
         method: 'POST',
         body: formData,
       });
@@ -431,7 +431,7 @@ function MigraterWorkspace() {
       formData.append('file', workbookFile);
       formData.append('mode', loadMode);
 
-      const response = await fetch('http://localhost:8080/migration/workbook/validate', {
+      const response = await fetch('/migration/workbook/validate', {
         method: 'POST',
         body: formData,
       });
@@ -464,7 +464,7 @@ function MigraterWorkspace() {
     setIsExecutionSubmitting(true);
     setWorkbookStatus('');
     try {
-      const response = await fetch('http://localhost:8080/migration/workbook/execute', {
+      const response = await fetch('/migration/workbook/execute', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -495,7 +495,7 @@ function MigraterWorkspace() {
   const loadLatestSummary = async () => {
     setIsSummaryLoading(true);
     try {
-      const response = await fetch('http://localhost:8080/migration/workbook/loads/latest');
+      const response = await fetch('/migration/workbook/loads/latest');
       if (!response.ok) {
         throw new Error('Load summary request failed.');
       }
@@ -519,7 +519,7 @@ function MigraterWorkspace() {
 
     setIsRejectionsLoading(true);
     try {
-      const response = await fetch(`http://localhost:8080/migration/workbook/loads/${executionId}/rejections`);
+      const response = await fetch(`/migration/workbook/loads/${executionId}/rejections`);
       if (!response.ok) {
         throw new Error('Rejected rows request failed.');
       }
@@ -543,7 +543,7 @@ function MigraterWorkspace() {
 
     setIsRollbackSubmitting(true);
     try {
-      const response = await fetch(`http://localhost:8080/migration/workbook/loads/${executionId}/rollback`, {
+      const response = await fetch(`/migration/workbook/loads/${executionId}/rollback`, {
         method: 'POST',
       });
 

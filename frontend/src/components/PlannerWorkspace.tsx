@@ -493,7 +493,7 @@ function PlannerWorkspace() {
     setPlannerError('');
 
     try {
-      const response = await fetch('http://localhost:8080/planner');
+      const response = await fetch('/planner');
       if (!response.ok) {
         throw new Error('Planner request failed.');
       }
@@ -534,7 +534,7 @@ function PlannerWorkspace() {
 
   const loadTransactionHistory = async () => {
     try {
-      const response = await fetch('http://localhost:8080/imports/history');
+      const response = await fetch('/imports/history');
       if (!response.ok) {
         throw new Error('History request failed.');
       }
@@ -585,7 +585,7 @@ function PlannerWorkspace() {
     setIsSubmitting(true);
     setImportStatus('');
     try {
-      const response = await fetch('http://localhost:8080/imports/preview', {
+      const response = await fetch('/imports/preview', {
         method: 'POST',
         headers: {
           'Content-Type': 'text/csv',
@@ -622,7 +622,7 @@ function PlannerWorkspace() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch('http://localhost:8080/imports/accept', {
+      const response = await fetch('/imports/accept', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -662,7 +662,7 @@ function PlannerWorkspace() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`http://localhost:8080/planner/accounts/${selected.id}`, {
+      const response = await fetch(`/planner/accounts/${selected.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -697,7 +697,7 @@ function PlannerWorkspace() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch('http://localhost:8080/imports/map-to-future', {
+      const response = await fetch('/imports/map-to-future', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -766,7 +766,7 @@ function PlannerWorkspace() {
     setIsSubmitting(true);
     setMonthlyCommitmentStatus('');
     try {
-      const response = await fetch(`http://localhost:8080/planner/commitments/${id}`, {
+      const response = await fetch(`/planner/commitments/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -819,7 +819,7 @@ function PlannerWorkspace() {
 
     try {
       for (const entry of validPayloads) {
-        const response = await fetch(`http://localhost:8080/planner/commitments/${entry.id}`, {
+        const response = await fetch(`/planner/commitments/${entry.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -853,7 +853,7 @@ function PlannerWorkspace() {
     setIsSubmitting(true);
     setMonthlyCommitmentStatus('');
     try {
-      const response = await fetch(`http://localhost:8080/planner/commitments/${id}`, {
+      const response = await fetch(`/planner/commitments/${id}`, {
         method: 'DELETE',
       });
 
@@ -881,7 +881,7 @@ function PlannerWorkspace() {
     setIsSubmitting(true);
     setMonthlyCommitmentStatus('');
     try {
-      const response = await fetch('http://localhost:8080/planner/commitments', {
+      const response = await fetch('/planner/commitments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -977,7 +977,7 @@ function PlannerWorkspace() {
 
         const normalizedId = idCell.trim();
         if (normalizedId) {
-          const response = await fetch(`http://localhost:8080/planner/commitments/${normalizedId}`, {
+          const response = await fetch(`/planner/commitments/${normalizedId}`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -993,7 +993,7 @@ function PlannerWorkspace() {
           continue;
         }
 
-        const response = await fetch('http://localhost:8080/planner/commitments', {
+        const response = await fetch('/planner/commitments', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1063,7 +1063,7 @@ function PlannerWorkspace() {
     setIsSubmitting(true);
     setOneOffCommitmentStatus('');
     try {
-      const response = await fetch(`http://localhost:8080/planner/commitments/${id}`, {
+      const response = await fetch(`/planner/commitments/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1116,7 +1116,7 @@ function PlannerWorkspace() {
 
     try {
       for (const entry of validPayloads) {
-        const response = await fetch(`http://localhost:8080/planner/commitments/${entry.id}`, {
+        const response = await fetch(`/planner/commitments/${entry.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -1150,7 +1150,7 @@ function PlannerWorkspace() {
     setIsSubmitting(true);
     setOneOffCommitmentStatus('');
     try {
-      const response = await fetch(`http://localhost:8080/planner/commitments/${id}`, {
+      const response = await fetch(`/planner/commitments/${id}`, {
         method: 'DELETE',
       });
 
@@ -1177,7 +1177,7 @@ function PlannerWorkspace() {
     setIsSubmitting(true);
     setOneOffCommitmentStatus('');
     try {
-      const response = await fetch('http://localhost:8080/planner/commitments', {
+      const response = await fetch('/planner/commitments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1269,7 +1269,7 @@ function PlannerWorkspace() {
 
         const normalizedId = idCell.trim();
         if (normalizedId) {
-          const response = await fetch(`http://localhost:8080/planner/commitments/${normalizedId}`, {
+          const response = await fetch(`/planner/commitments/${normalizedId}`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -1285,7 +1285,7 @@ function PlannerWorkspace() {
           continue;
         }
 
-        const response = await fetch('http://localhost:8080/planner/commitments', {
+        const response = await fetch('/planner/commitments', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

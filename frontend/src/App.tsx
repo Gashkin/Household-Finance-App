@@ -1,3 +1,4 @@
+import WorkspaceRecovery from './components/WorkspaceRecovery';
 import { useState } from 'react';
 import DebtDecisionWorkspace from './components/DebtDecisionWorkspace';
 import ConsumerDashboard from './components/ConsumerDashboard';
@@ -5,7 +6,7 @@ import MigraterWorkspace from './components/MigraterWorkspace';
 import PlannerWorkspace from './components/PlannerWorkspace';
 
 function App() {
-  const [role, setRole] = useState<'decision' | 'planner' | 'migrater' | 'consumer'>('decision');
+  const [role, setRole] = useState<'decision' | 'planner' | 'migrater' | 'consumer' | 'recovery'>('decision');
 
   return (
     <div className="app-shell">
@@ -22,10 +23,11 @@ function App() {
           <button onClick={() => setRole('consumer')} className={role === 'consumer' ? 'active' : ''}>
             Consumer
           </button>
-        </nav>
+        <button onClick={() => setRole('recovery')} className={role === 'recovery' ? 'active' : ''}>Backup &amp; recovery</button></nav>
       </header>
 
       <main className="app-main">
+        {role === 'recovery' ? <WorkspaceRecovery /> : null}
         {role === 'decision' ? <DebtDecisionWorkspace /> : null}
         {role === 'planner' ? <PlannerWorkspace /> : null}
         {role === 'migrater' ? <MigraterWorkspace /> : null}

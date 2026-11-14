@@ -1,0 +1,58 @@
+import {test,expect} from '@playwright/test';
+import {readFile} from 'node:fs/promises';
+import {PASSWORD} from './workspace-helper';
+
+test('locked workspace, encrypted download and safe recovery controls',async({page,request},testInfo)=>{
+  expect((await request.get('http://127.0.0.1:8080/planner')).status()).toBe(401);
+  await page.goto('/');
+  await expect(page.getByRole('heading',{name:'Private local workspace'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Compare scenarios'})).toHaveCount(0);
+  await page.getByLabel('Workspace password',{exact:true}).fill('wrong');
+  await page.getByRole('button',{name:'Unlock workspace',exact:true}).click();
+  await expect(page.getByRole('alert')).toContainText('Incorrect workspace password');
+  await page.getByLabel('Workspace password',{exact:true}).fill(PASSWORD);
+  await page.getByRole('button',{name:'Unlock workspace',exact:true}).click();
+  await page.getByRole('button',{name:'Backup & recovery',exact:true}).click();
+  await page.getByLabel('Backup passphrase',{exact:true}).fill('separate-synthetic-backup-passphrase');
+  await page.getByLabel('Repeat backup passphrase',{exact:true}).fill('separate-synthetic-backup-passphrase');
+  const event=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Download encrypted backup',exact:true}).click();
+  const download=await event; const bytes=await readFile((await download.path())!);
+  expect(bytes.subarray(0,9).toString()).toBe('HFBACKUP1');expect(bytes.toString()).not.toContain('sourceNote');
+  await expect(page.getByRole('status')).toContainText('Encrypted backup downloaded');
+  await expect(page.getByLabel('Backup passphrase',{exact:true})).toHaveValue('');
+  // Existing preceding journeys saved records; restoring must not overwrite them.
+  await expect(page.getByRole('button',{name:'Restore backup',exact:true})).toBeDisabled();
+  expect(await page.evaluate(()=>Object.keys(localStorage).length)).toBe(0);
+  expect(await page.evaluate(()=>document.cookie)).not.toContain('workspace_session');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+  await page.screenshot({path:testInfo.outputPath('private-recovery.png'),fullPage:true});
+  await page.getByRole('button',{name:'Lock workspace',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Unlock workspace',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Backup & recovery',exact:true})).toHaveCount(0);
+  expect((await page.request.get('/api/workspace/records')).status()).toBe(401);
+});
+
+test('recover an encrypted backup in a fresh workspace without partial writes',async({page,request},testInfo)=>{
+  test.skip(testInfo.project.name!=='desktop','Recovery database is shared; mobile covers the locked and backup layouts.');
+  const auth=await request.post('http://127.0.0.1:8080/api/workspace/unlock',{headers:{'X-Workspace-Request':'1'},data:{password:PASSWORD}});expect(auth.status()).toBe(204);
+  const backup=await request.post('http://127.0.0.1:8080/api/workspace/backup',{headers:{'X-Workspace-Request':'1'},data:{password:'separate-synthetic-backup-passphrase'}});expect(backup.ok()).toBeTruthy();
+  const bytes=await backup.body();
+  await page.goto('http://127.0.0.1:4174/');await page.getByLabel('Workspace password',{exact:true}).fill(PASSWORD);await page.getByRole('button',{name:'Unlock workspace',exact:true}).click();
+  await page.getByRole('button',{name:'Backup & recovery',exact:true}).click();
+  await expect(page.getByText('This workspace is empty and can receive a backup.',{exact:false})).toBeVisible();
+  await page.getByLabel('Encrypted backup file',{exact:true}).setInputFiles({name:'synthetic.hfb',mimeType:'application/octet-stream',buffer:bytes});
+  await page.getByLabel('Backup passphrase',{exact:true}).fill('wrong-but-long-passphrase');
+  await page.getByLabel('I want to restore all saved records into this empty workspace',{exact:true}).check();
+  await page.getByRole('button',{name:'Restore backup',exact:true}).click();
+  await expect(page.getByRole('alert')).toContainText('Wrong passphrase or damaged backup');
+  await expect(page.getByText('Saved records: 0.',{exact:false})).toBeVisible();
+  await page.getByLabel('Backup passphrase',{exact:true}).fill('separate-synthetic-backup-passphrase');
+  await page.getByRole('button',{name:'Restore backup',exact:true}).click();
+  await expect(page.getByRole('status')).toContainText('Recovery complete');
+  await expect(page.getByRole('button',{name:'Restore backup',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'Debt decision',exact:true}).click();
+  await expect(page.getByText('Loading saved cash position…')).toBeHidden();
+  await expect(page.getByRole('button',{name:'Use this cash position in debt comparison',exact:true})).toBeVisible();
+  await page.screenshot({path:testInfo.outputPath('restored-workspace.png'),fullPage:true});
+});

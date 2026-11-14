@@ -12,9 +12,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties={"evidence.intake.access-key=synthetic-test-access-0000","evidence.ai.enabled=false"}) @AutoConfigureMockMvc
+@SpringBootTest(properties={"evidence.intake.access-key=synthetic-test-access-0000","evidence.ai.enabled=false"}) @AutoConfigureMockMvc(addFilters=false)
 class EvidenceIntakeControllerTest {
     @Autowired MockMvc mvc; @Autowired ObjectMapper mapper; @Autowired CashPositionSnapshotRepository repository;
+    @Autowired org.springframework.web.context.WebApplicationContext context;
+    @Autowired IntakeAccessFilter intake;
+    @org.junit.jupiter.api.BeforeEach void retainIntakeBoundary() {
+        mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup(context).addFilters(intake).build();
+    }
     final String key = "synthetic-test-access-0000";
     @Test void unauthorizedDraftsAreBlockedAndCapabilitiesDoNotRevealKey() throws Exception {
         mvc.perform(post("/api/evidence-intake/drafts").contentType("application/json").content("{}"))

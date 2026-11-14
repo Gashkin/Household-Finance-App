@@ -6,7 +6,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-@SpringBootTest @AutoConfigureMockMvc
+@SpringBootTest @AutoConfigureMockMvc(addFilters=false)
 class DebtReportControllerTest {
     @Autowired MockMvc mvc;
     @Autowired com.fasterxml.jackson.databind.ObjectMapper mapper;

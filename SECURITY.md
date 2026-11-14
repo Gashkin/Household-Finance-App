@@ -16,4 +16,8 @@ Back up local copies of the database and workbook outside the repository first. 
 5. Keep real household evidence in protected local storage until application authentication, tenant isolation, retention and deployment security have been implemented and audited.
 
 ## Current application boundary
-The household finance backend is a local-development system, with no real authentication or tenancy enforcement. Do not expose port 8080 on a public host or use it to store real financial records in an internet-facing instance.
+The household finance backend is a single-operator local system. Password sessions protect financial HTTP endpoints, while live database files depend on private OS permissions and full-disk encryption. No household tenancy or network deployment is supplied. Do not expose the backend or Vite frontend publicly.
+
+## Private local workspace (GBD-13)
+
+Whole-app loopback-only password sessions now protect every financial backend route, including legacy routes. The H2 console is disabled. Versioned backups are passphrase-encrypted and restore transactionally into empty workspaces. See [the operating boundary and recovery guide](product/stories/private-workspace.md). The live H2 database relies on OS file permissions/full-disk encryption; this is not tenant isolation or internet deployment. Older statements above describe the pre-GBD-13 baseline.
