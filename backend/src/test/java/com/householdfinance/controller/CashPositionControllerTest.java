@@ -17,7 +17,7 @@ class CashPositionControllerTest {
             .andExpect(status().isOk()).andExpect(jsonPath("$.availableCashMinor").value(70000));
     }
     @Test void rejectsFractionalMissingNullAndMalformedData() throws Exception {
-        for (var json : new String[] {valid.replace("100000", "1.5"), valid.replace("100000", "null"), valid.replace("100000", "\"100000\""), valid.replace("2026-11-20", "bad-date"), "{}", "null", valid.replace("30000", "-1")})
+        for (var json : new String[] {valid.replace("100000", "1.5"), valid.replace("100000", "null"), valid.replace("100000", "\"100000\""), valid.replace("2026-11-20", "bad-date"), "{}", "null", valid.replace("\"commitments\":[{\"name\":\"Bill\",\"amountMinor\":30000,\"dueOn\":\"2026-11-20\"}]", "\"commitments\":[null]"), valid.replace("30000", "-1")})
             mvc.perform(post("/api/cash-position/calculate").contentType("application/json").content(json)).andExpect(status().isBadRequest());
     }
 }

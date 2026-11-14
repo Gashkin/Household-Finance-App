@@ -23,6 +23,7 @@ public class CashPositionController {
     private void validateAmounts(JsonNode rows, String field) {
         if (rows == null || !rows.isArray()) throw new IllegalArgumentException("Balances and commitments must be arrays");
         for (var row : rows) {
+            if (!row.isObject()) throw new IllegalArgumentException("Every evidence row must be an object");
             var value = row.get(field);
             if (value == null || !value.isIntegralNumber() || !value.canConvertToLong())
                 throw new IllegalArgumentException(field + " must be an integer number of cents");
