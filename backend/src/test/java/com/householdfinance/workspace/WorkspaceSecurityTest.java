@@ -71,12 +71,12 @@ class WorkspaceSecurityTest {
         assertTrue(backups.counts().values().stream().allMatch(n->n==0));
         var archive=json.readValue(BackupCrypto.decrypt(encrypted,"separate-synthetic-backup-passphrase"),WorkspaceBackupService.Archive.class);
         var missing=new LinkedHashMap<>(archive.tables());missing.remove("TRANSACTIONS");
-        byte[] incomplete=BackupCrypto.encrypt(json.writeValueAsBytes(new WorkspaceBackupService.Archive(1,archive.createdAt(),missing)),"separate-synthetic-backup-passphrase");
+        byte[] incomplete=BackupCrypto.encrypt(json.writeValueAsBytes(new WorkspaceBackupService.Archive(archive.version(),archive.createdAt(),missing)),"separate-synthetic-backup-passphrase");
         assertThrows(IllegalArgumentException.class,()->backups.restore(incomplete,"separate-synthetic-backup-passphrase","RESTORE INTO EMPTY WORKSPACE"));
         var invalid=new LinkedHashMap<>(archive.tables());
         var rows=new ArrayList<>(invalid.get("CASH_POSITION_LINES").rows());var broken=new ArrayList<>(rows.get(0));broken.set(invalid.get("CASH_POSITION_LINES").columns().indexOf("SNAPSHOT_ID"),"missing-parent");rows.add(broken);
         invalid.put("CASH_POSITION_LINES",new WorkspaceBackupService.TableData(invalid.get("CASH_POSITION_LINES").columns(),rows));
-        byte[] duplicate=BackupCrypto.encrypt(json.writeValueAsBytes(new WorkspaceBackupService.Archive(1,archive.createdAt(),invalid)),"separate-synthetic-backup-passphrase");
+        byte[] duplicate=BackupCrypto.encrypt(json.writeValueAsBytes(new WorkspaceBackupService.Archive(archive.version(),archive.createdAt(),invalid)),"separate-synthetic-backup-passphrase");
         assertThrows(org.springframework.dao.DataAccessException.class,()->backups.restore(duplicate,"separate-synthetic-backup-passphrase","RESTORE INTO EMPTY WORKSPACE"));
         assertTrue(backups.counts().values().stream().allMatch(n->n==0));
     }

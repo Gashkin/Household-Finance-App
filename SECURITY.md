@@ -21,3 +21,7 @@ The household finance backend is a single-operator local system. Password sessio
 ## Private local workspace (GBD-13)
 
 Whole-app loopback-only password sessions now protect every financial backend route, including legacy routes. The H2 console is disabled. Versioned backups are passphrase-encrypted and restore transactionally into empty workspaces. See [the operating boundary and recovery guide](product/stories/private-workspace.md). The live H2 database relies on OS file permissions/full-disk encryption; this is not tenant isolation or internet deployment. Older statements above describe the pre-GBD-13 baseline.
+
+## Reviewed ledger (GBD-10)
+
+The ledger retains reviewed financial facts/correction history behind the existing local session gate and includes them in encrypted backup/recovery. This slice has no banking transport or provider credential fields, no payment calls and no automatic financial-data forwarding. Sandbox registration/MFA is not live-bank readiness. [Trust boundaries, retention, recovery and remaining bank-readiness requirements](product/stories/reviewed-money-position.md).

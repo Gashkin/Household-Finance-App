@@ -42,3 +42,7 @@ The Debt decision workspace can turn a short source excerpt into editable, cited
 ## Private records and recovery
 
 Unlock once to access financial workspaces; lock when finished. **Backup & recovery** downloads a passphrase-encrypted archive and restores it into an empty local workspace without overwriting existing records. [Configuration, restart/recovery walkthrough and limits](product/stories/private-workspace.md).
+
+## Reviewed household money position
+
+Open **Money position** to record account evidence, review manual/CSV activity, reconcile a closing statement, and reuse reconciled cash in the debt report. Pending payments, transfers, overdrafts and corrections stay explicit. [Workflow, import format, backup compatibility and banking boundary](product/stories/reviewed-money-position.md). Live bank connectivity is not included or claimed.

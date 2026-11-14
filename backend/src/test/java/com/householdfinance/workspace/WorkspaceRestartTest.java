@@ -22,6 +22,9 @@ class WorkspaceRestartTest {
         try(var app=start("original")) {
             var jdbc=app.getBean(JdbcTemplate.class);
             jdbc.update("INSERT INTO ACCOUNTS(ID,NAME,TYPE,BALANCE) VALUES('persist','Synthetic durable account','cash',123.45)");
+            var ledger=app.getBean(com.householdfinance.ledger.LedgerService.class);
+            var account=ledger.create(new com.householdfinance.ledger.LedgerService.AccountInput("Synthetic durable ledger","CASH",java.time.LocalDate.now(java.time.ZoneId.of("Europe/Dublin")),"20.00","Synthetic restart evidence"));
+            ledger.manual(account.id(),new com.householdfinance.ledger.LedgerService.Manual(0L,new com.householdfinance.ledger.LedgerService.Row("durable-entry",account.openingDate(),"Synthetic durable activity","-1.00","BOOKED","ACTIVITY"),"Synthetic source",true));
             var backups=app.getBean(WorkspaceBackupService.class);original=backups.counts();backup=backups.exportBackup("separate-synthetic-backup-passphrase");
         }
         try(var app=start("original")) {

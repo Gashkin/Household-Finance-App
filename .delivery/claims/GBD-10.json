@@ -1,0 +1,9 @@
+{
+  "work_id":"GBD-10",
+  "page_id":"418d3419-fef0-8115-af0b-fa34604f8494",
+  "branch":"story/10-delivery",
+  "token":"claim-token:work-10-69ab9ae2-39b2-4f4f-813b-7b544a237721",
+  "claimed_at":"2026-11-14T16:01:58Z",
+  "base_sha":"eac1f71e637deffbeef5245eb16730ca6e497a7d",
+  "history":[{"event":"claim","at":"2026-11-14T16:01:58Z","method":"Connected GitHub create-only ref, Notion ownership write/readback, then canonical local branch. Existing execution model/story/branches/PRs inspected before implementation. Continued by the same execution after user sandbox/MFA updates; original token retained."}]
+}
