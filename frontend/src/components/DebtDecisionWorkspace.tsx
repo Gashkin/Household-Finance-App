@@ -1,4 +1,5 @@
 import { useRef, useState, type FormEvent } from 'react';
+import CashPositionWorkspace from './CashPositionWorkspace';
 import { compareDebtScenario, type DebtScenarioInput, type DebtScenarioResult } from '../api/debtScenarios';
 
 const euro = new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' });
@@ -25,6 +26,10 @@ function parseMoney(value: string, label: string): number {
 export default function DebtDecisionWorkspace() {
   const [values, setValues] = useState(defaults);
   const requestVersion = useRef(0);
+  const [cashSource, setCashSource] = useState('');
+  function invalidateCash() {
+    if (cashSource) { requestVersion.current++; setCashSource(''); setValues(current => ({ ...current, cash: '' })); setResult(null); setError(''); setLoading(false); }
+  }
   const [result, setResult] = useState<DebtScenarioResult | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -64,6 +69,11 @@ export default function DebtDecisionWorkspace() {
         <h2>Repay debt or keep the cash?</h2>
         <p>Compare the cost of keeping your repayment schedule with making an extra payment today. Figures are illustrative and stay in this browser session.</p>
       </div>
+      <CashPositionWorkspace onInvalidate={invalidateCash} onUse={(minor, description) => {
+        requestVersion.current++; setResult(null); setError(''); setLoading(false);
+        setValues(current => ({ ...current, cash: (minor / 100).toFixed(2) })); setCashSource(description);
+      }} />
+      {cashSource && <p role="status">Available cash from {cashSource}. Minimum reserve is protected separately.</p>}
       <div className="debt-layout">
         <form className="workspace-card debt-form" onSubmit={submit}>
           <h3>Model your decision</h3>
@@ -72,7 +82,7 @@ export default function DebtDecisionWorkspace() {
               <label key={key} className="debt-field">
                 <span>{label}</span>
                 <small>{hint}</small>
-                <input inputMode="decimal" value={values[key]} onChange={(event) => { requestVersion.current++; setResult(null); setError(''); setLoading(false); setValues(current => ({ ...current, [key]: event.target.value })); }} aria-label={label} />
+                <input inputMode="decimal" value={values[key]} onChange={(event) => { if (key === 'cash') setCashSource(''); requestVersion.current++; setResult(null); setError(''); setLoading(false); setValues(current => ({ ...current, [key]: event.target.value })); }} aria-label={label} />
               </label>
             ))}
           </div>
