@@ -8,7 +8,7 @@ export function installWorkspaceTransport() {
     new Headers(init?.headers).forEach((value,key) => headers.set(key,value));
     headers.set('X-Workspace-Request','1');
     const response = await nativeFetch(input, {...init, headers, credentials:'same-origin'});
-    if (response.status === 401 && !url.pathname.endsWith('/unlock')) window.dispatchEvent(new Event('workspace-locked'));
+    if (response.headers.get('X-Workspace-Locked') === '1') window.dispatchEvent(new Event('workspace-locked'));
     return response;
   };
 }

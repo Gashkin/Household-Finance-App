@@ -34,7 +34,7 @@ class WorkspaceSecurityTest {
         return post(path).cookie(session).header("X-Workspace-Request","1").contentType("application/json").content(json.writeValueAsBytes(value));
     }
     @Test void everyFinancialRouteRequiresSessionAndRejectsCrossSiteAndConsole() throws Exception {
-        for(String path:List.of("/planner","/imports/history","/reports/monthly-overview","/auth/me","/api/cash-position/latest","/api/evidence-intake/capabilities","/api/workspace/records")) mvc.perform(get(path)).andExpect(status().isUnauthorized());
+        for(String path:List.of("/planner","/imports/history","/reports/monthly-overview","/auth/me","/api/cash-position/latest","/api/evidence-intake/capabilities","/api/workspace/records")) mvc.perform(get(path)).andExpect(status().isUnauthorized()).andExpect(header().string("X-Workspace-Locked","1"));
         mvc.perform(get("/planner").cookie(session)).andExpect(status().isOk());
         mvc.perform(post("/api/workspace/lock").cookie(session)).andExpect(status().isForbidden());
         mvc.perform(postJson("/api/workspace/lock",Map.of()).header("Origin","https://attacker.example")).andExpect(status().isForbidden());

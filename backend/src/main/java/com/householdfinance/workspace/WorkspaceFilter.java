@@ -95,7 +95,7 @@ public class WorkspaceFilter extends OncePerRequestFilter {
         boolean safe = Set.of("GET", "HEAD").contains(request.getMethod());
         if (!safe && !"1".equals(request.getHeader("X-Workspace-Request"))) { deny(response, 403, "Workspace request header required"); return; }
         boolean publicRoute = (path.equals("/api/workspace/status") && request.getMethod().equals("GET")) || (path.equals("/api/workspace/unlock") && request.getMethod().equals("POST"));
-        if (!publicRoute && (!configured || !authenticated(request))) { deny(response, configured ? 401 : 503, configured ? "Unlock the workspace" : "Configure WORKSPACE_PASSWORD (16–256 characters) and restart"); return; }
+        if (!publicRoute && (!configured || !authenticated(request))) { response.setHeader("X-Workspace-Locked", "1"); deny(response, configured ? 401 : 503, configured ? "Unlock the workspace" : "Configure WORKSPACE_PASSWORD (16–256 characters) and restart"); return; }
         var guard = safe ? lock.readLock() : lock.writeLock();
         guard.lock();
         try { chain.doFilter(request, response); } finally { guard.unlock(); }
