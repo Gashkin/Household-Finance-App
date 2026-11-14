@@ -530,3 +530,37 @@ body {
   font-size: 0.8rem;
   color: #374151;
 }
+
+/* Household debt decision journey */
+.debt-intro { max-width: 760px; margin-bottom: 1.5rem; }
+.debt-intro h2 { margin: .25rem 0 .5rem; font-size: clamp(1.6rem, 3vw, 2.4rem); }
+.debt-intro p { color: #475569; line-height: 1.55; }
+.debt-eyebrow { font-size: .75rem; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; color: #1d4ed8 !important; }
+.debt-layout { display: grid; grid-template-columns: minmax(260px, 360px) minmax(0, 1fr); align-items: start; gap: 1.25rem; }
+.debt-form h3, .debt-results h3 { margin-top: 0; }
+.debt-fields { display: grid; gap: .9rem; }
+.debt-field { display: grid; gap: .2rem; font-weight: 600; }
+.debt-field small { color: #64748b; font-weight: 400; }
+.debt-field input { width: 100%; border: 1px solid #cbd5e1; border-radius: .65rem; padding: .7rem; font: inherit; background: white; }
+.debt-field input:focus-visible, .debt-primary:focus-visible, .debt-disclosure:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+.debt-primary { width: 100%; margin-top: 1.25rem; border: 0; border-radius: .65rem; background: #1d4ed8; color: white; padding: .8rem; font-weight: 700; cursor: pointer; }
+.debt-caption { font-size: .82rem; line-height: 1.5; color: #64748b; }
+.debt-results { display: grid; gap: 1rem; min-width: 0; }
+.debt-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; }
+.debt-metrics article { display: grid; gap: .5rem; }
+.debt-metrics span { color: #475569; font-size: .85rem; }
+.debt-metrics strong { font-size: clamp(1.1rem, 2.3vw, 1.65rem); overflow-wrap: anywhere; }
+.debt-table-wrap { overflow-x: auto; }
+.debt-table { min-width: 420px; }
+.debt-table th { font-weight: 600; }
+.debt-alert { padding: .85rem; border: 1px solid #fca5a5; border-radius: .6rem; background: #fff1f2; color: #991b1b; }
+.debt-safe { color: #166534; font-weight: 600; }
+.debt-disclosure { border: 0; background: transparent; padding: .25rem 0; color: #1d4ed8; font: inherit; font-weight: 650; cursor: pointer; }
+.debt-results li { margin: .5rem 0; }
+.role-switcher { display: flex; gap: .35rem; flex-wrap: wrap; }
+@media (max-width: 850px) {
+  .debt-layout { grid-template-columns: 1fr; }
+  .debt-metrics { grid-template-columns: 1fr; }
+  .app-header { align-items: flex-start; flex-direction: column; gap: 1rem; }
+  .role-switcher button { margin-left: 0; }
+}
