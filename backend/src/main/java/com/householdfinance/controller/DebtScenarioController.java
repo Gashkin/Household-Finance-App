@@ -18,14 +18,40 @@ public class DebtScenarioController {
         this.cashPositionService = cashPositionService;
     }
 
+    public record ReportInput(long balanceMinor, String annualRatePercent, long monthlyPaymentMinor,
+                              long extraPaymentMinor, long liquidCashMinor, long minimumReserveMinor, String cashPositionSnapshotId) {
+        static ReportInput from(DebtScenarioService.Input input, String snapshotId) {
+            return new ReportInput(input.balanceMinor(), input.annualRatePercent().toPlainString(), input.monthlyPaymentMinor(),
+                input.extraPaymentMinor(), input.liquidCashMinor(), input.minimumReserveMinor(), snapshotId);
+        }
+    }
+    public record Report(String schemaVersion, String calculationVersion, java.time.Instant generatedAt,
+                         String currency, ReportInput input, DebtScenarioService.Result result, CashPositionService.Snapshot cashEvidence) {}
+
+    @PostMapping("/report")
+    public Report report(@RequestBody JsonNode request) {
+        var parsed = parse(request);
+        var evidence = parsed.evidence();
+        return new Report("debt-comparison-report-v1", "debt-amortisation-v1", java.time.Instant.now(), "EUR",
+            ReportInput.from(parsed.input(), evidence == null ? null : evidence.id()),
+            service.compare(parsed.input()), evidence);
+    }
+
     @PostMapping("/compare")
     public DebtScenarioService.Result compare(@RequestBody JsonNode request) {
+        return service.compare(parse(request).input());
+    }
+
+    private record Parsed(DebtScenarioService.Input input, CashPositionService.Snapshot evidence) {}
+
+    private Parsed parse(JsonNode request) {
         if (request == null || !request.isObject())
             throw new IllegalArgumentException("A complete scenario object is required");
         var input = new DebtScenarioService.Input(
             minor(request, "balanceMinor"), decimal(request, "annualRatePercent"),
             minor(request, "monthlyPaymentMinor"), minor(request, "extraPaymentMinor"),
             minor(request, "liquidCashMinor"), minor(request, "minimumReserveMinor"));
+        CashPositionService.Snapshot evidence = null;
         JsonNode source = request.get("cashPositionSnapshotId");
         if (source != null) {
             if (!source.isTextual() || source.textValue().isBlank())
@@ -36,8 +62,9 @@ public class DebtScenarioController {
                     || input.liquidCashMinor() != snapshot.availableAfterCommitmentsMinor()
                     || input.minimumReserveMinor() != snapshot.minimumReserveMinor())
                 throw new IllegalArgumentException("Debt scenario cash figures do not match the referenced cash snapshot");
+            evidence = snapshot;
         }
-        return service.compare(input);
+        return new Parsed(input, evidence);
     }
 
     private static JsonNode required(JsonNode request, String field) {
@@ -55,6 +82,9 @@ public class DebtScenarioController {
     }
 
     private static BigDecimal decimal(JsonNode request, String field) {
+        JsonNode node = request.get(field);
+        if (node != null && node.isTextual() && node.textValue().length() <= 128
+            && node.textValue().matches("[0-9]+(?:\\.[0-9]+)?")) return new BigDecimal(node.textValue());
         return required(request, field).decimalValue();
     }
 
