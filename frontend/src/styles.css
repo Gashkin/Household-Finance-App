@@ -564,3 +564,51 @@ body {
   .app-header { align-items: flex-start; flex-direction: column; gap: 1rem; }
   .role-switcher button { margin-left: 0; }
 }
+
+
+/* Dated household cash evidence and reuse */
+.cash-position { margin-bottom: 1.5rem; background: #f8fafc; }
+.cash-heading h3 { margin: .1rem 0 .25rem; font-size: 1.3rem; }
+.cash-heading .debt-caption { max-width: 880px; margin: .2rem 0 .85rem; }
+.cash-snapshot { background: white; border: 1px solid #e2e8f0; border-radius: .85rem; padding: 1rem; margin-bottom: 1rem; }
+.cash-overview { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 1rem; }
+.cash-overview div { display: grid; gap: .3rem; }
+.cash-overview span { font-size: .85rem; color: #475569; }
+.cash-overview strong { font-size: clamp(1.05rem, 2vw, 1.4rem); overflow-wrap: anywhere; }
+.cash-breakdown { display: flex; flex-wrap: wrap; gap: 1.5rem; margin: .5rem 0; }
+.cash-line-summary { min-width: 200px; flex: 1; }
+.cash-line-summary h4 { margin: .25rem 0; font-size: .92rem; }
+.cash-line-summary ul { margin: 0; padding-left: 1.2rem; color: #334155; }
+.cash-line-summary li { padding: .1rem 0; }
+.cash-warning { margin: .6rem 0; padding: .65rem .8rem; border-radius: .6rem; background: #fffbeb; color: #92400e; border: 1px solid #fcd34d; }
+.cash-notice { padding: .6rem .8rem; color: #166534; }
+.cash-apply { width: auto; margin-top: .5rem; }
+.cash-position button:disabled { opacity: .55; cursor: not-allowed; }
+.cash-editor { border-top: 1px solid #cbd5e1; padding-top: .9rem; }
+.cash-editor summary { cursor: pointer; font-weight: 700; color: #1d4ed8; margin-bottom: 1rem; }
+.cash-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .9rem; }
+.cash-meta label { display: grid; gap: .3rem; font-weight: 600; font-size: .88rem; }
+.cash-meta input, .cash-meta select, .cash-line input {
+  width: 100%; min-width: 0; padding: .65rem; border: 1px solid #cbd5e1; border-radius: .6rem;
+  background: white; font: inherit; color: #111827;
+}
+.cash-line-editors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: .9rem; }
+.cash-lines { min-width: 0; border: 1px solid #dbe2ea; border-radius: .7rem; padding: .75rem; }
+.cash-lines legend { font-weight: 700; padding: 0 .3rem; }
+.cash-line { display: grid; grid-template-columns: minmax(0, 1fr) minmax(90px, .6fr) auto; gap: .4rem; margin-bottom: .55rem; }
+.cash-secondary { border: 1px solid #cbd5e1; border-radius: .6rem; background: white; padding: .5rem .65rem; color: #1e293b; cursor: pointer; }
+.cash-save { width: auto; }
+.cash-source-note { color: #1d4ed8; background: #eff6ff; padding: .7rem; border-radius: .6rem; font-size: .85rem; line-height: 1.5; }
+.cash-position input:focus-visible, .cash-position select:focus-visible,
+.cash-position button:focus-visible, .cash-position summary:focus-visible {
+  outline: 3px solid #93c5fd; outline-offset: 2px;
+}
+@media (max-width: 950px) {
+  .cash-line-editors { grid-template-columns: 1fr; }
+}
+@media (max-width: 650px) {
+  .cash-meta { grid-template-columns: 1fr; }
+  .cash-line { grid-template-columns: minmax(0, 1fr) minmax(0, .7fr); }
+  .cash-line button { grid-column: 1 / -1; justify-self: start; }
+  .cash-apply { width: 100%; }
+}

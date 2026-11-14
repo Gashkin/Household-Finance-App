@@ -1,8 +1,9 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { compareDebtScenario, type DebtScenarioInput, type DebtScenarioResult } from '../api/debtScenarios';
+import type { CashPositionSnapshot } from '../api/cashPosition';
+import CashPositionPanel from './CashPositionPanel';
+import { minorToInput, money, parseMoney } from '../domain/money';
 
-const euro = new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' });
-const money = (minor: number) => euro.format(minor / 100);
 const defaults = { balance: '10000', rate: '8', payment: '300', extra: '2000', cash: '8000', reserve: '4000' };
 type Field = keyof typeof defaults;
 const fields: { key: Field; label: string; hint: string }[] = [
@@ -14,21 +15,28 @@ const fields: { key: Field; label: string; hint: string }[] = [
   { key: 'reserve', label: 'Minimum cash reserve (€)', hint: 'Your protected cash floor' },
 ];
 
-function parseMoney(value: string, label: string): number {
-  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(value)) throw new RangeError(`${label} must be a non-negative euro amount with up to two decimals`);
-  const [whole, fraction = ''] = value.split('.');
-  const cents = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
-  if (!Number.isSafeInteger(cents)) throw new RangeError(`${label} is too large`);
-  return cents;
-}
-
 export default function DebtDecisionWorkspace() {
   const [values, setValues] = useState(defaults);
+  const [sourceSnapshot, setSourceSnapshot] = useState<CashPositionSnapshot | null>(null);
   const requestVersion = useRef(0);
   const [result, setResult] = useState<DebtScenarioResult | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showAssumptions, setShowAssumptions] = useState(false);
+
+  function applyCashPosition(snapshot: CashPositionSnapshot) {
+    if (snapshot.availableAfterCommitmentsMinor < 0) return;
+    requestVersion.current++;
+    setResult(null);
+    setLoading(false);
+    setError('');
+    setSourceSnapshot(snapshot);
+    setValues(current => ({
+      ...current,
+      cash: minorToInput(snapshot.availableAfterCommitmentsMinor),
+      reserve: minorToInput(snapshot.minimumReserveMinor),
+    }));
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -46,6 +54,7 @@ export default function DebtDecisionWorkspace() {
         extraPaymentMinor: parseMoney(values.extra, 'Extra repayment'),
         liquidCashMinor: parseMoney(values.cash, 'Available cash'),
         minimumReserveMinor: parseMoney(values.reserve, 'Minimum cash reserve'),
+        ...(sourceSnapshot ? { cashPositionSnapshotId: sourceSnapshot.id } : {}),
       };
       setLoading(true);
       const response = await compareDebtScenario(input);
@@ -62,8 +71,9 @@ export default function DebtDecisionWorkspace() {
       <div className="debt-intro">
         <p className="debt-eyebrow">Household decision workspace</p>
         <h2>Repay debt or keep the cash?</h2>
-        <p>Compare the cost of keeping your repayment schedule with making an extra payment today. Figures are illustrative and stay in this browser session.</p>
+        <p>Compare the cost of keeping your repayment schedule with making an extra payment today. Debt comparisons are illustrative and not saved. Your optional cash evidence is stored in the local backend.</p>
       </div>
+      <CashPositionPanel onApply={applyCashPosition} appliedId={sourceSnapshot?.id ?? null} />
       <div className="debt-layout">
         <form className="workspace-card debt-form" onSubmit={submit}>
           <h3>Model your decision</h3>
@@ -72,12 +82,13 @@ export default function DebtDecisionWorkspace() {
               <label key={key} className="debt-field">
                 <span>{label}</span>
                 <small>{hint}</small>
-                <input inputMode="decimal" value={values[key]} onChange={(event) => { requestVersion.current++; setResult(null); setError(''); setLoading(false); setValues(current => ({ ...current, [key]: event.target.value })); }} aria-label={label} />
+                <input inputMode="decimal" value={values[key]} onChange={(event) => { requestVersion.current++; setResult(null); setError(''); setLoading(false); if (key === 'cash' || key === 'reserve') setSourceSnapshot(null); setValues(current => ({ ...current, [key]: event.target.value })); }} aria-label={label} />
               </label>
             ))}
           </div>
           <button className="debt-primary" type="submit" disabled={loading}>{loading ? "Comparing…" : "Compare scenarios"}</button>
-          <p className="debt-caption">No bank connection, saved records or payment instructions.</p>
+          {sourceSnapshot ? <p className="cash-source-note">Using cash position dated {sourceSnapshot.asOfDate} ({sourceSnapshot.verification === 'REVIEWED' ? 'manually reviewed' : 'estimated'}). Cash is net of recorded commitments. {sourceSnapshot.stale ? 'Evidence is older than 30 days.' : ''}</p> : <p className="debt-caption">Cash and reserve values are manual or illustrative until you apply a recorded position.</p>}
+          <p className="debt-caption">Comparisons are not saved and no payment is initiated.</p>
         </form>
         <div className="debt-results" aria-live="polite">
           {error ? <div role="alert" className="debt-alert">{error}</div> : null}
