@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from 'react';
-import { compareDebtScenario, type DebtScenarioInput, type DebtScenarioResult } from '../api/debtScenarios';
+import { createDebtReport, type DebtComparisonReport, type DebtScenarioInput, type DebtScenarioResult } from '../api/debtScenarios';
 import type { CashPositionSnapshot } from '../api/cashPosition';
 import CashPositionPanel from './CashPositionPanel';
 import { minorToInput, money, parseMoney } from '../domain/money';
@@ -20,6 +20,7 @@ export default function DebtDecisionWorkspace() {
   const [sourceSnapshot, setSourceSnapshot] = useState<CashPositionSnapshot | null>(null);
   const requestVersion = useRef(0);
   const [result, setResult] = useState<DebtScenarioResult | null>(null);
+  const [report, setReport] = useState<DebtComparisonReport | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showAssumptions, setShowAssumptions] = useState(false);
@@ -27,7 +28,7 @@ export default function DebtDecisionWorkspace() {
   function applyCashPosition(snapshot: CashPositionSnapshot) {
     if (snapshot.availableAfterCommitmentsMinor < 0) return;
     requestVersion.current++;
-    setResult(null);
+    setResult(null); setReport(null);
     setLoading(false);
     setError('');
     setSourceSnapshot(snapshot);
@@ -41,7 +42,7 @@ export default function DebtDecisionWorkspace() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError('');
-    setResult(null);
+    setResult(null); setReport(null);
     const version = ++requestVersion.current;
     try {
       const rate = Number(values.rate);
@@ -49,7 +50,7 @@ export default function DebtDecisionWorkspace() {
         throw new RangeError('Annual interest rate must be a non-negative number');
       const input: DebtScenarioInput = {
         balanceMinor: parseMoney(values.balance, 'Debt outstanding'),
-        annualRatePercent: rate,
+        annualRatePercent: values.rate,
         monthlyPaymentMinor: parseMoney(values.payment, 'Monthly repayment'),
         extraPaymentMinor: parseMoney(values.extra, 'Extra repayment'),
         liquidCashMinor: parseMoney(values.cash, 'Available cash'),
@@ -57,13 +58,21 @@ export default function DebtDecisionWorkspace() {
         ...(sourceSnapshot ? { cashPositionSnapshotId: sourceSnapshot.id } : {}),
       };
       setLoading(true);
-      const response = await compareDebtScenario(input);
-      if (version === requestVersion.current) setResult(response);
+      const response = await createDebtReport(input);
+      if (version === requestVersion.current) { setResult(response.result); setReport(response); }
     } catch (e) {
       if (version === requestVersion.current) setError(e instanceof Error ? e.message : 'Unable to calculate scenario');
     } finally {
       if (version === requestVersion.current) setLoading(false);
     }
+  }
+
+  function downloadReport() {
+    if (!report) return;
+    const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }));
+    const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'debt-comparison.json';
+    document.body.appendChild(anchor); anchor.click(); anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   return (
@@ -82,7 +91,7 @@ export default function DebtDecisionWorkspace() {
               <label key={key} className="debt-field">
                 <span>{label}</span>
                 <small>{hint}</small>
-                <input inputMode="decimal" value={values[key]} onChange={(event) => { requestVersion.current++; setResult(null); setError(''); setLoading(false); if (key === 'cash' || key === 'reserve') setSourceSnapshot(null); setValues(current => ({ ...current, [key]: event.target.value })); }} aria-label={label} />
+                <input inputMode="decimal" value={values[key]} onChange={(event) => { requestVersion.current++; setResult(null); setReport(null); setError(''); setLoading(false); if (key === 'cash' || key === 'reserve') setSourceSnapshot(null); setValues(current => ({ ...current, [key]: event.target.value })); }} aria-label={label} />
               </label>
             ))}
           </div>
@@ -101,6 +110,8 @@ export default function DebtDecisionWorkspace() {
               </div>
               <div className="workspace-card">
                 <h3>Side-by-side comparison</h3>
+                <button type="button" onClick={downloadReport}>Download comparison report</button>
+                <p className="debt-caption">JSON includes inputs, exact rate, results, assumptions and cash evidence. Keep household reports private.</p>
                 <div className="debt-table-wrap">
                   <table className="debt-table"><thead><tr><th>Measure</th><th>Keep schedule</th><th>Extra repayment</th></tr></thead>
                     <tbody>
