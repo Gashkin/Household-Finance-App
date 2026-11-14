@@ -1,5 +1,17 @@
 # Household-Finance-App
 
+## Dated cash evidence → debt decision (current product slice)
+
+Run the Java 21 / Spring Boot backend with `cd backend && mvn spring-boot:run`. In another terminal run
+`cd frontend && npm ci && npm run dev`, then open http://localhost:5173.
+
+The **Debt decision** workspace lets you save a dated household cash position (cash accounts, next 30 days'
+commitments, source/status and protected reserve), then explicitly apply that position to the loan comparison.
+Both the cash totals and loan calculation run in the backend. Saved snapshots remain in local H2 storage;
+the comparison itself is not saved. See [the journey and API notes](product/dated-cash-position-journey.md).
+
+**Security boundary:** the current app has no real authentication or household isolation. It is for local
+development only; do not expose the backend publicly or enter sensitive data into an internet-facing instance.
 Household-Finance-App
 
 ## OKF Knowledge Model
