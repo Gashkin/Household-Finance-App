@@ -33,6 +33,10 @@ def marker(work_id):
     return f"<!-- gbd:{work_id} -->"
 
 
+def story_tags(body):
+    return re.findall(r'<!-- gbd:(GBD-[1-9][0-9]*) -->', body or '')
+
+
 def claim_path(work_id):
     marker(work_id)
     return f".delivery/claims/{work_id}.json"
@@ -53,7 +57,9 @@ def validate_definition(story):
     require(bool(story.get('artifacts')), "Declare verifiable feature/test artifacts before execution")
     for item in story['artifacts']:
         path = item['path']
-        require(not path.startswith('/') and '..' not in path.split('/') and bool(item.get('contains')), "Unsafe or unverifiable artifact")
+        needles = item.get('contains')
+        require(isinstance(path, str) and path and not path.startswith('/') and '..' not in path.split('/'), 'Unsafe artifact path')
+        require(isinstance(needles, list) and bool(needles) and all(isinstance(value, str) and value.strip() for value in needles), 'contains must be a nonempty list of nonblank marker strings')
     return story
 
 
@@ -127,6 +133,7 @@ class Coordinator:
         return claim
 
     def publish(self, story, token, title, body, base='main', parent_pr=None):
+        require(not story_tags(body), 'Description must omit canonical markers; publisher adds exactly one')
         self.sync(story, token)
         if base != 'main':
             require(parent_pr is not None, "Stacked work needs an explicit parent PR")
@@ -158,7 +165,7 @@ class Coordinator:
     def pr_gate(self, story, number):
         validate_definition(story)
         pr = self.git.pr(number)
-        require(marker(story['work_id']) in (pr.get('body') or ''), "PR lacks canonical story marker")
+        require(story_tags(pr.get('body')) == [story['work_id']], 'PR must contain exactly one canonical story marker')
         require(pr['head']['ref'] == story['branch'], "PR is not on the canonical claim branch")
         claim = self.git.file(claim_path(story['work_id']), pr['head']['sha'])
         require(claim['branch'] == story['branch'] and claim['work_id'] == story['work_id'], 'PR claim does not belong to this story')
@@ -173,9 +180,11 @@ class Coordinator:
         require(pr.get('merged'), "PR has not been human-merged")
         require(pr.get('merge_commit_sha'), 'Merged PR lacks an integration commit; cannot verify main reachability')
         require(pr['head']['ref'] == story['branch'], 'Merged PR is not the canonical story branch')
+        require(pr['base']['ref'] == 'main', 'Merged PR targets a feature branch; integrate to main under human control before Done')
         require(len(self.matching_prs(story)) == 1, 'Duplicate story PRs must be reconciled before Done')
         require(pr.get('merged_by', {}).get('type') == 'User', "Human-controlled merge provenance not confirmed")
-        require(marker(story['work_id']) in (pr.get('body') or '') or story.get('legacy_pr') == number, "PR/story association missing")
+        tags = story_tags(pr.get('body'))
+        require(tags == [story['work_id']] or (not tags and story.get('legacy_pr') == number), 'PR must contain exactly one canonical story marker')
         main = self.git.head('main')
         require(expected_main is None or expected_main == main, "Main advanced; verify the latest main CI, not a stale event")
         require(self.git.reachable(pr['merge_commit_sha'], main), "Merged away from main (PR #16 failure mode). Retarget/integrate under human control; do not mark Done")

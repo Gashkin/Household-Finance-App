@@ -253,6 +253,31 @@ class CoordinationIntegrationTests(unittest.TestCase):
             self.c.verify(STORY, 1)
 
 
+    def test_feature_target_is_blocked_even_when_its_commit_later_reaches_main(self):
+        self.ready_pr(); self.git.prs[0]['base']['ref'] = 'feature/parent'; self.git.human_merge(1)
+        with self.assertRaisesRegex(Blocked, 'targets a feature branch'): self.c.verify(STORY, 1)
+
+    def test_artifact_markers_cannot_be_strings_empty_blank_or_nonstrings(self):
+        for markers in ['a', [], [''], ['  '], [1], None]:
+            with self.subTest(markers=markers), self.assertRaisesRegex(Blocked, 'contains'):
+                validate_definition({**STORY, 'artifacts': [{'path': 'file', 'contains': markers}]})
+
+    def test_duplicate_or_mixed_story_markers_are_rejected(self):
+        self.ready_pr()
+        for extra in [marker(STORY['work_id']), marker('GBD-11')]:
+            self.git.prs[0]['body'] = marker(STORY['work_id']) + extra
+            with self.assertRaisesRegex(Blocked, 'exactly one'): self.c.pr_gate(STORY, 1)
+        with self.assertRaisesRegex(Blocked, 'omit canonical markers'):
+            self.c.publish(STORY, 'owner-A', 'No', marker(STORY['work_id']))
+
+    def test_supported_refresh_events_use_pr_data_not_commands(self):
+        pr = self.ready_pr()
+        self.git.trees[pr['head']['sha']]['.delivery/stories/GBD-10.json'] = json.dumps(STORY)
+        self.assertTrue(event_check(self.git, 'issue_comment', {'issue': {'number': 1, 'pull_request': {'url': 'https://example.test/pull/1'}}, 'comment': {'body': 'untrusted text'}})['review_ready'])
+        self.assertTrue(event_check(self.git, 'workflow_dispatch', {'inputs': {'pr_number': '1'}})['review_ready'])
+        self.assertIn('skipped', event_check(self.git, 'issue_comment', {'issue': {'number': 5}}))
+
+
 class WireContractTests(unittest.TestCase):
     def test_create_ref_is_post_only_and_handoff_has_atomic_before_oid(self):
         class HTTP:
@@ -295,6 +320,18 @@ class WireContractTests(unittest.TestCase):
                 if method == 'GET': return {'number': 18, 'merged': True}
                 return {'data': {'repository': {'pullRequest': {'mergeCommit': {'oid': 'integrated-sha'}}}}}
         self.assertEqual(GitHub('owner/repo', http=HTTP()).pr(18)['merge_commit_sha'], 'integrated-sha')
+
+    def test_token_bearing_workflow_never_checks_out_pr_code(self):
+        workflow = Path('.github/workflows/delivery-integrity.yml').read_text()
+        required = Path('.github/workflows/frontend-ci.yml').read_text()
+        self.assertIn('pull_request_target:', workflow)
+        self.assertIn('ref: main', workflow)
+        self.assertNotIn('ref: ${{', workflow)
+        self.assertNotIn('pull_request_review_thread:', workflow)
+        self.assertNotIn('GITHUB_TOKEN:', required)
+        self.assertNotIn('self-hosted', workflow)
+        for permission in ['contents: read', 'pull-requests: read', 'checks: read', 'actions: read']:
+            self.assertIn(permission, workflow)
 
     def test_network_errors_do_not_expose_credentials_or_response_bodies(self):
         error = urllib.error.HTTPError('https://example.test', 403, 'forbidden', {}, None)

@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import re
 import sys
-from delivery.coordinator import Blocked, Coordinator, GitHub, definition_path, validate_definition
+from delivery.coordinator import Blocked, Coordinator, GitHub, definition_path, validate_definition, story_tags
 
 
 def event_check(git, event_name, event):
@@ -16,14 +16,21 @@ def event_check(git, event_name, event):
         if run['conclusion'] != 'success':
             raise Blocked('Main CI failed; stories cannot be marked Done')
         return audit(service, run['head_sha'])
-    pr = event.get('pull_request')
+    if event_name == 'workflow_dispatch':
+        pr = git.pr(int(event['inputs']['pr_number']))
+    elif event_name == 'issue_comment':
+        if not event.get('issue', {}).get('pull_request'):
+            return {'skipped': 'Comment is not on a pull request'}
+        pr = git.pr(event['issue']['number'])
+    else:
+        pr = event.get('pull_request')
     if not pr:
         raise Blocked('No pull request in event')
-    tags = re.findall(r'<!-- gbd:(GBD-[1-9][0-9]*) -->', pr.get('body') or '')
+    tags = story_tags(pr.get('body'))
     if len(tags) != 1:
         raise Blocked('Exactly one canonical <!-- gbd:GBD-number --> marker is required')
     story = validate_definition(git.file(definition_path(tags[0]), pr['head']['sha']))
-    if event_name == 'pull_request' and event.get('action') == 'closed':
+    if event_name in ('pull_request', 'pull_request_target') and event.get('action') == 'closed':
         if not pr.get('merged'):
             return {'closed_unmerged': pr['number'], 'note': 'Claim retained; explicit recovery needed'}
         return service.verify(story, pr['number'])
