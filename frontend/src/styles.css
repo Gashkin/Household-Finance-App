@@ -612,3 +612,22 @@ body {
   .cash-line button { grid-column: 1 / -1; justify-self: start; }
   .cash-apply { width: 100%; }
 }
+
+
+.report-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+.report-inputs div { min-width: 0; }
+.report-inputs dt { color: #475569; font-size: .9rem; }
+.report-inputs dd { margin: .3rem 0 0; font-weight: 600; overflow-wrap: anywhere; }
+.report-preview { overflow-wrap: anywhere; }
+
+/* Result cards must shrink to the mobile viewport; only the comparison table scrolls. */
+.debt-results { grid-template-columns: minmax(0, 1fr); }
+.debt-results > .workspace-card { min-width: 0; }
+@media (max-width: 850px) {
+  .debt-layout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 480px) {
+  .app-shell { padding: 1rem; }
+  .app-main { padding: 1rem; }
+  .report-inputs { grid-template-columns: 1fr; }
+}
