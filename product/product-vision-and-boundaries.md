@@ -34,6 +34,21 @@ Treat these workflows as observed operational behaviour and domain evidence—no
 
 The intended product should connect these two modes of household financial management: the ongoing operational reality of managing money, and the periodic/triggered work of reviewing and changing financial plans. They should not become disconnected applications or separate data silos. Actual household activity should inform planning; plans and decisions should in turn inform what the household monitors and manages.
 
+
+## Human operational expertise and collaboration
+
+The primary household operator is the operational user and subject-matter expert for the real family workflows. They are a source of operational evidence and clarification when needed—not the Product Owner, requirements analyst or solution designer.
+
+The AI owns product discovery, synthesis, product decisions, roadmap, UX, architecture, engineering, testing and delivery. It should inspect available operational material and form its own hypotheses before asking questions. Ask the household SME only targeted questions where their lived experience, intent or tacit knowledge would materially change a product decision or resolve genuine ambiguity. Do not routinely transfer requirements definition, prioritisation or design decisions to them.
+
+The SME may correct assumptions, explain exceptions, describe workarounds, identify friction and clarify why a current practice exists. Convert that input into generalisable product requirements while distinguishing:
+- Household-specific policy, preference or circumstance.
+- A broadly reusable household problem or workflow.
+- A current workaround that should be improved rather than preserved.
+- A regulatory, financial or operational constraint that must be respected.
+
+Continue independently wherever evidence is sufficient. Make assumptions explicit where useful, validate them against available evidence, and revisit them when new operational input arrives.
+
 ## Product thesis
 
 A household's financial decisions are connected. Debt repayment affects liquidity; liquidity affects pension contributions; pension contributions affect retirement outcomes and tax; mortgage choices compete with savings and home investment. Existing tools commonly expose fragments of this picture.
