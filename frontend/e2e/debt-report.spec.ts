@@ -27,7 +27,6 @@ test('capture cash evidence, inspect and download a reproducible debt decision',
   await expect(preview).toContainText('Synthetic bank statement');
   await expect(preview).toContainText('Manually reviewed');
   await expect(preview).toContainText('No fees, penalties');
-  await page.screenshot({ path: testInfo.outputPath('report-preview.png'), fullPage: true });
   const downloadEvent = page.waitForEvent('download');
   await preview.getByRole('button', { name: 'Download JSON report' }).click();
   const download = await downloadEvent;
@@ -41,6 +40,8 @@ test('capture cash evidence, inspect and download a reproducible debt decision',
   const replay = await request.post('http://127.0.0.1:8080/api/debt-scenarios/report', { data: report.input });
   expect(replay.ok()).toBeTruthy();
   expect((await replay.json()).result).toEqual(report.result);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+  await page.screenshot({ path: testInfo.outputPath('report-preview.png'), fullPage: true });
   await page.getByLabel('Extra repayment now (€)', { exact: true }).fill('1');
   await expect(preview).toBeHidden();
   await expect(page.getByRole('button', { name: 'Download JSON report' })).toHaveCount(0);
