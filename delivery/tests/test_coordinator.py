@@ -23,7 +23,7 @@ class MemoryGit:
         self.trees = {'main-1': {'feature.py': 'working capability', 'tests.py': 'regression'}}
         self.parents = {'main-1': None}
         self.prs = []
-        self.review_items = [{'id': 123, 'state': 'COMMENTED', 'user': {'login': 'copilot-pull-request-reviewer[bot]'}}]
+        self.review_items = [{'id': 123, 'state': 'COMMENTED', 'user': {'login': 'copilot-pull-request-reviewer[bot]', 'type': 'Bot'}}]
         self.thread_items = []
         self.check = {'id': 1, 'status': 'completed', 'conclusion': 'success', 'html_url': 'https://example.test/check'}
         self.open_barrier = None
@@ -193,7 +193,7 @@ class CoordinationIntegrationTests(unittest.TestCase):
         self.ready_pr()
         self.git.review_items = []
         with self.assertRaisesRegex(Blocked, 'exactly one'): self.c.pr_gate(STORY, 1)
-        self.git.review_items = [{'id': i, 'state': 'COMMENTED', 'user': {'login': 'Copilot'}} for i in [1, 2]]
+        self.git.review_items = [{'id': i, 'state': 'COMMENTED', 'user': {'login': 'Copilot', 'type': 'Bot'}} for i in [1, 2]]
         with self.assertRaisesRegex(Blocked, 'found 2'): self.c.pr_gate(STORY, 1)
         self.git.review_items = self.git.review_items[:1]
         self.git.thread_items = [{'isResolved': False}]
@@ -288,6 +288,13 @@ class WireContractTests(unittest.TestCase):
         self.assertEqual(len(git.reviews(1)), 101)
         with self.assertRaisesRegex(Blocked, 'Branch changed'):
             git.cas_ref('story/10-delivery', 'old', 'new')
+
+    def test_merged_rest_response_without_sha_uses_graphql_integration_commit(self):
+        class HTTP:
+            def call(self, method, path, body=None):
+                if method == 'GET': return {'number': 18, 'merged': True}
+                return {'data': {'repository': {'pullRequest': {'mergeCommit': {'oid': 'integrated-sha'}}}}}
+        self.assertEqual(GitHub('owner/repo', http=HTTP()).pr(18)['merge_commit_sha'], 'integrated-sha')
 
     def test_network_errors_do_not_expose_credentials_or_response_bodies(self):
         error = urllib.error.HTTPError('https://example.test', 403, 'forbidden', {}, None)

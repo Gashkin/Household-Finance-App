@@ -148,8 +148,9 @@ class Coordinator:
         return pr
 
     def review_gate(self, number):
-        reviews = [r for r in self.git.reviews(number) if r['user']['login'].lower().startswith('copilot')
-                   and r['state'] != 'PENDING']
+        actors = {'copilot', 'copilot-pull-request-reviewer', 'copilot-pull-request-reviewer[bot]'}
+        reviews = [r for r in self.git.reviews(number) if r['user']['login'].lower() in actors
+                   and r['user'].get('type') == 'Bot' and r['state'] != 'PENDING']
         require(len(reviews) == 1, f"Expected exactly one independent Copilot review, found {len(reviews)}. Never request incremental re-reviews")
         require(not any(not t['isResolved'] for t in self.git.threads(number)), "Review conversations remain open; assess, reply with evidence and resolve them")
         return reviews[0]['id']
@@ -169,7 +170,8 @@ class Coordinator:
     def verify(self, story, number, expected_main=None):
         validate_definition(story)
         pr = self.git.pr(number)
-        require(pr.get('merged') and pr.get('merge_commit_sha'), "PR has not been human-merged")
+        require(pr.get('merged'), "PR has not been human-merged")
+        require(pr.get('merge_commit_sha'), 'Merged PR lacks an integration commit; cannot verify main reachability')
         require(pr['head']['ref'] == story['branch'], 'Merged PR is not the canonical story branch')
         require(len(self.matching_prs(story)) == 1, 'Duplicate story PRs must be reconciled before Done')
         require(pr.get('merged_by', {}).get('type') == 'User', "Human-controlled merge provenance not confirmed")
@@ -217,7 +219,9 @@ class JsonHTTP:
                 return json.loads(data) if data else None
         except urllib.error.HTTPError as error:
             # Never print response bodies or credentials from upstream services.
-            raise Blocked(f"{method} {path.split('?')[0]} returned HTTP {error.code}; inspect ownership/state before retrying writes") from error
+            code = error.code
+            error.close()
+            raise Blocked(f"{method} {path.split('?')[0]} returned HTTP {code}; inspect ownership/state before retrying writes") from error
         except urllib.error.URLError as error:
             raise Blocked("Remote service unavailable; writes may have succeeded. Use sync/recovery rather than re-claiming") from error
 
@@ -270,7 +274,17 @@ class GitHub:
         return self.pages('/pulls?state=all')
 
     def pr(self, number):
-        return self.api('GET', f'/pulls/{int(number)}')
+        pr = self.api('GET', f'/pulls/{int(number)}')
+        # REST 2026 no longer returns the integration SHA; normalize from GraphQL.
+        if pr.get('merged') and not pr.get('merge_commit_sha'):
+            owner, name = self.repo.split('/')
+            data = self.http.call('POST', '/graphql', {
+                'query': 'query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){mergeCommit{oid}}}}',
+                'variables': {'owner': owner, 'name': name, 'number': int(number)}})
+            require(not data.get('errors'), 'Cannot retrieve the merged integration commit')
+            commit = data['data']['repository']['pullRequest']['mergeCommit']
+            pr['merge_commit_sha'] = commit['oid'] if commit else None
+        return pr
 
     def open_pr(self, head, base, title, body):
         return self.api('POST', '/pulls', {'head': head, 'base': base, 'title': title, 'body': body})
