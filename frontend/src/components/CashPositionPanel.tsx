@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { getLatestCashPosition, saveCashPosition, type CashLine, type CashPositionSnapshot } from '../api/cashPosition';
 import { money, parseMoney } from '../domain/money';
+import { todayInDublin } from '../domain/dates';
 
 type DraftLine = { label: string; amount: string };
 type LineListProps = {
@@ -9,11 +10,6 @@ type LineListProps = {
   update: (next: DraftLine[]) => void;
   canBeEmpty?: boolean;
 };
-
-function localToday(): string {
-  const date = new Date();
-  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
-}
 
 function LineEditor({ title, entries, update, canBeEmpty = false }: LineListProps) {
   return (
@@ -64,7 +60,7 @@ export default function CashPositionPanel({ onApply, appliedId }: {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [asOfDate, setAsOfDate] = useState(localToday);
+  const [asOfDate, setAsOfDate] = useState(todayInDublin);
   const [sourceNote, setSourceNote] = useState('');
   const [verification, setVerification] = useState<'REVIEWED' | 'ESTIMATED'>('ESTIMATED');
   const [balances, setBalances] = useState<DraftLine[]>([{ label: '', amount: '' }]);
@@ -143,7 +139,7 @@ export default function CashPositionPanel({ onApply, appliedId }: {
         <form onSubmit={submit}>
           <div className="cash-meta">
             <label>Balance date
-              <input type="date" value={asOfDate} max={localToday()} required onChange={event => setAsOfDate(event.target.value)}/>
+              <input type="date" value={asOfDate} max={todayInDublin()} required onChange={event => setAsOfDate(event.target.value)}/>
             </label>
             <label>Evidence status
               <select value={verification} onChange={event => setVerification(event.target.value as 'REVIEWED' | 'ESTIMATED')}>
