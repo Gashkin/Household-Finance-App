@@ -1,16 +1,18 @@
 import { useState } from 'react';
+import DebtDecisionWorkspace from './components/DebtDecisionWorkspace';
 import ConsumerDashboard from './components/ConsumerDashboard';
 import MigraterWorkspace from './components/MigraterWorkspace';
 import PlannerWorkspace from './components/PlannerWorkspace';
 
 function App() {
-  const [role, setRole] = useState<'planner' | 'migrater' | 'consumer'>('planner');
+  const [role, setRole] = useState<'decision' | 'planner' | 'migrater' | 'consumer'>('decision');
 
   return (
     <div className="app-shell">
       <header className="app-header">
         <h1>Household Finance</h1>
-        <div className="role-switcher">
+        <nav className="role-switcher" aria-label="Workspaces">
+          <button onClick={() => setRole('decision')} className={role === 'decision' ? 'active' : ''}>Debt decision</button>
           <button onClick={() => setRole('planner')} className={role === 'planner' ? 'active' : ''}>
             Planner
           </button>
@@ -20,10 +22,11 @@ function App() {
           <button onClick={() => setRole('consumer')} className={role === 'consumer' ? 'active' : ''}>
             Consumer
           </button>
-        </div>
+        </nav>
       </header>
 
       <main className="app-main">
+        {role === 'decision' ? <DebtDecisionWorkspace /> : null}
         {role === 'planner' ? <PlannerWorkspace /> : null}
         {role === 'migrater' ? <MigraterWorkspace /> : null}
         {role === 'consumer' ? <ConsumerDashboard /> : null}
