@@ -1,0 +1,10 @@
+{
+  "work_id": "GBD-8",
+  "page_id": "418d3419-fef0-81ed-9800-fce021e83c0e",
+  "branch": "story/8-reliable-delivery",
+  "artifacts": [
+    {"path": "delivery/coordinator.py", "contains": ["class Coordinator:", "self.git.create_ref", "Merged away from main", "eligible_for_done"]},
+    {"path": "delivery/tests/test_coordinator.py", "contains": ["test_two_simultaneous_workers_only_one_claims", "test_pr16_wrong_base_regression_does_not_mark_done", "test_failed_notion_write_preserves_claim"]},
+    {"path": ".github/workflows/delivery-integrity.yml", "contains": ["workflow_run:", "permissions:", "python -m delivery.ci"]}
+  ]
+}

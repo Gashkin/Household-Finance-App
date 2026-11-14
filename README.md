@@ -54,3 +54,7 @@ Notes:
 ## Portable debt decision reports
 
 Use the Debt decision workspace to record cash evidence, compare repayment options, review the report and download its JSON record. See [GBD-7 local use, report contract and verification](product/stories/debt-report.md). This is a local-development application; see [security limitations](SECURITY.md) before entering real household data.
+
+## Autonomous delivery coordination
+
+See [claim, publish, recover and verify a story](delivery/README.md). Run `python -m delivery.demo` for a credential-free two-worker lifecycle demonstration. CI independently checks story identity/reviews and verifies that human-merged capabilities actually reach main.
