@@ -36,7 +36,7 @@ class DebtScenarioControllerTest {
     @Test void preservesExactDecimalRateAtHttpBoundary() throws Exception {
         mvc.perform(post("/api/debt-scenarios/compare")
             .contentType("application/json")
-            .content("{\\"balanceMinor\\":6000,\\"annualRatePercent\\":0.69999999999999999,\\"monthlyPaymentMinor\\":6000,\\"extraPaymentMinor\\":0,\\"liquidCashMinor\\":0,\\"minimumReserveMinor\\":0}"))
+            .content("{\"balanceMinor\":6000,\"annualRatePercent\":0.69999999999999999,\"monthlyPaymentMinor\":6000,\"extraPaymentMinor\":0,\"liquidCashMinor\":0,\"minimumReserveMinor\":0}"))
             .andExpect(status().isOk())
             .andExpect(MockMvcResultMatchers.jsonPath("$.baseline.interestMinor").value(3));
     }
