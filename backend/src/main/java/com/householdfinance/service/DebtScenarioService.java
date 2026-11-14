@@ -29,8 +29,8 @@ public class DebtScenarioService {
             throw new IllegalArgumentException("extraPaymentMinor cannot exceed outstanding balance");
         if (input.extraPaymentMinor() > input.liquidCashMinor())
             throw new IllegalArgumentException("extraPaymentMinor cannot exceed available liquid cash");
-        BigDecimal monthlyRate = input.annualRatePercent().divide(BigDecimal.valueOf(1200), 24, RoundingMode.HALF_UP);
-        Schedule baseline = simulate(input.balanceMinor(), input.monthlyPaymentMinor(), monthlyRate);
+        BigDecimal annualRate = input.annualRatePercent();
+        Schedule baseline = simulate(input.balanceMinor(), input.monthlyPaymentMinor(), annualRate);
         Schedule extra = input.extraPaymentMinor() == input.balanceMinor()
                 ? new Schedule(0, 0, 0, 0)
                 : simulate(input.balanceMinor() - input.extraPaymentMinor(), input.monthlyPaymentMinor(), monthlyRate);
@@ -52,12 +52,12 @@ public class DebtScenarioService {
         if (value < 0 || value > Number.MAX_SAFE_INTEGER) throw new IllegalArgumentException(field + " must be a non-negative safe integer");
     }
 
-    private static Schedule simulate(long balance, long payment, BigDecimal monthlyRate) {
+    private static Schedule simulate(long balance, long payment, BigDecimal annualRate) {
         long remaining = balance, interestTotal = 0, paidTotal = 0, finalPayment = 0;
         int months = 0;
         while (remaining > 0) {
             if (months >= 1200) throw new IllegalArgumentException("Debt is not repaid within 1200 months");
-            long interest = BigDecimal.valueOf(remaining).multiply(monthlyRate).setScale(0, RoundingMode.HALF_UP).longValueExact();
+            long interest = BigDecimal.valueOf(remaining).multiply(annualRate).divide(BigDecimal.valueOf(1200), 0, RoundingMode.HALF_UP).longValueExact();
             if (payment <= interest) throw new IllegalArgumentException("Monthly payment does not cover interest and reduce principal");
             long due = Math.addExact(remaining, interest);
             long actual = Math.min(payment, due);
