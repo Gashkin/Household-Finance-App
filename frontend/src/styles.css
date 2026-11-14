@@ -631,3 +631,21 @@ body {
   .app-main { padding: 1rem; }
   .report-inputs { grid-template-columns: 1fr; }
 }
+
+
+.evidence-intake { margin-bottom: 1.5rem; min-width: 0; }
+.evidence-intake summary { cursor: pointer; color: #1d4ed8; font-weight: 700; }
+.intake-unlock { max-width: 450px; }
+.evidence-intake label { display: grid; gap: .35rem; margin: .7rem 0; font-weight: 600; }
+.evidence-intake input:not([type=checkbox]), .evidence-intake textarea, .evidence-intake select { width: 100%; min-width: 0; font: inherit; padding: .6rem; border: 1px solid #cbd5e1; border-radius: .5rem; }
+.intake-review-layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 1rem; }
+.intake-passage { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.5; padding: 1rem; background: #eef2ff; border-radius: .6rem; }
+.intake-facts { min-width: 0; border: 1px solid #cbd5e1; border-radius: .6rem; padding: 1rem; }
+.intake-fact { border-bottom: 1px solid #cbd5e1; margin-bottom: 1rem; padding-bottom: 1rem; }
+.intake-fact blockquote { margin: 0; border-left: 3px solid #94a3b8; padding: .5rem .75rem; overflow-wrap: anywhere; font-size: .9rem; }
+.intake-source-fields { display: grid; grid-template-columns: minmax(0,1fr); gap: .5rem; }
+.evidence-intake .intake-check { display: flex; align-items: flex-start; gap: .6rem; font-weight: 400; line-height: 1.5; }
+.intake-check input { margin-top: .35rem; flex: 0 0 auto; }
+.intake-warning { background: #fff7ed; color: #7c2d12; padding: .7rem; border-radius: .5rem; }
+.evidence-intake :is(input, textarea, select, button):focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+@media (max-width: 850px) { .intake-review-layout { grid-template-columns: minmax(0,1fr); } }

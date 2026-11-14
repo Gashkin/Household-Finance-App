@@ -1,0 +1,9 @@
+{
+  "work_id": "GBD-4",
+  "page_id": "418d3419-fef0-811b-9da6-ead4cf827e25",
+  "branch": "story/4-delivery",
+  "token": "claim-token:work-bc78f8b2-40d1-43d4-b427-c4a775dc4506",
+  "claimed_at": "2026-11-14T12:24:39Z",
+  "base_sha": "cbfd87582895d2e65b824c4e39399a5a3b56bfba",
+  "history": [{"event": "claim", "at": "2026-11-14T12:24:39Z", "method": "Connected GitHub create-only ref and Notion write/readback; CLI cannot inherit app integration credentials. Existing claims and PRs checked first."}]
+}

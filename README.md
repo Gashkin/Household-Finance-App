@@ -58,3 +58,7 @@ Use the Debt decision workspace to record cash evidence, compare repayment optio
 ## Autonomous delivery coordination
 
 See [claim, publish, recover and verify a story](delivery/README.md). Run `python -m delivery.demo` for a credential-free two-worker lifecycle demonstration. CI independently checks story identity/reviews and verifies that human-merged capabilities actually reach main.
+
+## Review source evidence before updating cash
+
+The Debt decision workspace can turn a short source excerpt into editable, cited cash/bill suggestions, then save and apply only explicitly reviewed facts. [Evidence intake setup, manual walkthrough and optional model configuration](product/stories/evidence-intake.md). Intake is locked until the local instance owner configures its access key; external model extraction is off by default.

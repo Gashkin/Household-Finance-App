@@ -1,3 +1,4 @@
+import EvidenceIntakePanel from './EvidenceIntakePanel';
 import DebtReportPreview from './DebtReportPreview';
 import { useRef, useState, type FormEvent } from 'react';
 import { createDebtReport, type DebtComparisonReport, type DebtScenarioInput, type DebtScenarioResult } from '../api/debtScenarios';
@@ -18,6 +19,7 @@ const fields: { key: Field; label: string; hint: string }[] = [
 
 export default function DebtDecisionWorkspace() {
   const [values, setValues] = useState(defaults);
+  const [cashRefresh, setCashRefresh] = useState(0);
   const [sourceSnapshot, setSourceSnapshot] = useState<CashPositionSnapshot | null>(null);
   const requestVersion = useRef(0);
   const [result, setResult] = useState<DebtScenarioResult | null>(null);
@@ -83,7 +85,8 @@ export default function DebtDecisionWorkspace() {
         <h2>Repay debt or keep the cash?</h2>
         <p>Compare the cost of keeping your repayment schedule with making an extra payment today. Debt comparisons are illustrative and not saved. Your optional cash evidence is stored in the local backend.</p>
       </div>
-      <CashPositionPanel onApply={applyCashPosition} appliedId={sourceSnapshot?.id ?? null} />
+      <EvidenceIntakePanel onApproved={snapshot => { applyCashPosition(snapshot); setCashRefresh(value => value + 1); }} />
+      <CashPositionPanel key={cashRefresh} onApply={applyCashPosition} appliedId={sourceSnapshot?.id ?? null} />
       <div className="debt-layout">
         <form className="workspace-card debt-form" onSubmit={submit}>
           <h3>Model your decision</h3>
