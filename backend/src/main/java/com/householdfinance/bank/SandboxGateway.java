@@ -103,17 +103,7 @@ public class SandboxGateway {
       } else {
         AclFileAttributeView acl = Files.getFileAttributeView(file, AclFileAttributeView.class);
         if (acl == null) throw new IOException();
-        String owner = acl.getOwner().getName();
-        for (AclEntry entry : acl.getAcl())
-          if (entry.type() == AclEntryType.ALLOW
-              && entry.permissions().contains(AclEntryPermission.READ_DATA)) {
-            String principal = entry.principal().getName();
-            if (!principal.equalsIgnoreCase(owner)
-                && !principal.toUpperCase(Locale.ROOT).endsWith("\\SYSTEM")
-                && !principal.equalsIgnoreCase("SYSTEM")
-                && !principal.toUpperCase(Locale.ROOT).endsWith("\\ADMINISTRATORS"))
-              throw new IOException();
-          }
+        if (!privateAcl(acl.getOwner().getName(), acl.getAcl())) throw new IOException();
       }
       bytes = Files.readAllBytes(file);
       String pem = new String(bytes, StandardCharsets.US_ASCII);
@@ -135,6 +125,18 @@ public class SandboxGateway {
       if (bytes != null) Arrays.fill(bytes, (byte) 0);
       if (der != null) Arrays.fill(der, (byte) 0);
     }
+  }
+
+  static boolean privateAcl(String owner, List<AclEntry> entries) {
+    for (AclEntry entry : entries) {
+      if (entry.type() != AclEntryType.ALLOW || entry.permissions().isEmpty()) continue;
+      String principal = entry.principal().getName();
+      if (!principal.equalsIgnoreCase(owner)
+          && !principal.equalsIgnoreCase("NT AUTHORITY\\SYSTEM")
+          && !principal.equalsIgnoreCase("SYSTEM")
+          && !principal.equalsIgnoreCase("BUILTIN\\Administrators")) return false;
+    }
+    return true;
   }
 
   private String jwt() {
@@ -247,13 +249,11 @@ public class SandboxGateway {
             && "127.0.0.1".equals(uri.getHost())
             && uri.getPort() == base.getPort();
     if (uri.getUserInfo() != null
+        || ("auth.enablebanking.com".equals(uri.getHost()) && !uri.getPath().startsWith("/ais/"))
         || uri.getFragment() != null
         || (!mock
             && !("https".equals(uri.getScheme())
-                && Set.of(
-                        "auth.enablebanking.com",
-                        "tilisy-sandbox.enablebanking.com",
-                        "tilisy.enablebanking.com")
+                && Set.of("auth.enablebanking.com", "tilisy-sandbox.enablebanking.com")
                     .contains(Objects.toString(uri.getHost(), "")))))
       throw new IllegalArgumentException("Untrusted sandbox consent redirect");
     return value;

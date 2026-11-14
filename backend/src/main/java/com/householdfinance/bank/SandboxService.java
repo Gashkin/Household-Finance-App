@@ -261,10 +261,11 @@ public class SandboxService {
     if (!selected) reauthorize = true;
     check(selected, "Selected account is no longer authorized");
     try {
-      check(
-          Instant.parse(text(session.path("access"), "valid_until", 80)).isAfter(Instant.now()),
-          "Sandbox consent expired");
+      Instant remoteExpiry = Instant.parse(text(session.path("access"), "valid_until", 80));
+      if (remoteExpiry.isBefore(expires)) expires = remoteExpiry;
+      check(remoteExpiry.isAfter(Instant.now()), "Sandbox consent expired");
     } catch (DateTimeException e) {
+      reauthorize = true;
       throw new IllegalArgumentException("Invalid sandbox session expiry");
     }
   }

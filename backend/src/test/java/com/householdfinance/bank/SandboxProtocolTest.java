@@ -198,11 +198,18 @@ class SandboxProtocolTest {
         () -> service.complete(new SandboxService.Complete(provider.state, "code"), "a"));
     service.forget();
     var request = input(connect());
+    provider.mode = "expired";
+    var remotelyExpired = request;
+    assertThrows(IllegalArgumentException.class, () -> service.fetch(remotelyExpired));
+    assertEquals("EXPIRED", service.status().state());
+    service.forget();
+    provider.mode = "ok";
+    var locallyExpired = input(connect());
     var expiry = SandboxService.class.getDeclaredField("expires");
     expiry.setAccessible(true);
     expiry.set(service, Instant.EPOCH);
     assertEquals("EXPIRED", service.status().state());
-    assertThrows(IllegalArgumentException.class, () -> service.fetch(request));
+    assertThrows(IllegalArgumentException.class, () -> service.fetch(locallyExpired));
   }
 
   @Test
@@ -231,6 +238,37 @@ class SandboxProtocolTest {
   }
 
   @Test
+  void windowsAclRejectsUntrustedReadWriteDeleteAndOwnershipPermissions() {
+    for (var permission : java.nio.file.attribute.AclEntryPermission.values()) {
+      var ace =
+          java.nio.file.attribute.AclEntry.newBuilder()
+              .setType(java.nio.file.attribute.AclEntryType.ALLOW)
+              .setPrincipal(() -> "Everyone")
+              .setPermissions(permission)
+              .build();
+      assertFalse(
+          SandboxGateway.privateAcl("WORKSTATION\\Owner", List.of(ace)), permission.toString());
+    }
+    for (String name :
+        List.of("WORKSTATION\\Owner", "NT AUTHORITY\\SYSTEM", "BUILTIN\\Administrators")) {
+      var ace =
+          java.nio.file.attribute.AclEntry.newBuilder()
+              .setType(java.nio.file.attribute.AclEntryType.ALLOW)
+              .setPrincipal(() -> name)
+              .setPermissions(java.nio.file.attribute.AclEntryPermission.WRITE_DATA)
+              .build();
+      assertTrue(SandboxGateway.privateAcl("WORKSTATION\\Owner", List.of(ace)));
+    }
+    var spoof =
+        java.nio.file.attribute.AclEntry.newBuilder()
+            .setType(java.nio.file.attribute.AclEntryType.ALLOW)
+            .setPrincipal(() -> "ATTACKER\\SYSTEM")
+            .setPermissions(java.nio.file.attribute.AclEntryPermission.READ_DATA)
+            .build();
+    assertFalse(SandboxGateway.privateAcl("WORKSTATION\\Owner", List.of(spoof)));
+  }
+
+  @Test
   void gatewayRejectsPaymentsAndUnsafeCallbacks() {
     assertThrows(
         IllegalArgumentException.class,
@@ -248,6 +286,18 @@ class SandboxProtocolTest {
     assertThrows(
         IllegalArgumentException.class,
         () -> provider.gateway().safeRedirect("https://auth.enablebanking.com.evil.example/"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> provider.gateway().safeRedirect("https://tilisy.enablebanking.com/"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> provider.gateway().safeRedirect("https://auth.enablebanking.com/pis/start"));
+    assertEquals(
+        "https://auth.enablebanking.com/ais/start",
+        provider.gateway().safeRedirect("https://auth.enablebanking.com/ais/start"));
+    assertEquals(
+        "https://tilisy-sandbox.enablebanking.com/",
+        provider.gateway().safeRedirect("https://tilisy-sandbox.enablebanking.com/"));
   }
 
   @Test

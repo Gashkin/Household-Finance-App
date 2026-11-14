@@ -40,8 +40,13 @@ export default function BankSandboxPanel({
       .then((value) => {
         if (live) setStatus(value);
       })
-      .catch((e) => {
+      .catch(async (e) => {
         if (live) setError(e.message);
+        // A failed/cancelled exchange must not hide the controls for a fresh connection.
+        try {
+          const current = await sandbox<SandboxStatus>("status");
+          if (live) setStatus(current);
+        } catch { /* keep the original failure; the local backend may be unavailable */ }
       });
     return () => {
       live = false;

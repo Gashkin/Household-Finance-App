@@ -51,7 +51,7 @@ public final class SyntheticProvider implements AutoCloseable {
   }
 
   Map<String, Object> access() {
-    return Map.of("valid_until", until());
+    return Map.of("valid_until", mode.equals("expired") ? Instant.EPOCH.toString() : until());
   }
 
   void handle(HttpExchange ex) throws java.io.IOException {

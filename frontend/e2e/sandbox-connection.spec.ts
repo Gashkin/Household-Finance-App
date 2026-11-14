@@ -6,6 +6,13 @@ test("connect synthetic read-only accounts, review paginated activity and discon
   page,
 }, testInfo) => {
   test.setTimeout(90000);
+  for (const query of ["error=access_denied", "state=synthetic-invalid&code=synthetic-code"]) {
+    await page.goto("/bank/callback?" + query);
+    const recovery = page.getByRole("region", { name: "Enable Banking sandbox connection", exact: true });
+    await expect(recovery.getByRole("alert")).toBeVisible();
+    await expect(recovery.getByRole("checkbox", { name: "I will use only synthetic sandbox accounts and allow read-only account, balance and transaction access" })).toBeVisible();
+    expect(new URL(page.url()).search).toBe("");
+  }
   await page.goto("/");
   await page
     .getByRole("button", { name: "Money position", exact: true })
