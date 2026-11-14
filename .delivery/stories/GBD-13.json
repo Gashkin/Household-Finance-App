@@ -1,0 +1,13 @@
+{
+  "work_id": "GBD-13",
+  "page_id": "418d3419-fef0-8152-bc49-da005e04d060",
+  "branch": "story/13-delivery",
+  "artifacts": [
+    {"path":"backend/src/main/java/com/householdfinance/workspace/WorkspaceFilter.java","contains":["SameSite=Strict","X-Workspace-Request","Local workspace host required"]},
+    {"path":"backend/src/main/java/com/householdfinance/workspace/WorkspaceBackupService.java","contains":["RESTORE INTO EMPTY WORKSPACE","rollbackFor=Exception.class","checkSchema"]},
+    {"path":"backend/src/main/java/com/householdfinance/workspace/BackupCrypto.java","contains":["AES/GCM/NoPadding","600_000"]},
+    {"path":"frontend/src/components/WorkspaceRecovery.tsx","contains":["Download encrypted backup","Restore backup"]},
+    {"path":"frontend/e2e/workspace-recovery.spec.ts","contains":["fresh workspace without partial writes","Recovery complete"]},
+    {"path":"backend/src/test/java/com/householdfinance/workspace/WorkspaceRestartTest.java","contains":["recordsSurviveRestartAndEncryptedBackupRecoversIntoANewDatabase"]}
+  ]
+}

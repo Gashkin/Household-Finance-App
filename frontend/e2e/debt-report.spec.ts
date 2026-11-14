@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+import { unlockFixture } from './workspace-helper';
+test.use({ extraHTTPHeaders: { 'X-Workspace-Request': '1' } });
+test.beforeEach(unlockFixture);
 
 test('capture cash evidence, inspect and download a reproducible debt decision', async ({ page, request }, testInfo) => {
   await page.goto('/');

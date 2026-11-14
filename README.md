@@ -2,7 +2,7 @@
 
 ## Dated cash evidence → debt decision (current product slice)
 
-Run the Java 21 / Spring Boot backend with `cd backend && mvn spring-boot:run`. In another terminal run
+First configure `WORKSPACE_PASSWORD` (16–256 characters) in the backend environment. Then run the Java 21 / Spring Boot backend with `cd backend && mvn spring-boot:run`. In another terminal run
 `cd frontend && npm ci && npm run dev`, then open http://localhost:5173.
 
 The **Debt decision** workspace lets you save a dated household cash position (cash accounts, next 30 days'
@@ -10,8 +10,7 @@ commitments, source/status and protected reserve), then explicitly apply that po
 Both the cash totals and loan calculation run in the backend. Saved snapshots remain in local H2 storage;
 the comparison itself is not saved. See [the journey and API notes](product/dated-cash-position-journey.md).
 
-**Security boundary:** the current app has no real authentication or household isolation. It is for local
-development only; do not expose the backend publicly or enter sensitive data into an internet-facing instance.
+**Security boundary:** one password-protected local workspace, with server-enforced sessions and encrypted recovery backups. Use a private OS profile and encrypted disk: the live H2 database is not application-encrypted. No multi-user or network deployment. See [setup, backup and tested recovery](product/stories/private-workspace.md).
 
 ## OKF Knowledge Model
 
@@ -62,3 +61,7 @@ See [claim, publish, recover and verify a story](delivery/README.md). Run `pytho
 ## Review source evidence before updating cash
 
 The Debt decision workspace can turn a short source excerpt into editable, cited cash/bill suggestions, then save and apply only explicitly reviewed facts. [Evidence intake setup, manual walkthrough and optional model configuration](product/stories/evidence-intake.md). Intake is locked until the local instance owner configures its access key; external model extraction is off by default.
+
+## Private records and recovery
+
+Unlock once to access financial workspaces; lock when finished. **Backup & recovery** downloads a passphrase-encrypted archive and restores it into an empty local workspace without overwriting existing records. [Configuration, restart/recovery walkthrough and limits](product/stories/private-workspace.md).

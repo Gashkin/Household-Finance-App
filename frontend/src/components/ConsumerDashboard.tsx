@@ -32,7 +32,7 @@ function ConsumerDashboard() {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:8080/reports/monthly-overview');
+      const response = await fetch('/reports/monthly-overview');
       if (!response.ok) {
         throw new Error('Request failed.');
       }
