@@ -33,3 +33,20 @@ backend/target/
 
 # Generated frontend build output
 frontend/dist/
+
+# Never commit household runtime data or personal source workbooks
+/data/
+/**/data/*.mv.db
+/**/data/*.trace.db
+**/*.xlsx
+**/*.xlsm
+**/*.xls
+**/*.ods
+/backend/sql/*.sql
+/AnalysisScripts/*.csv
+/Docs/*.csv
+**/__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
