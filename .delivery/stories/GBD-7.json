@@ -1,0 +1,11 @@
+{
+  "work_id": "GBD-7",
+  "page_id": "418d3419-fef0-81db-956a-f0c5d54865a0",
+  "branch": "story/7-portable-debt-decisions",
+  "legacy_pr": 18,
+  "artifacts": [
+    {"path": "backend/src/main/java/com/householdfinance/controller/DebtScenarioController.java", "contains": ["@PostMapping(\"/report\")", "ReportInput"]},
+    {"path": "frontend/src/components/DebtReportPreview.tsx", "contains": ["Review your report before downloading", "Download JSON report"]},
+    {"path": "frontend/e2e/debt-report.spec.ts", "contains": ["capture cash evidence", "download.path()", "replay.json()"]}
+  ]
+}

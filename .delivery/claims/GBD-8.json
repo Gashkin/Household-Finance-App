@@ -1,0 +1,9 @@
+{
+  "work_id": "GBD-8",
+  "page_id": "418d3419-fef0-81ed-9800-fce021e83c0e",
+  "branch": "story/8-reliable-delivery",
+  "token": "claim-token:work-03171789-3ff6-49da-8b5f-bb5ae7da0ec1",
+  "claimed_at": "2026-11-14T11:44:48Z",
+  "base_sha": "0ee28e8f9633e79bfca1aa2136d6b9c21572cc0a",
+  "history": [{"event": "claim", "at": "2026-11-14T11:44:48Z", "method": "Bootstrap: connected GitHub create-only ref, then Notion claim write and readback. This coordinator did not exist before GBD-8."}]
+}

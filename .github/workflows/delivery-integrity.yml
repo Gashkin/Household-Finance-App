@@ -1,0 +1,53 @@
+name: Story delivery integrity
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited, closed]
+  issue_comment:
+    types: [created, edited]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to recheck after resolving review threads
+        required: true
+        type: number
+  workflow_run:
+    workflows: [Required CI]
+    types: [completed]
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+  actions: read
+
+jobs:
+  delivery-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: >-
+      (github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.event == 'push')) &&
+      (github.event_name != 'issue_comment' || github.event.issue.pull_request)
+    steps:
+      # Never use the PR head/merge ref in this token-bearing workflow.
+      # The new coordinator becomes active after this bootstrap PR reaches main.
+      - name: Check out trusted integration code only
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify ownership, single review and main integration
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python -m delivery.ci
+      - name: Retain actionable delivery receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: delivery-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: delivery-receipt.json
+          if-no-files-found: ignore

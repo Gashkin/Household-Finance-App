@@ -54,3 +54,6 @@ frontend/dist/
 # Synthetic browser verification outputs
 frontend/test-results/
 frontend/playwright-report/
+
+# Operator verification receipts (CI retains these separately)
+delivery-receipt.json
