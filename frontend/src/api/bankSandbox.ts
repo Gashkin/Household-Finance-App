@@ -82,5 +82,11 @@ export function completeSandboxCallback() {
         state: value.state,
         code: value.code,
       });
-  return completion;
+  const current = completion;
+  // Share only the in-flight exchange (React StrictMode). Later mounts read fresh status.
+  void current.then(
+    () => { if (completion === current) completion = null; },
+    () => { if (completion === current) completion = null; },
+  );
+  return current;
 }
