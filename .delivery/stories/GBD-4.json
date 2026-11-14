@@ -1,0 +1,11 @@
+{
+  "work_id": "GBD-4",
+  "page_id": "418d3419-fef0-811b-9da6-ead4cf827e25",
+  "branch": "story/4-delivery",
+  "artifacts": [
+    {"path": "backend/src/main/java/com/householdfinance/intake/EvidenceIntakeService.java", "contains": ["Explicit review acknowledgement", "draft.lines = List.of()", "source text not retained"]},
+    {"path": "backend/src/main/java/com/householdfinance/intake/IntakeAccessFilter.java", "contains": ["X-Intake-Key", "MessageDigest.isEqual", "no-store"]},
+    {"path": "frontend/src/components/EvidenceIntakePanel.tsx", "contains": ["Review suggestions", "Approve and use cash position"]},
+    {"path": "frontend/e2e/evidence-intake.spec.ts", "contains": ["unlock, inspect and correct source facts", "retry.json()", "report.cashEvidence.id"]}
+  ]
+}
