@@ -33,7 +33,7 @@ public class DebtScenarioService {
         Schedule baseline = simulate(input.balanceMinor(), input.monthlyPaymentMinor(), annualRate);
         Schedule extra = input.extraPaymentMinor() == input.balanceMinor()
                 ? new Schedule(0, 0, 0, 0)
-                : simulate(input.balanceMinor() - input.extraPaymentMinor(), input.monthlyPaymentMinor(), monthlyRate);
+                : simulate(input.balanceMinor() - input.extraPaymentMinor(), input.monthlyPaymentMinor(), annualRate);
         long remainingCash = input.liquidCashMinor() - input.extraPaymentMinor();
         long shortfall = Math.max(0, input.minimumReserveMinor() - remainingCash);
         List<String> warnings = new ArrayList<>();
