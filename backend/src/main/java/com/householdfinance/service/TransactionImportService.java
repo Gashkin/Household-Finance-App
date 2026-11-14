@@ -145,7 +145,7 @@ public class TransactionImportService {
                     row.account(),
                     row.duplicate(),
                     null,
-                    null,
+                    null
                     RESOLUTION_UNRESOLVED
             ));
             acceptedCount += 1;
