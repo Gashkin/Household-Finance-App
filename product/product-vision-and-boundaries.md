@@ -6,6 +6,16 @@ Help households understand their complete financial position, make informed deci
 
 This is not an expense tracker with a chatbot. It is a household financial operating system built around a trusted financial record, deterministic financial models, explicit goals and decisions, and an AI companion that makes the system easier to understand and use.
 
+## Architecture principle: business logic belongs in the backend
+
+The Java/Spring Boot backend is the authoritative home for domain and business logic, including financial calculations, validation of business invariants, scenario comparison, decision rules and application workflows.
+
+The React/TypeScript frontend owns presentation, user interactions, local UI state, formatting and API integration. It may validate inputs to improve usability, but server-side validation remains mandatory. Do not duplicate authoritative financial calculations or business decisions in client code.
+
+Implement backend domain behaviour in independently testable services and cover financial rules and edge cases with automated tests. Keep the API contract explicit so multiple clients receive consistent results. Document and justify any deliberate exception to this boundary.
+
+Existing frontend calculation code is transitional technical debt and should be migrated to the backend rather than used as precedent for new features.
+
 ## Product discovery rule: greenfield functionality
 
 This product is being designed from scratch at the functional level.
