@@ -2,6 +2,7 @@ package com.householdfinance.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.householdfinance.service.DebtScenarioService;
+import com.householdfinance.service.CashPositionService;
 import java.math.BigDecimal;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,7 +12,11 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/debt-scenarios")
 public class DebtScenarioController {
     private final DebtScenarioService service;
-    public DebtScenarioController(DebtScenarioService service) { this.service = service; }
+    private final CashPositionService cashPositionService;
+    public DebtScenarioController(DebtScenarioService service, CashPositionService cashPositionService) {
+        this.service = service;
+        this.cashPositionService = cashPositionService;
+    }
 
     @PostMapping("/compare")
     public DebtScenarioService.Result compare(@RequestBody JsonNode request) {
@@ -21,6 +26,17 @@ public class DebtScenarioController {
             minor(request, "balanceMinor"), decimal(request, "annualRatePercent"),
             minor(request, "monthlyPaymentMinor"), minor(request, "extraPaymentMinor"),
             minor(request, "liquidCashMinor"), minor(request, "minimumReserveMinor"));
+        JsonNode source = request.get("cashPositionSnapshotId");
+        if (source != null) {
+            if (!source.isTextual() || source.textValue().isBlank())
+                throw new IllegalArgumentException("cashPositionSnapshotId must be a nonempty snapshot identifier");
+            var snapshot = cashPositionService.byId(source.textValue())
+                    .orElseThrow(() -> new IllegalArgumentException("Cash evidence snapshot not found"));
+            if (snapshot.availableAfterCommitmentsMinor() < 0
+                    || input.liquidCashMinor() != snapshot.availableAfterCommitmentsMinor()
+                    || input.minimumReserveMinor() != snapshot.minimumReserveMinor())
+                throw new IllegalArgumentException("Debt scenario cash figures do not match the referenced cash snapshot");
+        }
         return service.compare(input);
     }
 
