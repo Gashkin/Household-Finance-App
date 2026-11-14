@@ -49,3 +49,16 @@ jobs:
       - name: Test and package backend
         working-directory: backend
         run: mvn --batch-mode --no-transfer-progress verify
+      - name: Install browser for the report journey
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Verify debt report in desktop and mobile browsers
+        working-directory: frontend
+        run: npm run test:e2e
+      - name: Retain synthetic browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-browser-evidence
+          path: frontend/test-results/
+          if-no-files-found: ignore

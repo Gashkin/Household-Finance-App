@@ -50,3 +50,7 @@ Notes:
 - Backend must be running on `http://localhost:8080` (or set `--base-url`).
 - Categories are optional and only loaded when `--include-categories` is provided.
 - Every run writes a report to `AnalysisScripts/output/load-report.json`.
+
+## Portable debt decision reports
+
+Use the Debt decision workspace to record cash evidence, compare repayment options, review the report and download its JSON record. See [GBD-7 local use, report contract and verification](product/stories/debt-report.md). This is a local-development application; see [security limitations](SECURITY.md) before entering real household data.

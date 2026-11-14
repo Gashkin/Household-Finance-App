@@ -612,3 +612,10 @@ body {
   .cash-line button { grid-column: 1 / -1; justify-self: start; }
   .cash-apply { width: 100%; }
 }
+
+
+.report-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+.report-inputs div { min-width: 0; }
+.report-inputs dt { color: #475569; font-size: .9rem; }
+.report-inputs dd { margin: .3rem 0 0; font-weight: 600; overflow-wrap: anywhere; }
+.report-preview { overflow-wrap: anywhere; }

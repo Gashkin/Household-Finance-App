@@ -1,6 +1,8 @@
+import type { CashPositionSnapshot } from './cashPosition';
+
 export type DebtScenarioInput = {
   balanceMinor: number;
-  annualRatePercent: number;
+  annualRatePercent: number | string;
   monthlyPaymentMinor: number;
   extraPaymentMinor: number;
   liquidCashMinor: number;
@@ -40,4 +42,26 @@ export async function compareDebtScenario(input: DebtScenarioInput): Promise<Deb
     throw new Error(response.status === 400 ? message : 'The calculation service failed. Please retry.');
   }
   return response.json() as Promise<DebtScenarioResult>;
+}
+
+export type DebtComparisonReport = {
+  schemaVersion: string;
+  calculationVersion: string;
+  generatedAt: string;
+  currency: string;
+  input: DebtScenarioInput;
+  result: DebtScenarioResult;
+  cashEvidence: CashPositionSnapshot | null;
+};
+export async function createDebtReport(input: DebtScenarioInput): Promise<DebtComparisonReport> {
+  let response: Response;
+  try {
+    response = await fetch('/api/debt-scenarios/report', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    });
+  } catch {
+    throw new Error('Cannot reach the financial calculation service. Start the backend and retry.');
+  }
+  if (!response.ok) throw new Error(response.status === 400 ? await response.text() : 'Unable to prepare the comparison report. Please retry.');
+  return response.json() as Promise<DebtComparisonReport>;
 }
