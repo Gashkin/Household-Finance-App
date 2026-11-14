@@ -35,7 +35,7 @@ export default function DebtDecisionWorkspace() {
     setResult(null);
     try {
       const rate = Number(values.rate);
-      if (!/^\\d+(?:\\.\\d+)?$/.test(values.rate) || !Number.isFinite(rate))
+      if (!/^\d+(?:\.\d+)?$/.test(values.rate) || !Number.isFinite(rate))
         throw new RangeError('Annual interest rate must be a non-negative number');
       const input: DebtScenarioInput = {
         balanceMinor: parseMoney(values.balance, 'Debt outstanding'),
