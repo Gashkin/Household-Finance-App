@@ -24,10 +24,10 @@ function Set-PrivatePath([string]$Path, [bool]$Directory) {
 function Assert-PrivatePath([string]$Path) {
     $item = Get-Item -LiteralPath $Path -Force
     if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Reparse points are not supported.' }
-    $current = if ($item.PSIsContainer) { $item } else { $item.Directory }
+    $current = if ($item -is [IO.DirectoryInfo]) { $item } else { $item.Directory }
     while ($current) {
         if ($current.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Reparse points are not supported.' }
-        if ($current.PSIsContainer -and (Test-Path -LiteralPath (Join-Path $current.FullName '.git'))) { throw 'Instance data must be outside a checkout.' }
+        if ($current -is [IO.DirectoryInfo] -and (Test-Path -LiteralPath (Join-Path $current.FullName '.git'))) { throw 'Instance data must be outside a checkout.' }
         $current = $current.Parent
     }
     $acl = Get-Acl -LiteralPath $Path

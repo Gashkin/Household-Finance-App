@@ -2,6 +2,8 @@ name: Windows release verification
 on:
   pull_request:
     paths: ['windows/**', 'backend/**', 'frontend/**', '.github/workflows/windows-release.yml', 'product/stories/persistent-aib-instance.md']
+  push:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -13,6 +15,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

@@ -56,7 +56,9 @@ try {
     $launcher = Join-Path $root 'Launch.cmd'
     '@echo off' + "`r`n" + 'set /p VERSION=<"%LOCALAPPDATA%\HouseholdFinance\active.txt"' + "`r`n" + 'powershell.exe -NoProfile -File "%LOCALAPPDATA%\HouseholdFinance\versions\%VERSION%\Start.ps1"' | Set-Content -LiteralPath $launcher -Encoding ASCII
     $shell = New-Object -ComObject WScript.Shell
-    $shortcut = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'Household Finance.lnk'))
+    $desktop=[Environment]::GetFolderPath('Desktop')
+    if(-not (Test-Path -LiteralPath $desktop)){New-Item -ItemType Directory -Path $desktop | Out-Null}
+    $shortcut = $shell.CreateShortcut((Join-Path $desktop 'Household Finance.lnk'))
     $shortcut.TargetPath = $launcher
     $shortcut.WorkingDirectory = $root
     $shortcut.Save()
