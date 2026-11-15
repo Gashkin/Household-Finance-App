@@ -1,9 +1,9 @@
 . "$PSScriptRoot\Common.ps1"
 $root=Get-InstanceRoot
-$config=Read-PrivateConfig $root
 $mutex=New-Object Threading.Mutex($false,'Local\HouseholdFinance-Instance')
 if(-not $mutex.WaitOne(0)){throw 'Stop Household Finance first.'}
 try {
+    $config=Read-PrivateConfig $root
     $config.Production=$false
     $config | Export-Clixml -LiteralPath (Join-Path $root 'config.xml')
     Set-PrivatePath (Join-Path $root 'config.xml') $false
