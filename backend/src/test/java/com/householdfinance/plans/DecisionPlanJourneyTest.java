@@ -330,4 +330,184 @@ class DecisionPlanJourneyTest {
       executor.shutdownNow();
     }
   }
+
+  DecisionPlanService.Content maximumContent() {
+    var evidence = new ArrayList<DecisionPlanService.Evidence>();
+    for (int i = 0; i < 20; i++)
+      evidence.add(
+          new DecisionPlanService.Evidence(
+              "e" + i, "s".repeat(500), today, "e".repeat(2000), "u".repeat(1000)));
+    var options = new ArrayList<DecisionPlanService.Option>();
+    for (int i = 0; i < 10; i++)
+      options.add(
+          new DecisionPlanService.Option(
+              "o" + i, "o".repeat(120), "i".repeat(2000), "u".repeat(1000)));
+    return new DecisionPlanService.Content(
+        "Synthetic capacity boundary", "g".repeat(2000), evidence, options);
+  }
+
+  @Test
+  void legalMultiPlanGrowthCannotDisableCompleteWorkspaceRecovery() throws Exception {
+    var ledger =
+        new com.householdfinance.ledger.LedgerService.AccountInput(
+            "Synthetic unrelated ledger", "CASH", today, "100", "Synthetic capacity evidence");
+    // The recovery invariant includes unrelated ledger data, not just this feature's rows.
+    var ledgerService =
+        mvc.getDispatcherServlet()
+            .getWebApplicationContext()
+            .getBean(com.householdfinance.ledger.LedgerService.class);
+    var account = ledgerService.create(ledger);
+    ledgerService.manual(
+        account.id(),
+        new com.householdfinance.ledger.LedgerService.Manual(
+            0L,
+            new com.householdfinance.ledger.LedgerService.Row(
+                "capacity-entry",
+                today,
+                "Synthetic unchanged activity",
+                "-1",
+                "BOOKED",
+                "ACTIVITY"),
+            "Synthetic source",
+            true));
+    var unrelated = jdbc.queryForList("SELECT * FROM LEDGER_ENTRIES");
+    var content = maximumContent();
+    var first = service.create(content);
+    first =
+        service.choose(
+            first.id(),
+            new DecisionPlanService.Choose(
+                first.revision(),
+                "o0",
+                "r".repeat(2000),
+                today.plusDays(7),
+                List.of(
+                    new DecisionPlanService.ActionInput(
+                        "follow", "f".repeat(500), today.plusDays(1))),
+                true));
+    first = service.get(first.id());
+    var second = service.create(content);
+    second = service.get(second.id());
+    boolean rejected = false;
+    int accepted = 0;
+    for (int i = 0; i < 24; i++) {
+      String body =
+          json.writeValueAsString(new DecisionPlanService.Edit(second.revision(), content));
+      assertTrue(body.getBytes(java.nio.charset.StandardCharsets.UTF_8).length < 262144);
+      var response =
+          mvc.perform(
+                  put("/api/plans/" + second.id())
+                      .cookie(cookie)
+                      .header("X-Workspace-Request", "1")
+                      .contentType("application/json")
+                      .content(body))
+              .andReturn()
+              .getResponse();
+      if (response.getStatus() == 400) {
+        assertTrue(response.getContentAsString().contains("backup limit"));
+        rejected = true;
+        break;
+      }
+      assertEquals(
+          200,
+          response.getStatus(),
+          response
+              .getContentAsString()
+              .substring(0, Math.min(200, response.getContentAsString().length())));
+      second = json.readValue(response.getContentAsString(), DecisionPlanService.View.class);
+      second = service.get(second.id());
+      accepted++;
+    }
+    assertTrue(rejected, "Legal history growth must reach capacity before disabling backup");
+    assertTrue(
+        accepted >= 3, "Exercise cumulative legal revisions, not just one oversized request");
+    assertTrue(first.equals(service.get(first.id())), "Other accepted plan must stay unchanged");
+    assertTrue(
+        second.equals(service.get(second.id())),
+        "Rejected edit must preserve payload, history, timestamp and optimistic revision");
+    assertEquals(unrelated, jdbc.queryForList("SELECT * FROM LEDGER_ENTRIES"));
+    var before = service.list();
+    assertThrows(IllegalArgumentException.class, () -> service.create(content));
+    var optionPlan = second;
+    var actions = new ArrayList<DecisionPlanService.ActionInput>();
+    for (int i = 0; i < 20; i++)
+      actions.add(new DecisionPlanService.ActionInput("a" + i, "a".repeat(500), today.plusDays(1)));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            service.choose(
+                optionPlan.id(),
+                new DecisionPlanService.Choose(
+                    optionPlan.revision(),
+                    "o0",
+                    "r".repeat(2000),
+                    today.plusDays(7),
+                    actions,
+                    true)));
+    var decided = first;
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            service.complete(
+                decided.id(),
+                new DecisionPlanService.Complete(decided.revision(), "follow", "o".repeat(2000))));
+    assertTrue(
+        before.equals(service.list()), "All four mutation paths must roll back crossing writes");
+    var counts = backups.counts();
+    byte[] backup = backups.exportBackup("separate-synthetic-backup-passphrase");
+    clear();
+    assertEquals(
+        counts,
+        backups.restore(
+            backup, "separate-synthetic-backup-passphrase", "RESTORE INTO EMPTY WORKSPACE"));
+    assertTrue(
+        before.equals(service.list()),
+        "Complete histories and accepted decisions survive encrypted restore");
+    assertEquals(unrelated, jdbc.queryForList("SELECT * FROM LEDGER_ENTRIES"));
+  }
+
+  @Test
+  void concurrentDifferentPlansCannotOverbookSharedBackupCapacity() throws Exception {
+    // Existing unrelated synthetic data leaves room for one maximum plan, but not two.
+    jdbc.update(
+        "INSERT INTO MIGRATION_ARTIFACTS(IMPORT_ID,ARTIFACT_TYPE,CREATED_AT,PAYLOAD)"
+            + " VALUES(?,?,CURRENT_TIMESTAMP,?)",
+        "synthetic-capacity",
+        "synthetic",
+        "x".repeat(1_400_000));
+    var content = maximumContent();
+    var barrier = new java.util.concurrent.CyclicBarrier(2);
+    var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+    try {
+      java.util.concurrent.Callable<String> create =
+          () -> {
+            barrier.await();
+            try {
+              service.create(content);
+              return "accepted";
+            } catch (IllegalArgumentException e) {
+              if (!e.getMessage().contains("backup limit")) throw e;
+              return "capacity";
+            }
+          };
+      var a = executor.submit(create);
+      var b = executor.submit(create);
+      var results = List.of(a.get(), b.get());
+      assertEquals(1, Collections.frequency(results, "accepted"));
+      assertEquals(1, Collections.frequency(results, "capacity"));
+    } finally {
+      executor.shutdownNow();
+    }
+    var expected = service.list();
+    assertEquals(1, expected.size());
+    byte[] backup = backups.exportBackup("separate-synthetic-backup-passphrase");
+    clear();
+    backups.restore(backup, "separate-synthetic-backup-passphrase", "RESTORE INTO EMPTY WORKSPACE");
+    assertEquals(expected, service.list());
+    assertEquals(
+        "x".repeat(1_400_000),
+        jdbc.queryForObject(
+            "SELECT PAYLOAD FROM MIGRATION_ARTIFACTS WHERE IMPORT_ID='synthetic-capacity'",
+            String.class));
+  }
 }

@@ -62,12 +62,17 @@ public class DecisionPlanService {
   private final DecisionPlanRepository plans;
   private final ObjectMapper json;
   private final DebtScenarioController debt;
+  private final com.householdfinance.workspace.WorkspaceBackupService backups;
 
   public DecisionPlanService(
-      DecisionPlanRepository plans, ObjectMapper json, DebtScenarioController debt) {
+      DecisionPlanRepository plans,
+      ObjectMapper json,
+      DebtScenarioController debt,
+      com.householdfinance.workspace.WorkspaceBackupService backups) {
     this.plans = plans;
     this.json = json;
     this.debt = debt;
+    this.backups = backups;
   }
 
   public static LocalDate today() {
@@ -174,6 +179,8 @@ public class DecisionPlanService {
       List<Action> actions,
       String kind,
       String note) {
+    backups.guardPlanMutation();
+    if (old == null) require(plans.count() < 100, "Local plan limit reached");
     var history = new ArrayList<History>(old == null ? List.of() : old.history());
     require(
         history.size() < 200, "Plan history limit reached; retain this plan and create a new one");
@@ -187,12 +194,21 @@ public class DecisionPlanService {
     } catch (Exception e) {
       throw new IllegalStateException("Cannot save plan");
     }
-    return view(plans.saveAndFlush(p));
+    var saved = plans.saveAndFlush(p);
+    try {
+      backups.assertPlanMutationRecoverable();
+    } catch (IllegalArgumentException e) {
+      if (e.getMessage() != null && e.getMessage().contains("backup limit"))
+        throw new IllegalArgumentException(
+            "This plan change would exceed the workspace backup limit. Saved records and history"
+                + " were kept; export a backup. Downloading does not free capacity.");
+      throw e;
+    }
+    return view(saved);
   }
 
   @Transactional
   public View create(Content input) {
-    require(plans.count() < 100, "Local plan limit reached");
     var p = new DecisionPlan();
     p.id = UUID.randomUUID().toString();
     return persist(
@@ -244,7 +260,6 @@ public class DecisionPlanService {
                         + euro(r.reserveShortfallMinor()),
                     String.join("; ", r.warnings())
                         + " Illustrative calculation; confirm lender terms")));
-    require(plans.count() < 100, "Local plan limit reached");
     var p = new DecisionPlan();
     p.id = UUID.randomUUID().toString();
     return persist(

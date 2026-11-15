@@ -4,6 +4,10 @@ import com.fasterxml.jackson.databind.*;
 import java.sql.*;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.locks.ReentrantLock;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -44,9 +48,23 @@ public class WorkspaceBackupService {
         Set<String> actual = new HashSet<>(jdbc.queryForList("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='PUBLIC' AND TABLE_TYPE='BASE TABLE'", String.class));
         if (!actual.equals(new HashSet<>(TABLES))) throw new IllegalArgumentException("Database schema is not supported by this backup version");
     }
-    @Transactional(readOnly=true, isolation=Isolation.SERIALIZABLE)
-    public byte[] exportBackup(String password) {
-        BackupCrypto.validatePassword(password); checkSchema();
+    // Hold admission through transaction completion, including direct domain-service callers.
+    // HTTP mutations are additionally serialized by the existing WorkspaceFilter.
+    private final ReentrantLock planWrites = new ReentrantLock(true);
+    public void guardPlanMutation() {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()
+                || !TransactionSynchronizationManager.isSynchronizationActive())
+            throw new IllegalStateException("Plan admission requires a transaction");
+        planWrites.lock();
+        try {
+            TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override public void afterCompletion(int status) { planWrites.unlock(); }
+                });
+        } catch (RuntimeException e) { planWrites.unlock(); throw e; }
+    }
+    private Archive snapshot() {
+        checkSchema();
         Map<String, TableData> tables = new LinkedHashMap<>();
         int[] bytes = {0};
         for (String table : TABLES) {
@@ -68,10 +86,31 @@ public class WorkspaceBackupService {
             });
             tables.put(table, new TableData(cols, rows));
         }
-        byte[] plain = null;
-        try { plain = json.writeValueAsBytes(new Archive(4, Instant.now().toString(), tables)); return BackupCrypto.encrypt(plain,password); }
+        return new Archive(4, Instant.now().toString(), tables);
+    }
+    private byte[] encodeSnapshot() {
+        byte[] plain;
+        try { plain = json.writeValueAsBytes(snapshot()); }
         catch (java.io.IOException e) { throw new IllegalStateException("Cannot encode backup", e); }
-        finally { if (plain != null) Arrays.fill(plain,(byte)0); }
+        if (plain.length > BackupCrypto.MAX_BYTES - 64) {
+            Arrays.fill(plain, (byte)0);
+            throw new IllegalArgumentException("Workspace exceeds the 10 MiB backup limit");
+        }
+        return plain;
+    }
+    @Transactional(propagation=Propagation.MANDATORY)
+    public void assertPlanMutationRecoverable() {
+        // Same manifest, row bounds, conservative accounting and encoded-size limit as export.
+        // Caller has flushed its pending mutation; a rejection rolls back that whole transaction.
+        byte[] plain = encodeSnapshot();
+        Arrays.fill(plain, (byte)0);
+    }
+    @Transactional(readOnly=true, isolation=Isolation.SERIALIZABLE)
+    public byte[] exportBackup(String password) {
+        BackupCrypto.validatePassword(password);
+        byte[] plain = encodeSnapshot();
+        try { return BackupCrypto.encrypt(plain,password); }
+        finally { Arrays.fill(plain,(byte)0); }
     }
     @Transactional(isolation=Isolation.SERIALIZABLE, rollbackFor=Exception.class)
     public Map<String, Long> restore(byte[] envelope, String password, String confirmation) {
