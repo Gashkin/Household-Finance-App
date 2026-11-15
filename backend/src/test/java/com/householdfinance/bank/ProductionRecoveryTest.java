@@ -53,6 +53,15 @@ class ProductionRecoveryTest {
         var plan=plans.create(new DecisionPlanService.Content("Synthetic sourced decision","Keep a bank-sourced buffer",List.of(new DecisionPlanService.Evidence("bank","Synthetic reconciled ledger",today,"EUR 990 booked, EUR 5 pending","No guarantee of future income")),List.of(new DecisionPlanService.Option("keep","Keep cash","Buffer","Rate"),new DecisionPlanService.Option("repay","Repay","Interest","Penalty"))));
         plans.choose(plan.id(),new DecisionPlanService.Choose(plan.revision(),"keep","Synthetic reviewed cash rationale",today.plusDays(7),List.of(new DecisionPlanService.ActionInput("terms","Check terms",today.plusDays(1))),true));
         var recovery=app.getBean(WorkspaceBackupService.class); counts=recovery.counts(); backup=recovery.exportBackup("synthetic-separate-backup-passphrase");
+        // Financial records are intentionally recoverable; authentication and
+        // live bank capability are not. Check the decrypted archive, not just
+        // the absence of plaintext in random-looking ciphertext.
+        byte[] archive=com.householdfinance.workspace.BackupCrypto.decrypt(backup,"synthetic-separate-backup-passphrase");
+        try {
+          String payload=new String(archive,java.nio.charset.StandardCharsets.UTF_8);
+          for(String secret:List.of(provider.session,provider.account,config.storageKey(),"synthetic-production-recovery-password","BEGIN PRIVATE KEY","synthetic-binding","synthetic-code")) assertFalse(payload.contains(secret));
+          assertFalse(new String(backup,java.nio.charset.StandardCharsets.ISO_8859_1).contains("Synthetic production account"));
+        } finally { Arrays.fill(archive,(byte)0); }
       }
       try(var app=start("original")) {
         var ledger=app.getBean(LedgerService.class); var bank=new SandboxService(gateway,ledger);

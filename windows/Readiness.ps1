@@ -6,6 +6,8 @@ $mutex = New-Object Threading.Mutex($false, 'Local\HouseholdFinance-Instance')
 if (-not $mutex.WaitOne(0)) { $mutex.Dispose(); throw 'Stop Household Finance or the other configuration operation before readiness.' }
 try {
     $manifest = Get-PackageManifest $PSScriptRoot
+    Assert-ProductionReleaseCleared $manifest
+    Assert-StandardRuntimeIdentity | Out-Null
     $config = Read-PrivateConfig $root
     Test-EncryptedDevice $root
     Assert-PrivatePath (Join-Path $root 'data')

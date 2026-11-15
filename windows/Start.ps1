@@ -5,6 +5,11 @@ $manifest = Get-PackageManifest $PSScriptRoot
 $mutex = New-Object Threading.Mutex($false, 'Local\HouseholdFinance-Instance')
 if (-not $mutex.WaitOne(0)) { throw 'Household Finance is already running.' }
 try {
+    if ($config.Production) {
+        Assert-ProductionReleaseCleared $manifest
+        Assert-StandardRuntimeIdentity | Out-Null
+        Test-EncryptedDevice $root
+    }
     $data = Join-Path $root 'data'
     if (-not (Test-Path -LiteralPath $data)) { New-Item -ItemType Directory -Path $data | Out-Null; Set-PrivatePath $data $true }
     Assert-PrivatePath $data
@@ -29,6 +34,6 @@ try {
     & (Join-Path $PSScriptRoot 'runtime\bin\java.exe') -jar (Join-Path $PSScriptRoot 'app.jar')
     if ($LASTEXITCODE -ne 0) { throw 'Application stopped with an error. Keep the data directory; follow the recovery guide.' }
 } finally {
-    foreach ($name in @('WORKSPACE_PASSWORD','BANK_PRODUCTION_STORAGE_KEY','BANK_PRODUCTION_ENABLED','BANK_PRODUCTION_READINESS','SPRING_DATASOURCE_URL')) { [Environment]::SetEnvironmentVariable($name,$null,'Process') }
+    foreach ($name in @('WORKSPACE_PASSWORD','BANK_PRODUCTION_APP_ID','BANK_PRODUCTION_KEY_PATH','BANK_PRODUCTION_CALLBACK','BANK_PRODUCTION_STORE_PATH','BANK_PRODUCTION_STORAGE_KEY','BANK_PRODUCTION_ENABLED','BANK_PRODUCTION_READINESS','SPRING_DATASOURCE_URL')) { [Environment]::SetEnvironmentVariable($name,$null,'Process') }
     $mutex.ReleaseMutex(); $mutex.Dispose()
 }

@@ -90,12 +90,25 @@ class ProductionProtocolTest {
     assertEquals("RECONNECT_REQUIRED",new SandboxService(gateway,ledger).status().state());
   }
   @Test void metadataRejectsWrongEnvironmentPaymentScopeAndUnsafeRedirects() {
-    provider.mode="pis"; assertThrows(IllegalArgumentException.class,()->service.banks());
+    for(String mode:List.of("pis", "pis-only", "unknown-scope", "empty-scope", "inactive")) {
+      provider.mode=mode; assertThrows(IllegalArgumentException.class,()->service.banks());
+      assertThrows(IllegalArgumentException.class,()->service.start(new SandboxService.Start("AIB","IE",true),"synthetic-binding"));
+      assertEquals("",provider.state); // Metadata rejection occurs before consent creation.
+    }
     provider.mode="ok"; provider.environment="SANDBOX";
     assertThrows(IllegalArgumentException.class,()->service.banks());
     assertThrows(IllegalArgumentException.class,()->gateway.request("POST","/payments",Map.of()));
     for(String url:List.of("https://auth.enablebanking.com/pis/start","https://auth.enablebanking.com/ais/../pis/start","https://auth.enablebanking.com/ais/%2e%2e/pis/start","https://tilisy-sandbox.enablebanking.com/","https://auth.enablebanking.com:8443/ais/start","https://evil.example/ais/start"))
       assertThrows(IllegalArgumentException.class,()->gateway.safeRedirect(url));
+  }
+  @Test void expiredConsentAfterRestartCannotRefreshOrMutateReviewedRecords() {
+    var request=input(connect());
+    var before=ledger.position(today);
+    provider.mode="expired";
+    service=new SandboxService(gateway,ledger);
+    assertThrows(IllegalArgumentException.class,()->service.fetch(request));
+    assertEquals(before,ledger.position(today));
+    assertNull(service.status().lastSuccessfulFetch());
   }
   @Test void tamperWrongKeyOrApplicationNeverSilentlyOverwriteConnection() throws Exception {
     connect(); Path path=Path.of(config.storePath()); byte[] original=Files.readAllBytes(path);

@@ -72,8 +72,32 @@ function Get-PackageManifest([string]$Directory) {
 }
 
 function Assert-SameRelease($Installed, $Incoming) {
+    $installedEligible=$Installed.PSObject.Properties['productionEligible']
+    $incomingEligible=$Incoming.PSObject.Properties['productionEligible']
+    if (($null -eq $installedEligible) -ne ($null -eq $incomingEligible) -or ($installedEligible -and $incomingEligible -and $installedEligible.Value -cne $incomingEligible.Value)) { throw 'Installed production eligibility differs from incoming release.' }
     if ($Installed.version -ne $Incoming.version -or $Installed.commit -ne $Incoming.commit -or @($Installed.files).Count -ne @($Incoming.files).Count) { throw 'Installed version differs from the incoming release; active version and records retained.' }
     $left = @($Installed.files | Sort-Object path | ForEach-Object { $_.path + ':' + $_.sha256.ToUpperInvariant() }) -join "`n"
     $right = @($Incoming.files | Sort-Object path | ForEach-Object { $_.path + ':' + $_.sha256.ToUpperInvariant() }) -join "`n"
     if ($left -cne $right) { throw 'Installed manifest differs from the incoming release; inspect or re-stage deliberately.' }
+}
+
+function Assert-ProductionReleaseCleared($Manifest) {
+    # Release hold is code-reviewed source, not a Read-Host answer or editable local receipt.
+    # Missing fields on earlier packages also fail closed. Manifest hashes are integrity
+    # evidence, not signatures and do not protect a compromised runtime owner/admin.
+    $field = $Manifest.PSObject.Properties['productionEligible']
+    if (-not $field -or $field.Value -isnot [bool] -or $field.Value -ne $true) {
+        throw 'Production release hold: amended GBD-14 isolation, provider entitlement, exposure containment, device evidence and whole-PR review are incomplete. Keep production disabled; no account linking.'
+    }
+}
+
+function Assert-StandardRuntimeIdentity {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    # Check membership, including a filtered/deny-only Administrators SID. Merely
+    # declining elevation does not make a development administrator isolated.
+    $groups = @($identity.Groups | ForEach-Object { $_.Value })
+    if ($identity.IsSystem -or $identity.User.Value -notlike 'S-1-5-21-*' -or 'S-1-5-32-544' -in $groups) {
+        throw 'Production requires a dedicated standard Windows user; administrator/development/runner identities are not a runtime boundary.'
+    }
+    $identity.User.Value
 }

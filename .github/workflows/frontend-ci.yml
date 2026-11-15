@@ -19,7 +19,9 @@ jobs:
       - name: Test story coordination and integration guards
         run: python3 -m unittest discover -s delivery/tests -v
       - name: Validate local-only analysis scripts
-        run: python3 -m py_compile AnalysisScripts/inspect_workbook.py AnalysisScripts/inspect_budget.py
+        run: |
+          python3 -m py_compile AnalysisScripts/inspect_workbook.py AnalysisScripts/inspect_budget.py AnalysisScripts/audit_history_exposure.py
+          python3 -m unittest discover -s AnalysisScripts -p test_audit_history_exposure.py -v
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

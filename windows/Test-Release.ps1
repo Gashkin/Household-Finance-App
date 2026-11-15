@@ -20,6 +20,19 @@ function Assert-Rejected([scriptblock]$Operation) {
     try { & $Operation } catch { $rejected=$true }
     if(-not $rejected){throw 'An unsafe path was accepted.'}
 }
+# Amended acceptance is not satisfied by the earlier READINESS PASSED prompt.
+# Missing, false and string-valued eligibility all fail closed.
+foreach ($candidate in @([PSCustomObject]@{},[PSCustomObject]@{productionEligible=$false},[PSCustomObject]@{productionEligible='true'})) {
+    Assert-Rejected { Assert-ProductionReleaseCleared $candidate }
+}
+$release=Get-PackageManifest $Package
+Assert-Rejected { Assert-ProductionReleaseCleared $release }
+$same=($release | ConvertTo-Json -Depth 5 | ConvertFrom-Json)
+$same.productionEligible=$true
+Assert-Rejected { Assert-SameRelease $same $release }
+# Hosted runner is an administrator and must never qualify as the production
+# runtime even with a filtered token. This does not certify the owner's users.
+Assert-Rejected { Assert-StandardRuntimeIdentity }
 $nested=Join-Path $instance 'nested\private'
 New-Item -ItemType Directory -Path $nested -Force | Out-Null
 Set-PrivatePath $nested $true
@@ -89,6 +102,17 @@ try {
     if((Get-Content -LiteralPath (Join-Path $installed 'data\sentinel.txt') -Raw).Trim() -ne 'synthetic-preserved-record'){throw 'Update changed records.'}
     $private=Read-PrivateConfig $installed
     if((Get-PlainSecret $private.Password) -ne 'synthetic-install-password' -or $private.Production){throw 'Update changed private configuration.'}
+    # Old local readiness cannot activate the held release. The actual launcher
+    # must fail before Java/provider activity, retaining configuration and data.
+    $private.Production=$true
+    $private | Export-Clixml -LiteralPath (Join-Path $installed 'config.xml')
+    $held=$false
+    try { & (Join-Path $installed ('versions\'+$changed.commit+'\Start.ps1')) }
+    catch { $held=$_.Exception.Message -like 'Production release hold:*' }
+    if(-not $held){throw 'Previously enabled configuration bypassed the release hold.'}
+    $private.Production=$false
+    $private | Export-Clixml -LiteralPath (Join-Path $installed 'config.xml')
+    Set-PrivatePath (Join-Path $installed 'config.xml') $false
 } finally {
     $env:LOCALAPPDATA=$originalLocalAppData
     $originalManifest | Set-Content -LiteralPath (Join-Path $Package 'manifest.json') -Encoding UTF8

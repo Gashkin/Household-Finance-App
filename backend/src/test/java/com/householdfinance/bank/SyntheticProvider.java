@@ -81,9 +81,9 @@ public final class SyntheticProvider implements AutoCloseable {
                 "environment",
                 environment,
                 "active",
-                true,
+                !mode.equals("inactive"),
                 "services",
-                environment.equals("PRODUCTION") && !mode.equals("pis") ? List.of("AIS") : List.of("AIS", "PIS"),
+                mode.equals("pis-only") ? List.of("PIS") : mode.equals("unknown-scope") ? List.of("AIS", "UNKNOWN") : mode.equals("empty-scope") ? List.of() : environment.equals("PRODUCTION") && !mode.equals("pis") ? List.of("AIS") : List.of("AIS", "PIS"),
                 "redirect_urls",
                 List.of(callback));
       else if (path.equals("/aspsps"))
