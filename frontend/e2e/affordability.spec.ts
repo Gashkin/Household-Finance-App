@@ -311,5 +311,25 @@ test("a second-tab ledger change withdraws current evidence after comparing", as
     path: testInfo.outputPath("changed-forecast-source.png"),
     fullPage: true,
   });
+  const amounts = page.locator(".forecast-totals strong");
+  await expect(amounts).toHaveCount(8);
+  expect(
+    await amounts.evaluateAll((elements) =>
+      elements.every((element) => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        return (
+          range.getClientRects().length === 1 &&
+          element.getBoundingClientRect().width <=
+            element.parentElement!.getBoundingClientRect().width
+        );
+      }),
+    ),
+  ).toBe(true);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
   await other.close();
 });

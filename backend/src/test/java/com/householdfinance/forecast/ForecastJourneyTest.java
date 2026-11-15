@@ -114,6 +114,45 @@ class ForecastJourneyTest {
   }
 
   @Test
+  void cashAccountOpenedAfterBaselineInvalidatesTheFrozenSourceSet() {
+    var date = today.minusDays(1);
+    var original =
+        ledger.create(
+            new LedgerService.AccountInput(
+                "Original synthetic cash", "CASH", date, "1000", "Synthetic opening"));
+    ledger.reconcile(
+        original.id(),
+        date,
+        new LedgerService.Reconcile(
+            original.revision(), "1000", "Synthetic dated closing", true, false));
+    var plan =
+        service
+            .save(
+                input(
+                    0,
+                    new ForecastService.BaselineInput("LEDGER", date, null, null, null),
+                    List.of()))
+            .plan();
+    assertEquals("DATED", plan.evidenceState());
+    assertFalse(plan.currentDecisionReady());
+    ledger.create(
+        new LedgerService.AccountInput(
+            "Later synthetic cash", "CASH", today, "500", "New synthetic account"));
+    // The historical position intentionally excludes this account. Freshness must not.
+    assertEquals(1, ledger.position(date).accounts().size());
+    var changed = service.get().plan();
+    assertEquals("SOURCE_CHANGED", changed.evidenceState());
+    assertFalse(changed.currentDecisionReady());
+    assertEquals(plan.inputs().baseline(), changed.inputs().baseline());
+    assertEquals(100000, changed.projection().startingMinor());
+    var comparison =
+        service.compare(
+            new ForecastService.WhatIf(plan.revision(), "1", today.plusDays(1), null, null, false));
+    assertEquals("SOURCE_CHANGED", comparison.checkedPlan().evidenceState());
+    assertFalse(comparison.checkedPlan().currentDecisionReady());
+  }
+
+  @Test
   void sameDayOutflowsPrecedeIncome() {
     var i =
         input(

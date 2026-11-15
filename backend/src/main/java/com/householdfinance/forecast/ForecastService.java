@@ -398,7 +398,7 @@ public class ForecastService {
     } else {
       var p = ledger.position(b.date());
       Map<String, Long> current = new TreeMap<>();
-      p.accounts().stream()
+      ledger.position(today()).accounts().stream()
           .filter(a -> a.kind().equals("CASH"))
           .forEach(a -> current.put(a.id(), a.revision()));
       if (current.isEmpty()
