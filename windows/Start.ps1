@@ -18,7 +18,7 @@ try {
     $env:BANK_SANDBOX_ENABLED='false'; $env:BANK_PRODUCTION_ENABLED='false'; $env:EVIDENCE_AI_ENABLED='false'
     $env:SERVER_ADDRESS='127.0.0.1'; $env:SERVER_PORT='8080'; $env:WORKSPACE_ORIGINS='http://127.0.0.1:8080'
     $env:WORKSPACE_PASSWORD=Get-PlainSecret $config.Password
-    $env:SPRING_DATASOURCE_URL='jdbc:h2:file:' + (Join-Path $data 'household-finance').Replace('\','/') + ';DB_CLOSE_ON_EXIT=FALSE'
+    $env:SPRING_DATASOURCE_URL='jdbc:h2:file:' + (Join-Path $data 'household-finance').Replace('\','/') + ';WRITE_DELAY=0'
     $env:SPRING_DATASOURCE_USERNAME='sa'; $env:SPRING_DATASOURCE_PASSWORD=''
     if ($config.Production) {
         if ($config.ReadinessCommit -ne $manifest.commit -or [DateTimeOffset]::Parse($config.ReadinessAt).AddDays(7) -lt [DateTimeOffset]::UtcNow) { throw 'Production readiness is missing, expired, or belongs to a different release. Run Readiness.ps1 before using bank data.' }
