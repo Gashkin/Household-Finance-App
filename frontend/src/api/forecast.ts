@@ -71,6 +71,7 @@ export type Comparison = {
   warnings: string[];
   base: Projection;
   scenario: Projection;
+  checkedPlan: Plan;
 };
 export async function forecast<T>(path = "", body?: unknown): Promise<T> {
   let response: Response;

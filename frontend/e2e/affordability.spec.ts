@@ -40,6 +40,21 @@ test("dated affordability, delayed payday, corrected inputs and stale evidence s
   await page
     .getByLabel("Plan name", { exact: true })
     .fill("Synthetic forecast " + testInfo.project.name);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const baselineDate = page.getByLabel(
+    "Starting evidence date (closing balance)",
+    { exact: true },
+  );
+  await baselineDate.fill("");
+  await expect(page.getByLabel("Plan name", { exact: true })).toHaveValue(
+    "Synthetic forecast " + testInfo.project.name,
+  );
+  await expect(
+    page.getByRole("heading", { name: "Plan ahead", exact: true }),
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+  await baselineDate.fill(today);
   await page.getByLabel("Plan through", { exact: true }).fill(after(today, 10));
   await page.getByLabel("Protected reserve (€)", { exact: true }).fill("200");
   while (
@@ -166,4 +181,135 @@ test("dated affordability, delayed payday, corrected inputs and stale evidence s
       { exact: true },
     ),
   ).toBeVisible();
+});
+
+test("a second-tab ledger change withdraws current evidence after comparing", async ({
+  page,
+  context,
+}, testInfo) => {
+  test.setTimeout(90000);
+  const current = await (await page.request.get("/api/forecast")).json();
+  const today = current.today;
+  const response = await page.request.post("/api/ledger/accounts", {
+    data: {
+      name: "Synthetic forecast source " + testInfo.project.name,
+      kind: "CASH",
+      openingDate: today,
+      openingEuro: "1000",
+      source: "Synthetic source opening",
+    },
+  });
+  expect(response.ok()).toBeTruthy();
+  const account = await response.json();
+  expect(
+    (
+      await page.request.post(
+        `/api/ledger/accounts/${account.id}/reconcile?asOf=${today}`,
+        {
+          data: {
+            revision: account.revision,
+            statementEuro: "1000",
+            source: "Synthetic source closing",
+            commit: true,
+            acceptAdjustment: false,
+          },
+        },
+      )
+    ).ok(),
+  ).toBeTruthy();
+  const saved = await page.request.post("/api/forecast", {
+    data: {
+      revision: current.plan?.revision || 0,
+      name: "Synthetic live source guard",
+      baseline: {
+        mode: "LEDGER",
+        date: today,
+        cashEuro: null,
+        pendingEuro: null,
+        source: null,
+      },
+      endDate: after(today, 5),
+      reserveEuro: "100",
+      events: [],
+      acknowledged: true,
+    },
+  });
+  expect(saved.ok()).toBeTruthy();
+  await page.goto("/");
+  await page.getByRole("button", { name: "Plan ahead", exact: true }).click();
+  const claim =
+    "Starting evidence is current and reconciled. Future income is still only projected.";
+  await expect(page.getByText(claim, { exact: true })).toBeVisible();
+  const other = await context.newPage();
+  await other.goto("/");
+  await other
+    .getByRole("button", { name: "Money position", exact: true })
+    .click();
+  await other
+    .getByLabel("Review account", { exact: true })
+    .selectOption(account.id);
+  await other
+    .getByLabel("Activity description", { exact: true })
+    .fill("Late synthetic card debit");
+  await other
+    .getByLabel("Signed activity amount (€)", { exact: true })
+    .fill("-10");
+  await other
+    .getByLabel("Activity source or correction reason", { exact: true })
+    .fill("Second-tab synthetic receipt");
+  await other
+    .getByLabel("I checked the source and existing activity for duplication", {
+      exact: true,
+    })
+    .check();
+  await other
+    .getByRole("button", { name: "Save reviewed activity", exact: true })
+    .click();
+  await expect(
+    other.getByRole("region", { name: "Account balance evidence" }),
+  ).toContainText("€990.00");
+  await page.bringToFront();
+  await page
+    .getByLabel("Proposed purchase (€; 0 for none)", { exact: true })
+    .fill("1");
+  await page
+    .getByRole("button", { name: "Compare what-if", exact: true })
+    .click();
+  await expect(
+    page.getByRole("region", { name: "Forecast evidence status" }),
+  ).toContainText("SOURCE CHANGED");
+  await expect(page.getByText(claim, { exact: true })).toBeHidden();
+  await expect(
+    page.getByText(
+      "Illustrative projection — refresh/review starting evidence before a current spending decision.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  const actual = await (
+    await other.request.get("/api/ledger?asOf=" + today)
+  ).json();
+  const changed = actual.accounts.find(
+    (a: { id: string }) => a.id === account.id,
+  );
+  expect(
+    (
+      await other.request.post(
+        `/api/ledger/accounts/${account.id}/reconcile?asOf=${today}`,
+        {
+          data: {
+            revision: changed.revision,
+            statementEuro: "990",
+            source: "Synthetic corrected statement",
+            commit: true,
+            acceptAdjustment: false,
+          },
+        },
+      )
+    ).ok(),
+  ).toBeTruthy();
+  await page.screenshot({
+    path: testInfo.outputPath("changed-forecast-source.png"),
+    fullPage: true,
+  });
+  await other.close();
 });

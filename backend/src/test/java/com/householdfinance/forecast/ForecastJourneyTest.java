@@ -188,6 +188,13 @@ class ForecastJourneyTest {
     var changed = service.get().plan();
     assertEquals("SOURCE_CHANGED", changed.evidenceState());
     assertFalse(changed.currentDecisionReady());
+    var checked =
+        service.compare(
+            new ForecastService.WhatIf(
+                changed.revision(), "1", today.plusDays(1), null, null, false));
+    assertEquals("SOURCE_CHANGED", checked.checkedPlan().evidenceState());
+    assertFalse(checked.checkedPlan().currentDecisionReady());
+
     assertEquals(100000, changed.inputs().baseline().cashMinor());
     assertThrows(
         IllegalArgumentException.class,

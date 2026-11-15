@@ -107,7 +107,8 @@ public class ForecastService {
       boolean currentDecisionReady,
       List<String> warnings,
       Projection base,
-      Projection scenario) {}
+      Projection scenario,
+      View checkedPlan) {}
 
   private static final long SAFE = 9_007_199_254_740_991L, MAX_AMOUNT = 1_000_000_000_000L;
   private final ForecastPlanRepository repository;
@@ -525,7 +526,8 @@ public class ForecastService {
         view.currentDecisionReady() && !input.includeUncertain(),
         List.copyOf(warnings),
         view.projection(),
-        projection(stored, scenario, input.includeUncertain()));
+        projection(stored, scenario, input.includeUncertain()),
+        view);
   }
 
   private Projection projection(Stored stored, List<Event> events, boolean includeUncertain) {

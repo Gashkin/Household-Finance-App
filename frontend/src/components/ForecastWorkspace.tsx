@@ -8,7 +8,7 @@ import {
 } from "../api/forecast";
 import { money } from "../domain/money";
 import { euroText } from "../api/ledger";
-import { todayInDublin } from "../domain/dates";
+import { todayInDublin, dateInputOffset as dateAfter } from "../domain/dates";
 type EventDraft = {
   id: string;
   date: string;
@@ -18,11 +18,6 @@ type EventDraft = {
   amountEuro: string;
   source: string;
 };
-function dateAfter(value: string, days: number) {
-  const date = new Date(value + "T12:00:00Z");
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
 function draft(event: FutureEvent): EventDraft {
   return {
     id: event.id,
@@ -211,6 +206,9 @@ export default function ForecastWorkspace() {
         delayedUntil: income ? until || null : null,
         includeUncertain: upside,
       });
+      setWorkspace((current) =>
+        current ? { ...current, plan: value.checkedPlan } : current,
+      );
       setComparison(value);
     } catch (e) {
       setError((e as Error).message);
@@ -251,7 +249,7 @@ export default function ForecastWorkspace() {
           comparing a what-if.
         </p>
       )}
-      <fieldset disabled={busy} className="forecast-controls">
+      <fieldset disabled={busy} className="affordability-controls">
         <form onSubmit={save}>
           <h3>Starting evidence and horizon</h3>
           <label>
