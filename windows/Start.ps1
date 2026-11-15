@@ -1,10 +1,11 @@
 . "$PSScriptRoot\Common.ps1"
 $root = Get-InstanceRoot
-$config = Read-PrivateConfig $root
 $manifest = Get-PackageManifest $PSScriptRoot
 $mutex = New-Object Threading.Mutex($false, 'Local\HouseholdFinance-Instance')
 if (-not $mutex.WaitOne(0)) { throw 'Household Finance is already running.' }
 try {
+    # Read after the lock: readiness/disable must not race the launch decision.
+    $config = Read-PrivateConfig $root
     if ($config.Production) {
         Assert-ProductionReleaseCleared $manifest
         Assert-StandardRuntimeIdentity | Out-Null
