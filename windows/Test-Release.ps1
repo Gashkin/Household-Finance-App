@@ -122,6 +122,23 @@ try {
 $env:LOCALAPPDATA=Join-Path $instance 'profile'
 $activeVersion=(Get-Content -LiteralPath (Join-Path $installed 'active.txt') -Raw).Trim()
 $startScript=Join-Path $installed ('versions\'+$activeVersion+'\Start.ps1')
+function Restart-SyntheticInstance {
+    param($Previous)
+    if(-not $Previous.HasExited){ & taskkill.exe /PID $Previous.Id /T /F | Out-Null; $Previous.WaitForExit() }
+    $next=Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-File',('"'+$startScript+'"')) -WorkingDirectory $instance -PassThru -RedirectStandardOutput (Join-Path $instance 'restart.log') -RedirectStandardError (Join-Path $instance 'restart-error.log')
+    for($attempt=0;$attempt -lt 90;$attempt++) {
+        if($next.HasExited){throw 'Synthetic restart failed.'}
+        try { $health=Invoke-WebRequest 'http://127.0.0.1:8080/health' -UseBasicParsing; if($health.StatusCode -eq 200){return $next} } catch {}
+        Start-Sleep -Seconds 1
+    }
+    if(-not $next.HasExited){ & taskkill.exe /PID $next.Id /T /F | Out-Null; $next.WaitForExit() }
+    throw 'Synthetic restart timeout.'
+}
+function Unlock-SyntheticInstance {
+    $web=New-Object Microsoft.PowerShell.Commands.WebRequestSession
+    Invoke-WebRequest 'http://127.0.0.1:8080/api/workspace/unlock' -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body '{"password":"synthetic-install-password"}' -WebSession $web -UseBasicParsing | Out-Null
+    return $web
+}
 $process=Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-File',('"'+$startScript+'"')) -WorkingDirectory $instance -PassThru -RedirectStandardOutput (Join-Path $instance 'app.log') -RedirectStandardError (Join-Path $instance 'error.log')
 try {
     $ready=$false
@@ -147,7 +164,27 @@ try {
     $status=Invoke-RestMethod 'http://127.0.0.1:8080/api/banking/status' -WebSession $session
     if($status.configured -or $status.environment -ne 'SANDBOX') { throw 'Production was enabled by default.' }
     if(-not (Test-Path -LiteralPath (Join-Path $installed 'data\household-finance.mv.db'))) { throw 'Launcher did not use the persistent private data directory.' }
-    Write-Host 'Packaged Windows runtime, actual launcher, static app, callback, private ACLs, DPAPI and authenticated banking checks passed using synthetic data.'
+    $today=[DateTime]::UtcNow.ToString('yyyy-MM-dd')
+    $account=@{name='Synthetic Windows recovery account';kind='CASH';openingDate=$today;openingEuro='123.45';source='Synthetic Windows opening'}
+    Invoke-RestMethod 'http://127.0.0.1:8080/api/ledger/accounts' -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($account | ConvertTo-Json) -WebSession $session | Out-Null
+    $backupFile=Join-Path $instance 'synthetic.hfb'
+    Invoke-WebRequest 'http://127.0.0.1:8080/api/workspace/backup' -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body '{"password":"synthetic-recovery-passphrase"}' -WebSession $session -UseBasicParsing -OutFile $backupFile | Out-Null
+    $bytes=[IO.File]::ReadAllBytes($backupFile)
+    if($bytes.Length -lt 45 -or [Text.Encoding]::UTF8.GetString($bytes).Contains('Synthetic Windows recovery account')){throw 'Encrypted backup failed.'}
+    $process=Restart-SyntheticInstance $process
+    $session=Unlock-SyntheticInstance
+    $position=Invoke-RestMethod ('http://127.0.0.1:8080/api/ledger?asOf='+$today) -WebSession $session
+    if($position.cashMinor -ne 12345){throw 'Synthetic records lost after actual Windows restart.'}
+    & taskkill.exe /PID $process.Id /T /F | Out-Null; $process.WaitForExit()
+    Move-Item -LiteralPath (Join-Path $installed 'data') -Destination (Join-Path $installed 'original-synthetic-data')
+    $process=Restart-SyntheticInstance $process
+    $session=Unlock-SyntheticInstance
+    $restore=@{password='synthetic-recovery-passphrase';backup=[Convert]::ToBase64String($bytes);confirmation='RESTORE INTO EMPTY WORKSPACE'}
+    Invoke-RestMethod 'http://127.0.0.1:8080/api/workspace/restore' -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($restore | ConvertTo-Json) -WebSession $session | Out-Null
+    $position=Invoke-RestMethod ('http://127.0.0.1:8080/api/ledger?asOf='+$today) -WebSession $session
+    if($position.cashMinor -ne 12345){throw 'Packaged Windows encrypted restore changed synthetic records.'}
+    [Array]::Clear($bytes,0,$bytes.Length)
+    Write-Host 'Packaged Windows runtime, actual launcher/restart/encrypted restore, static app, callback, private ACLs, DPAPI and authenticated banking checks passed using synthetic data.'
 } finally {
     $env:LOCALAPPDATA=$originalLocalAppData
     if(-not $process.HasExited){ & taskkill.exe /PID $process.Id /T /F | Out-Null; $process.WaitForExit() }
