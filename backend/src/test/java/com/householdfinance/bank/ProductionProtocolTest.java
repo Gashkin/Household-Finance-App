@@ -110,6 +110,15 @@ class ProductionProtocolTest {
     assertEquals(before,ledger.position(today));
     assertNull(service.status().lastSuccessfulFetch());
   }
+  @Test void malformedRemoteExpiryRequiresReconnectAfterRestart() {
+    var request=input(connect());
+    provider.mode="bad-expiry";
+    assertThrows(IllegalArgumentException.class,()->service.fetch(request));
+    assertEquals("RECONNECT_REQUIRED",service.status().state());
+    service=new SandboxService(gateway,ledger);
+    assertEquals("RECONNECT_REQUIRED",service.status().state());
+    assertThrows(IllegalArgumentException.class,()->service.fetch(request));
+  }
   @Test void tamperWrongKeyOrApplicationNeverSilentlyOverwriteConnection() throws Exception {
     connect(); Path path=Path.of(config.storePath()); byte[] original=Files.readAllBytes(path);
     byte[] wrong=new byte[32]; Arrays.fill(wrong,(byte)1);
