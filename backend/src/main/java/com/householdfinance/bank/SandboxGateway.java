@@ -48,7 +48,12 @@ public class SandboxGateway {
         URI.create("https://api.enablebanking.com"),
         () -> loadPrivateKey(production.enabled() ? production.keyPath() : path),
         json);
-    if (enabled && production.enabled()) throw new IllegalArgumentException("Select one banking environment");
+    if (production.enabled()) {
+      // GBD-14 must also reject a direct Java launch that bypasses Start.ps1.
+      // Test-only synthetic gateways use the package-private injected transport,
+      // not this runtime Spring constructor. GBD-15 owns production activation.
+      throw new IllegalArgumentException("GBD-14 production release hold: live banking is disabled");
+    }
     this.production = production;
     if (production.enabled()) new ConnectionStore(production);
   }
