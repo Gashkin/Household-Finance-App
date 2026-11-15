@@ -82,13 +82,11 @@ function Assert-SameRelease($Installed, $Incoming) {
 }
 
 function Assert-ProductionReleaseCleared($Manifest) {
-    # Release hold is code-reviewed source, not a Read-Host answer or editable local receipt.
-    # Missing fields on earlier packages also fail closed. Manifest hashes are integrity
-    # evidence, not signatures and do not protect a compromised runtime owner/admin.
-    $field = $Manifest.PSObject.Properties['productionEligible']
-    if (-not $field -or $field.Value -isnot [bool] -or $field.Value -ne $true) {
-        throw 'Production release hold: amended GBD-14 isolation, provider entitlement, exposure containment, device evidence and whole-PR review are incomplete. Keep production disabled; no account linking.'
-    }
+    # GBD-14 is unconditionally production-disabled. The manifest is unsigned
+    # metadata and may be edited by the local runtime user; it is NEVER an
+    # authorization mechanism. A future GBD-15 reviewed release must implement
+    # its own authenticated, host-isolated production activation boundary.
+    throw 'Production release hold: GBD-14 cannot activate live banking. Complete GBD-15 production security and release review first.'
 }
 
 function Assert-StandardRuntimeIdentity {
