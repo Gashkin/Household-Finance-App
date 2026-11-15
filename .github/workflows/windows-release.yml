@@ -28,7 +28,7 @@ jobs:
         shell: pwsh
         run: ./windows/Build-Release.ps1 -Output "$env:RUNNER_TEMP/household-finance"
       - name: Verify Windows package using synthetic data
-        shell: pwsh
+        shell: powershell
         run: ./windows/Test-Release.ps1 -Package "$env:RUNNER_TEMP/household-finance"
       - uses: actions/upload-artifact@v4
         with:

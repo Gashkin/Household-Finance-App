@@ -94,7 +94,7 @@ class ProductionProtocolTest {
     provider.mode="ok"; provider.environment="SANDBOX";
     assertThrows(IllegalArgumentException.class,()->service.banks());
     assertThrows(IllegalArgumentException.class,()->gateway.request("POST","/payments",Map.of()));
-    for(String url:List.of("https://auth.enablebanking.com/pis/start","https://tilisy-sandbox.enablebanking.com/","https://auth.enablebanking.com:8443/ais/start","https://evil.example/ais/start"))
+    for(String url:List.of("https://auth.enablebanking.com/pis/start","https://auth.enablebanking.com/ais/../pis/start","https://auth.enablebanking.com/ais/%2e%2e/pis/start","https://tilisy-sandbox.enablebanking.com/","https://auth.enablebanking.com:8443/ais/start","https://evil.example/ais/start"))
       assertThrows(IllegalArgumentException.class,()->gateway.safeRedirect(url));
   }
   @Test void tamperWrongKeyOrApplicationNeverSilentlyOverwriteConnection() throws Exception {

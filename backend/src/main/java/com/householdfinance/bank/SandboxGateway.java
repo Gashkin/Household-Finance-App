@@ -264,7 +264,7 @@ public class SandboxGateway {
             && "127.0.0.1".equals(uri.getHost())
             && uri.getPort() == base.getPort();
     if (uri.getUserInfo() != null
-        || ("auth.enablebanking.com".equals(uri.getHost()) && !uri.getPath().startsWith("/ais/"))
+        || ("auth.enablebanking.com".equals(uri.getHost()) && !"/ais/start".equals(uri.getRawPath()))
         || uri.getFragment() != null
         || (!mock
             && !("https".equals(uri.getScheme())

@@ -13,6 +13,32 @@ $instance = Join-Path $env:RUNNER_TEMP ('gbd14-'+[Guid]::NewGuid().ToString())
 New-Item -ItemType Directory -Path $instance | Out-Null
 Set-PrivatePath $instance $true
 Assert-PrivatePath $instance
+# Regression for the reviewed ancestor-walk failure: native directory/file objects,
+# plus hostile ACL, checkout and reparse cases. No protection check is bypassed.
+function Assert-Rejected([scriptblock]$Operation) {
+    $rejected=$false
+    try { & $Operation } catch { $rejected=$true }
+    if(-not $rejected){throw 'An unsafe path was accepted.'}
+}
+$nested=Join-Path $instance 'nested\private'
+New-Item -ItemType Directory -Path $nested -Force | Out-Null
+Assert-PrivatePath $nested
+$ordinary=Join-Path $nested 'ordinary.txt'
+'synthetic' | Set-Content -LiteralPath $ordinary
+Assert-PrivatePath $ordinary
+$checkout=Join-Path $instance 'checkout'
+New-Item -ItemType Directory -Path (Join-Path $checkout '.git') -Force | Out-Null
+Assert-Rejected { Assert-PrivatePath $checkout }
+$junction=Join-Path $instance 'junction'
+New-Item -ItemType Junction -Path $junction -Target $nested | Out-Null
+Assert-Rejected { Assert-PrivatePath $junction }
+Remove-Item -LiteralPath $junction -Force
+$acl=Get-Acl -LiteralPath $nested
+$everyone=New-Object Security.Principal.SecurityIdentifier('S-1-1-0')
+$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($everyone,'Read','Allow')))
+Set-Acl -LiteralPath $nested -AclObject $acl
+Assert-Rejected { Assert-PrivatePath $nested }
+Set-PrivatePath $nested $true
 # Round-trip Windows DPAPI without disclosing any plaintext in logs.
 $secret=ConvertTo-SecureString 'synthetic-test-secret-16' -AsPlainText -Force
 [PSCustomObject]@{Password=$secret} | Export-Clixml -LiteralPath (Join-Path $instance 'test.xml')

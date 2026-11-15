@@ -141,7 +141,7 @@ export default function BankSandboxPanel({
             </p>
           )}
           <p>
-            Registered redirect must be exactly <code>{status.callback}</code>.
+            Registered redirect must be exactly <code>{status.callback}</code>.{" "}
             {production ? "Connection references stay encrypted on this device across restarts and are excluded from recovery backups. New-device recovery requires reconnecting. Refresh is manual, limited to four attempts per day across the connection. No background refresh or AI forwarding." : "Credentials and provider session references remain server-side and are not saved in backups or browser storage. Restarting the backend requires reconnecting."}
           </p>
           <fieldset
