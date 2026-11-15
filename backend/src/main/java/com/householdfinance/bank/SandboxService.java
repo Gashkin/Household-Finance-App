@@ -74,6 +74,7 @@ public class SandboxService {
       fetchWindow = saved.fetchWindow();
       for(var a : saved.accounts()) accounts.put(a.publicAccount().handle(), a);
     }
+    persist(); // Initialize/migrate the marker before any provider operation.
   }
   private void persist() {
     try {
@@ -98,7 +99,9 @@ public class SandboxService {
 
   private String uuid(String value) {
     try {
-      return UUID.fromString(value).toString();
+      String id = UUID.fromString(value).toString();
+      if (!id.equalsIgnoreCase(value)) throw new IllegalArgumentException();
+      return id;
     } catch (Exception e) {
       throw new IllegalArgumentException("Invalid bank response identifier");
     }
@@ -117,11 +120,9 @@ public class SandboxService {
 
   public synchronized Status status() {
     String state =
-        sessionId == null
+        blocked ? "REVOCATION_PENDING" : sessionId == null
             ? "DISCONNECTED"
-            : blocked
-                ? "REVOCATION_PENDING"
-                : reauthorize
+            : reauthorize
                     ? "RECONNECT_REQUIRED"
                     : !Instant.now().isBefore(expires) ? "EXPIRED" : "CONNECTED";
     return new Status(
@@ -156,7 +157,7 @@ public class SandboxService {
     check(
         input != null && Boolean.TRUE.equals(input.acknowledged()),
         "Confirm read-only account, balance and transaction access through Enable Banking; select only your own accounts in the bank consent flow");
-    check(sessionId == null, "Disconnect the existing bank session before connecting again");
+    check(sessionId == null && !blocked, "Resolve or revoke the existing bank session before connecting again");
     Instant now = Instant.now();
     if (!now.isBefore(attemptWindow.plusSeconds(60))) {
       attemptWindow = now;
@@ -222,9 +223,10 @@ public class SandboxService {
         "Sandbox authorization code missing");
     Pending flow = pending;
     pending = null;
-    var response = gateway.request("POST", "/sessions", Map.of("code", input.code()));
-    String id = uuid(text(response, "session_id", 36));
+    String id = null;
     try {
+      var response = gateway.request("POST", "/sessions", Map.of("code", input.code()));
+      id = uuid(text(response, "session_id", 36));
       Instant expiry = Instant.parse(text(response.path("access"), "valid_until", 80));
       check(expiry.isAfter(Instant.now()), "Bank consent already expired");
       var source = response.path("accounts");
@@ -259,6 +261,11 @@ public class SandboxService {
       persist();
       return status();
     } catch (Exception e) {
+      if (id == null) {
+        sessionId = null; expires = flow.consentUntil(); blocked = true; accounts.clear();
+        persist();
+        throw new IllegalArgumentException("Provider returned no usable session reference. Revoke access at the bank/provider, then explicitly confirm external revocation; connecting again is blocked.");
+      }
       try {
         gateway.request("DELETE", "/sessions/" + id, null);
       } catch (Exception ignored) {
@@ -460,15 +467,23 @@ public class SandboxService {
 
   public synchronized Status disconnect() {
     pending = null;
+    if (sessionId == null && !blocked) return forget();
     blocked = true;
     persist();
-    if (sessionId != null) {
-      gateway.request("DELETE", "/sessions/" + sessionId, null);
-    }
+    check(sessionId != null, "No usable provider reference. Revoke externally and confirm that action locally.");
+    gateway.request("DELETE", "/sessions/" + sessionId, null);
+    blocked = false;
+    return forget();
+  }
+
+  public synchronized Status confirmExternalRevocation(Boolean acknowledged) {
+    check(blocked && Boolean.TRUE.equals(acknowledged), "Explicit confirmation of bank/provider revocation is required");
+    blocked = false;
     return forget();
   }
 
   public synchronized Status forget() {
+    check(!blocked, "Revocation is pending. Retry disconnect or revoke at the bank/provider and explicitly confirm before forgetting.");
     pending = null;
     sessionId = null;
     accounts.clear();

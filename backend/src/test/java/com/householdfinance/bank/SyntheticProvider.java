@@ -71,6 +71,10 @@ public final class SyntheticProvider implements AutoCloseable {
         ex.getResponseBody().write(html);
         return;
       }
+      if (path.equals("/sessions") && mode.equals("session-exchange-fail")) { ex.sendResponseHeaders(503,-1); return; }
+      if (path.equals("/sessions") && mode.equals("session-bad-json")) {
+        byte[] invalid="not-json".getBytes(StandardCharsets.UTF_8); ex.sendResponseHeaders(200,invalid.length); ex.getResponseBody().write(invalid); return;
+      }
       if (path.equals("/application"))
         result =
             Map.of(
@@ -100,7 +104,7 @@ public final class SyntheticProvider implements AutoCloseable {
         result =
             Map.of(
                 "session_id",
-                session,
+                mode.equals("malformed-session") ? "not-a-session-identifier" : session,
                 "access",
                 access(),
                 "accounts",

@@ -25,7 +25,8 @@ export default function BankSandboxPanel({
     [bank, setBank] = useState(""),
     [account, setAccount] = useState(""),
     [consent, setConsent] = useState(false),
-    [forget, setForget] = useState(false);
+    [forget, setForget] = useState(false),
+    [revoked, setRevoked] = useState(false);
   const [from, setFrom] = useState(openingDate || todayInDublin()),
     [to, setTo] = useState(todayInDublin()),
     [balance, setBalance] = useState<SandboxFetched | null>(null);
@@ -260,7 +261,7 @@ export default function BankSandboxPanel({
                 </label>
                 <button
                   type="button"
-                  disabled={!forget}
+                  disabled={!forget || status.state === "REVOCATION_PENDING"}
                   onClick={() =>
                     run(async () => {
                       setStatus(
@@ -276,6 +277,14 @@ export default function BankSandboxPanel({
                 >
                   {production ? "Forget local bank connection only" : "Forget local sandbox connection only"}
                 </button>
+                {status.state === "REVOCATION_PENDING" && <>
+                  <p>Keep this reference to retry revocation. If no usable reference was returned, revoke access in your bank or Enable Banking consent controls first.</p>
+                  <label className="ledger-check"><input type="checkbox" checked={revoked} onChange={e => setRevoked(e.target.checked)} />I have personally revoked this application's access at the bank or provider</label>
+                  <button type="button" disabled={!revoked} onClick={() => run(async () => {
+                    setStatus(await sandbox<SandboxStatus>("external-revocation", {acknowledged: revoked}));
+                    setRevoked(false); setForget(false); setConsent(false); setBalance(null);
+                  })}>Confirm completed external revocation and clear connection</button>
+                </>}
               </>
             )}
           </fieldset>

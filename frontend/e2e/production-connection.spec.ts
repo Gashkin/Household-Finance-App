@@ -116,3 +116,25 @@ test("packaged single-origin production protocol simulation, review and revoke",
     fullPage: true,
   });
 });
+
+test("pending revocation cannot be forgotten without separately confirming the external action", async ({page}) => {
+  const state={configured:true,environment:"PRODUCTION",state:"REVOCATION_PENDING",expiresAt:null,lastSuccessfulFetch:null,lastError:"",accounts:[],callback:"http://127.0.0.1:8082/bank/callback"};
+  await page.route("**/api/banking/status",r=>r.fulfill({json:state}));
+  let confirmations=0;
+  await page.route("**/api/banking/external-revocation",async r=>{
+    expect(r.request().postDataJSON()).toEqual({acknowledged:true}); confirmations++;
+    await r.fulfill({json:{...state,state:"DISCONNECTED"}});
+  });
+  await page.goto("/");
+  await page.getByRole("button",{name:"Money position",exact:true}).click();
+  const panel=page.getByRole("region",{name:"AIB bank connection",exact:true});
+  await expect(panel).toContainText("REVOCATION_PENDING");
+  await panel.getByLabel("I understand local forgetting does not revoke provider consent or erase reviewed ledger records").check();
+  await expect(panel.getByRole("button",{name:"Forget local bank connection only",exact:true})).toBeDisabled();
+  const confirm=panel.getByRole("button",{name:"Confirm completed external revocation and clear connection",exact:true});
+  await expect(confirm).toBeDisabled();
+  await panel.getByLabel("I have personally revoked this application's access at the bank or provider").check();
+  await confirm.click();
+  await expect(panel).toContainText("DISCONNECTED");
+  expect(confirmations).toBe(1);
+});

@@ -70,3 +70,10 @@ function Get-PackageManifest([string]$Directory) {
     }
     $manifest
 }
+
+function Assert-SameRelease($Installed, $Incoming) {
+    if ($Installed.version -ne $Incoming.version -or $Installed.commit -ne $Incoming.commit -or @($Installed.files).Count -ne @($Incoming.files).Count) { throw 'Installed version differs from the incoming release; active version and records retained.' }
+    $left = @($Installed.files | Sort-Object path | ForEach-Object { $_.path + ':' + $_.sha256.ToUpperInvariant() }) -join "`n"
+    $right = @($Incoming.files | Sort-Object path | ForEach-Object { $_.path + ':' + $_.sha256.ToUpperInvariant() }) -join "`n"
+    if ($left -cne $right) { throw 'Installed manifest differs from the incoming release; inspect or re-stage deliberately.' }
+}

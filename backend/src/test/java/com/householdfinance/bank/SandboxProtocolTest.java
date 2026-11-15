@@ -178,7 +178,8 @@ class SandboxProtocolTest {
     assertThrows(IllegalArgumentException.class, () -> service.disconnect());
     assertEquals("REVOCATION_PENDING", service.status().state());
     assertThrows(IllegalArgumentException.class, () -> service.fetch(request));
-    assertEquals("DISCONNECTED", service.forget().state());
+    assertThrows(IllegalArgumentException.class, () -> service.forget());
+    assertEquals("DISCONNECTED", service.confirmExternalRevocation(true).state());
   }
 
   @Test

@@ -66,3 +66,4 @@ delivery-receipt.json
 *.pem
 *.key
 **/bank-connection.bin
+**/bank-connection.bin.initialized

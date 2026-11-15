@@ -114,4 +114,38 @@ class ProductionProtocolTest {
     assertThrows(IllegalArgumentException.class,()->new ConnectionStore(unready));
     assertEquals("",provider.authorization);
   }
+  @Test void lostInitializedStateFailsClosedWithoutOverwritingOrCreatingAnotherSession() throws Exception {
+    connect(); Path path=Path.of(config.storePath());
+    Files.delete(path);
+    assertThrows(IllegalArgumentException.class,()->new SandboxService(gateway,ledger));
+    assertFalse(Files.exists(path)); assertEquals(0,provider.deletes);
+  }
+  @Test void malformedSessionReferenceRetainsDurableUnresolvedRevocationUntilOwnerConfirms() {
+    for(String mode:List.of("malformed-session","session-bad-json","session-exchange-fail")) {
+    provider.mode=mode;
+    service.start(new SandboxService.Start("AIB","IE",true),"synthetic-binding");
+    assertThrows(IllegalArgumentException.class,()->service.complete(new SandboxService.Complete(provider.state,"synthetic-code"),"synthetic-binding"));
+    service=new SandboxService(gateway,ledger);
+    assertEquals("REVOCATION_PENDING",service.status().state());
+    assertThrows(IllegalArgumentException.class,()->service.forget());
+    assertThrows(IllegalArgumentException.class,()->service.disconnect());
+    assertThrows(IllegalArgumentException.class,()->service.start(new SandboxService.Start("AIB","IE",true),"synthetic-binding"));
+    assertThrows(IllegalArgumentException.class,()->service.confirmExternalRevocation(false));
+    assertEquals(0,provider.deletes); // No valid ID exists: never invent an unsafe DELETE path.
+    assertEquals("DISCONNECTED",service.confirmExternalRevocation(true).state());
+    assertEquals("DISCONNECTED",new SandboxService(gateway,ledger).status().state());
+    }
+  }
+  @Test void forgettingCannotDiscardAFailedRevocationReferenceAcrossRestart() {
+    connect(); provider.mode="delete-fail";
+    assertThrows(IllegalArgumentException.class,()->service.disconnect());
+    assertThrows(IllegalArgumentException.class,()->service.forget());
+    service=new SandboxService(gateway,ledger);
+    assertEquals("REVOCATION_PENDING",service.status().state());
+    assertThrows(IllegalArgumentException.class,()->service.forget());
+    provider.mode="ok";
+    assertEquals("DISCONNECTED",service.disconnect().state());
+    assertEquals(2,provider.deletes);
+  }
+
 }

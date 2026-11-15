@@ -13,7 +13,10 @@ try {
     $versions = Join-Path $root 'versions'
     if (-not (Test-Path -LiteralPath $versions)) { New-Item -ItemType Directory -Path $versions | Out-Null }
     $target = Join-Path $versions $manifest.commit
-    if (Test-Path -LiteralPath $target) { Get-PackageManifest $target | Out-Null }
+    if (Test-Path -LiteralPath $target) {
+        $existing = Get-PackageManifest $target
+        Assert-SameRelease $existing $manifest
+    }
     else {
         $stage = Join-Path $versions ('staging-' + [Guid]::NewGuid().ToString())
         New-Item -ItemType Directory -Path $stage | Out-Null

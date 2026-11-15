@@ -60,6 +60,23 @@ try {
     & (Join-Path $Package 'Install.ps1')
     $installed=Join-Path $env:LOCALAPPDATA 'HouseholdFinance'
     $first=(Get-Content -LiteralPath (Join-Path $installed 'active.txt') -Raw).Trim()
+    # A coherent but stale local manifest cannot replace the incoming reviewed release.
+    $versionRoot=Join-Path $installed ('versions\'+$first)
+    $storedManifestPath=Join-Path $versionRoot 'manifest.json'
+    $storedManifest=[IO.File]::ReadAllBytes($storedManifestPath)
+    $storedCommonPath=Join-Path $versionRoot 'Common.ps1'
+    $storedCommon=[IO.File]::ReadAllBytes($storedCommonPath)
+    try {
+        Add-Content -LiteralPath $storedCommonPath -Value '# synthetic stale copy'
+        $stale=Get-Content -LiteralPath $storedManifestPath -Raw | ConvertFrom-Json
+        ($stale.files | Where-Object { $_.path -eq 'Common.ps1' }).sha256=(Get-FileHash -LiteralPath $storedCommonPath).Hash
+        $stale | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $storedManifestPath -Encoding UTF8
+        Assert-Rejected { & (Join-Path $Package 'Install.ps1') }
+        if((Get-Content -LiteralPath (Join-Path $installed 'active.txt') -Raw).Trim() -ne $first){throw 'Rejected reinstall changed the active release.'}
+    } finally {
+        [IO.File]::WriteAllBytes($storedCommonPath,$storedCommon)
+        [IO.File]::WriteAllBytes($storedManifestPath,$storedManifest)
+    }
     New-Item -ItemType Directory -Path (Join-Path $installed 'data') | Out-Null
     Set-PrivatePath (Join-Path $installed 'data') $true
     'synthetic-preserved-record' | Set-Content -LiteralPath (Join-Path $installed 'data\sentinel.txt')
@@ -90,6 +107,11 @@ try {
         Start-Sleep -Seconds 1
     }
     if(-not $ready) { throw 'Packaged launcher health timeout.' }
+    $beforeConfig=(Get-FileHash -LiteralPath (Join-Path $installed 'config.xml')).Hash
+    $locked=$false
+    try { & (Join-Path (Split-Path $startScript) 'Readiness.ps1') }
+    catch { $locked=$_.Exception.Message -like 'Stop Household Finance or the other configuration operation*' }
+    if(-not $locked -or (Get-FileHash -LiteralPath (Join-Path $installed 'config.xml')).Hash -ne $beforeConfig){throw 'Readiness did not reject the active instance before config access.'}
     $shell=Invoke-WebRequest 'http://127.0.0.1:8080/' -UseBasicParsing
     if($shell.StatusCode -ne 200 -or $shell.Content -notmatch '/assets/') { throw 'Packaged app shell missing.' }
     $callback=Invoke-WebRequest 'http://127.0.0.1:8080/bank/callback?code=synthetic-secret&state=synthetic-state' -UseBasicParsing
