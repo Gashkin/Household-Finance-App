@@ -11,15 +11,23 @@ $mutex = New-Object Threading.Mutex($false, 'Local\HouseholdFinance-Instance')
 if (-not $mutex.WaitOne(0)) { throw 'Close Household Finance before installing or updating.' }
 try {
     $versions = Join-Path $root 'versions'
-    if (-not (Test-Path -LiteralPath $versions)) { New-Item -ItemType Directory -Path $versions | Out-Null }
+    if (-not (Test-Path -LiteralPath $versions)) {
+        New-Item -ItemType Directory -Path $versions | Out-Null
+        Set-PrivatePath $versions $true
+    }
+    # The root ACL alone cannot protect a replaced/junctioned versions directory.
+    Assert-PrivatePath $versions
     $target = Join-Path $versions $manifest.commit
     if (Test-Path -LiteralPath $target) {
+        Assert-PrivatePath $target
         $existing = Get-PackageManifest $target
         Assert-SameRelease $existing $manifest
     }
     else {
         $stage = Join-Path $versions ('staging-' + [Guid]::NewGuid().ToString())
         New-Item -ItemType Directory -Path $stage | Out-Null
+        Set-PrivatePath $stage $true
+        Assert-PrivatePath $stage
         foreach ($entry in $manifest.files) {
             $destination = Join-Path $stage $entry.path
             New-Item -ItemType Directory -Force -Path (Split-Path $destination) | Out-Null
@@ -28,6 +36,7 @@ try {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'manifest.json') -Destination $stage
         Get-PackageManifest $stage | Out-Null
         Move-Item -LiteralPath $stage -Destination $target
+        Assert-PrivatePath $target
     }
     if (-not (Test-Path -LiteralPath (Join-Path $root 'config.xml'))) {
         $password = Read-Host 'Create a workspace password (16-256 characters; save in your password manager)' -AsSecureString
