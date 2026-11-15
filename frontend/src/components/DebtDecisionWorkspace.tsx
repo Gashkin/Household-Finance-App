@@ -1,3 +1,4 @@
+import { plans, type DecisionPlan } from '../api/plans';
 import EvidenceIntakePanel from './EvidenceIntakePanel';
 import DebtReportPreview from './DebtReportPreview';
 import { useRef, useState, type FormEvent } from 'react';
@@ -17,7 +18,7 @@ const fields: { key: Field; label: string; hint: string }[] = [
   { key: 'reserve', label: 'Minimum cash reserve (€)', hint: 'Your protected cash floor' },
 ];
 
-export default function DebtDecisionWorkspace() {
+export default function DebtDecisionWorkspace({ onPlanCreated }: { onPlanCreated: (id: string) => void }) {
   const [values, setValues] = useState(defaults);
   const [cashRefresh, setCashRefresh] = useState(0);
   const [sourceSnapshot, setSourceSnapshot] = useState<CashPositionSnapshot | null>(null);
@@ -83,7 +84,7 @@ export default function DebtDecisionWorkspace() {
       <div className="debt-intro">
         <p className="debt-eyebrow">Household decision workspace</p>
         <h2>Repay debt or keep the cash?</h2>
-        <p>Compare the cost of keeping your repayment schedule with making an extra payment today. Debt comparisons are illustrative and not saved. Your optional cash evidence is stored in the local backend.</p>
+        <p>Compare the cost of keeping your repayment schedule with making an extra payment today. Debt comparisons are illustrative. Save a comparison to Financial plans to record a decision and follow-up. Your optional cash evidence is stored in the local backend.</p>
       </div>
       <EvidenceIntakePanel onApproved={snapshot => { applyCashPosition(snapshot); setCashRefresh(value => value + 1); }} />
       <CashPositionPanel key={cashRefresh} onApply={applyCashPosition} appliedId={sourceSnapshot?.id ?? null} />
@@ -101,7 +102,7 @@ export default function DebtDecisionWorkspace() {
           </div>
           <button className="debt-primary" type="submit" disabled={loading}>{loading ? "Comparing…" : "Compare scenarios"}</button>
           {sourceSnapshot ? <p className="cash-source-note">Using cash position dated {sourceSnapshot.asOfDate} ({sourceSnapshot.verification === 'REVIEWED' ? 'manually reviewed' : 'estimated'}). Cash is net of recorded commitments. {sourceSnapshot.stale ? 'Evidence is older than 30 days.' : ''}</p> : <p className="debt-caption">Cash and reserve values are manual or illustrative until you apply a recorded position.</p>}
-          <p className="debt-caption">Comparisons are not saved and no payment is initiated.</p>
+          <p className="debt-caption">Comparisons are saved only when you choose Save comparison to financial plan. No payment is initiated.</p>
         </form>
         <div className="debt-results" aria-live="polite">
           {error ? <div role="alert" className="debt-alert">{error}</div> : null}
@@ -133,6 +134,12 @@ export default function DebtDecisionWorkspace() {
                 ) : <p className="debt-safe">Cash remains at or above your stated minimum reserve.</p>}
                 {result.warnings.filter(w => !w.includes('reserve')).map(w => <p className="debt-alert" key={w}>{w}</p>)}
               </div>
+              {report && <button type="button" className="debt-primary" disabled={loading} onClick={async () => {
+                setLoading(true); setError(''); const version=requestVersion.current;
+                try { const plan=await plans<DecisionPlan>('/from-debt',report.input); if(version===requestVersion.current) onPlanCreated(plan.id); }
+                catch(e) { if(version===requestVersion.current) setError(e instanceof Error ? e.message : 'Could not save comparison'); }
+                finally { if(version===requestVersion.current) setLoading(false); }
+              }}>Save comparison to financial plan</button>}
               {report && <DebtReportPreview report={report} onDownload={downloadReport} />}
               <div className="workspace-card">
                 <button type="button" className="debt-disclosure" aria-expanded={showAssumptions} onClick={() => setShowAssumptions(x => !x)}>

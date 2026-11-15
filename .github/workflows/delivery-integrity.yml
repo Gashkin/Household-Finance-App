@@ -2,7 +2,7 @@ name: Story delivery integrity
 
 on:
   pull_request_target:
-    types: [opened, reopened, synchronize, edited, closed]
+    types: [opened, reopened, synchronize, edited, ready_for_review, converted_to_draft, closed]
   issue_comment:
     types: [created, edited]
   workflow_dispatch:
@@ -15,10 +15,15 @@ on:
     workflows: [Required CI]
     types: [completed]
 
+# Serialize check publication; each queued event re-reads current GitHub state.
+concurrency:
+  group: story-delivery-integrity
+  cancel-in-progress: false
+
 permissions:
   contents: read
   pull-requests: read
-  checks: read
+  checks: write
   actions: read
 
 jobs:
@@ -27,7 +32,7 @@ jobs:
     timeout-minutes: 5
     if: >-
       (github.event_name != 'workflow_run' ||
-      (github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.event == 'push')) &&
+      ((github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.event == 'push') || github.event.workflow_run.event == 'pull_request')) &&
       (github.event_name != 'issue_comment' || github.event.issue.pull_request)
     steps:
       # Never use the PR head/merge ref in this token-bearing workflow.

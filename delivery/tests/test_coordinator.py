@@ -5,7 +5,7 @@ import json
 import threading
 import tempfile
 from pathlib import Path
-from delivery.ci import event_check
+from delivery.ci import event_check, publish_readiness
 import unittest
 from unittest.mock import patch
 import urllib.error
@@ -61,7 +61,7 @@ class MemoryGit:
         if self.open_barrier: self.open_barrier.wait(timeout=5)
         with self.lock:
             if any(p['head']['ref'] == head for p in self.prs): raise Blocked('PR already exists')
-            pr = {'number': len(self.prs)+1, 'head': {'ref': head, 'sha': self.refs[head]}, 'base': {'ref': base},
+            pr = {'number': len(self.prs)+1, 'head': {'ref': head, 'sha': self.refs[head]}, 'base': {'ref': base, 'sha': self.refs[base]},
                   'title': title, 'body': body, 'state': 'open', 'merged': False, 'merged_at': None,
                   'html_url': f'https://example.test/pull/{len(self.prs)+1}'}
             self.prs.append(pr)
@@ -81,7 +81,7 @@ class MemoryGit:
             if descendant == ancestor: return True
             descendant = self.parents.get(descendant)
         return False
-    def reviews(self, number): return deepcopy(self.review_items)
+    def reviews(self, number): return [{**deepcopy(r), 'commit_id': r.get('commit_id', self.pr(number)['head']['sha'])} for r in self.review_items]
     def threads(self, number): return deepcopy(self.thread_items)
     def required_check(self, sha): return deepcopy(self.check)
 
@@ -240,8 +240,10 @@ class CoordinationIntegrationTests(unittest.TestCase):
         self.git.trees[pr['head']['sha']][path] = json.dumps(STORY)
         self.assertTrue(event_check(self.git, 'pull_request_review', {'pull_request': pr})['review_ready'])
         without_marker = {**pr, 'body': 'No identity'}
+        self.git.prs[0]['body'] = 'No identity'
         with self.assertRaisesRegex(Blocked, 'marker'):
             event_check(self.git, 'pull_request', {'pull_request': without_marker})
+        self.git.prs[0]['body'] = pr['body']
         self.git.human_merge(1, to_main=False)
         with self.assertRaisesRegex(Blocked, 'Merged away from main'):
             event_check(self.git, 'pull_request', {'action': 'closed', 'pull_request': self.git.pr(1)})
@@ -291,7 +293,94 @@ class CoordinationIntegrationTests(unittest.TestCase):
         self.assertIn('skipped', event_check(self.git, 'issue_comment', {'issue': {'number': 5}}))
 
 
+    def test_draft_pending_review_is_not_failure_or_merge_ready(self):
+        pr = self.ready_pr()
+        self.git.prs[0]['draft'] = True
+        self.git.review_items = []
+        result = self.c.pr_readiness(STORY, 1)
+        self.assertFalse(result['review_ready'])
+        self.assertIn('Draft PR', result['pending'][0])
+        with self.assertRaises(Blocked): self.c.pr_gate(STORY, 1)
+        self.git.prs[0]['body'] += marker('GBD-99')
+        with self.assertRaisesRegex(Blocked, 'exactly one'): self.c.pr_readiness(STORY, 1)
+
+    def test_ready_event_and_ci_completion_refresh_exact_head(self):
+        pr = self.ready_pr()
+        self.git.trees[pr['head']['sha']]['.delivery/stories/GBD-10.json'] = json.dumps(STORY)
+        self.git.review_items = []
+        result = event_check(self.git, 'pull_request_target', {'action': 'ready_for_review', 'pull_request': pr})
+        self.assertFalse(result['review_ready'])
+        self.git.review_items = [{'id': 1, 'state': 'COMMENTED', 'user': {'login': 'Copilot', 'type': 'Bot'}}]
+        self.git.check = None
+        self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'])
+        self.git.check = {'status': 'completed', 'conclusion': 'success'}
+        event = {'workflow_run': {'event': 'pull_request', 'head_sha': pr['head']['sha']}}
+        self.assertTrue(event_check(self.git, 'workflow_run', event)['review_ready'])
+        event['workflow_run']['head_sha'] = 'old-head'
+        self.assertIn('skipped', event_check(self.git, 'workflow_run', event))
+        self.git.check['conclusion'] = 'failure'
+        with self.assertRaisesRegex(Blocked, 'CI failed'): self.c.pr_readiness(STORY, 1)
+        self.git.check['conclusion'] = 'success'
+        self.git.thread_items = [{'isResolved': False}]
+        self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'])
+        self.git.review_items *= 2
+        with self.assertRaisesRegex(Blocked, 'Too many'): self.c.pr_readiness(STORY, 1)
+
+    def test_stale_review_requires_bound_owner_delta_receipt_without_another_review(self):
+        pr = self.ready_pr()
+        self.git.review_items[0]['commit_id'] = 'reviewed-old-head'
+        self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'])
+        receipt = {'head_sha': pr['head']['sha'], 'base_sha': pr['base']['sha'],
+                   'review_id': self.git.review_items[0]['id'], 'reviewed_sha': 'reviewed-old-head'}
+        prefix = pr['body']
+        def attest(value): self.git.prs[0]['body'] = prefix + '\n<!-- gbd-owned-verification ' + json.dumps(value) + ' -->'
+        attest(receipt)
+        result = self.c.pr_readiness(STORY, 1)
+        self.assertTrue(result['review_ready'])
+        self.assertTrue(result['owned_delta_verified'])
+        self.assertEqual(result['copilot_reviewed_sha'], 'reviewed-old-head')
+        for field in ['head_sha', 'base_sha', 'review_id', 'reviewed_sha']:
+            bad = {**receipt, field: 99 if field == 'review_id' else 'wrong'}
+            attest(bad)
+            self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'], field)
+        attest({**receipt, 'review_id': True})
+        self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'])
+        attest(receipt)
+        self.git.prs[0]['body'] += '\n<!-- gbd-owned-verification ' + json.dumps(receipt) + ' -->'
+        self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'])
+        self.git.prs[0]['body'] = prefix + '\n<!-- gbd-owned-verification invalid-json -->'
+        self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'])
+        attest(receipt)
+        self.git.check = {'status': 'completed', 'conclusion': 'failure'}
+        with self.assertRaisesRegex(Blocked, 'CI failed'): self.c.pr_readiness(STORY, 1)
+        self.git.check = {'status': 'completed', 'conclusion': 'success'}
+        self.git.review_items[0]['commit_id'] = None
+        self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'])
+        self.assertEqual(len(self.git.review_items), 1)
+
+
+
 class WireContractTests(unittest.TestCase):
+    def test_readiness_check_remains_pending_then_completes_and_fails_closed(self):
+        class Remote:
+            calls = []
+            def pr(self, number): return {'head': {'sha': 'current'}}
+            def pages(self, path, key): return [{'id': 8, 'name': 'Story merge readiness', 'app': {'slug': 'github-actions'}}]
+            def api(self, method, path, body): self.calls.append((method, path, body))
+        git = Remote()
+        pending = {'pr': 1, 'head_sha': 'current', 'review_ready': False, 'pending': ['Copilot pending']}
+        publish_readiness(git, pending)
+        self.assertEqual(git.calls[-1][2]['status'], 'in_progress')
+        self.assertNotIn('conclusion', git.calls[-1][2])
+        publish_readiness(git, {**pending, 'review_ready': True, 'pending': []})
+        self.assertEqual(git.calls[-1][2]['conclusion'], 'success')
+        publish_readiness(git, {**pending, 'blocked': 'Invalid identity'})
+        self.assertEqual(git.calls[-1][2]['conclusion'], 'failure')
+        before = len(git.calls)
+        with self.assertRaisesRegex(Blocked, 'Head changed'):
+            publish_readiness(git, {**pending, 'head_sha': 'old'})
+        self.assertEqual(before, len(git.calls))
+
     def test_create_ref_is_post_only_and_handoff_has_atomic_before_oid(self):
         class HTTP:
             calls = []
@@ -343,7 +432,7 @@ class WireContractTests(unittest.TestCase):
         self.assertNotIn('pull_request_review_thread:', workflow)
         self.assertNotIn('GITHUB_TOKEN:', required)
         self.assertNotIn('self-hosted', workflow)
-        for permission in ['contents: read', 'pull-requests: read', 'checks: read', 'actions: read']:
+        for permission in ['contents: read', 'pull-requests: read', 'checks: write', 'actions: read']:
             self.assertIn(permission, workflow)
 
     def test_network_errors_do_not_expose_credentials_or_response_bodies(self):
