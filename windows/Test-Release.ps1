@@ -61,6 +61,7 @@ try {
     $installed=Join-Path $env:LOCALAPPDATA 'HouseholdFinance'
     $first=(Get-Content -LiteralPath (Join-Path $installed 'active.txt') -Raw).Trim()
     New-Item -ItemType Directory -Path (Join-Path $installed 'data') | Out-Null
+    Set-PrivatePath (Join-Path $installed 'data') $true
     'synthetic-preserved-record' | Set-Content -LiteralPath (Join-Path $installed 'data\sentinel.txt')
     $changed=$originalManifest | ConvertFrom-Json
     $changed.commit='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
