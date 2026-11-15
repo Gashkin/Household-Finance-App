@@ -1,15 +1,7 @@
-# Autonomous delivery
+# Agent context entry point
 
-Read the current Notion Product Build operating instructions and canonical story before implementing. Notion is the roadmap/ownership source; GitHub is the code/integration source. One substantial story, one PR; all UI/backend/tests/docs for a coherent outcome belong together. Human alone controls merges.
+Fetch the live [Product Build operating authority](https://www.notion.so/418d3419fef081f79b7bfeeed488eb86) first on every execution. Then retrieve the relevant canonical story, ownership and acceptance criteria from the [Product Build backlog](https://www.notion.so/418d3419fef081b2ae72d18082f3dc45) (data source `collection://418d3419-fef0-8195-bcba-000b5e9d7d91`). Read the authority's security/privacy and banking sections when relevant.
 
-Use [the delivery coordinator](delivery/README.md) for available stories: `claim`, preserve the execution claim token, re-read Notion ownership, implement on the canonical branch, and `publish` one PR. Existing claims/PRs are owned even after a chat ends. New Work IDs have deterministic `story/N-delivery` branches; GBD-7/8 retain their declared bootstrap names. Never reset/delete/reclaim an existing ref or invent another slug to take over.
+Use the [independent review trial record](https://www.notion.so/418d3419fef08170a93cf8418b2948fa) for review-specific context and the [appraisals and learning record](https://www.notion.so/418d3419fef081ee91cdf6a1bc8d179a) when the live authority calls for it. These links are retrieval targets, not evidence their contents were read. If Notion is unavailable, report that context blocker rather than infer current policy from old repo prose or a previous session.
 
-Exactly one automatic Copilot review occurs at PR creation. Fix valid findings, verify, reply and resolve original conversations. Do not request incremental re-reviews. Keep public PR CI hosted and read-only; no personal self-hosted runner or long-lived Notion credentials in PR workflows.
-
-After a human merge, verify merge reachability, declared feature/test artifacts, resolved review conversations and the required check on the current main SHA before marking Done. A merged feature-branch PR is not integration. See `verify`/`finish` and CI receipts. Keep claim history; only explicit verified handoff changes ownership.
-
-Record meaningful execution evidence in Notion. Appraise after three newly verified feature integrations since the last appraisal, or immediately after a significant escaped incident. Do not turn planning, test setup, docs or trivial commits into separate PR stories or redundant appraisals. Backend owns financial/business logic; the frontend owns presentation and interaction.
-
-Before promising that scope will be covered in a later story, verify that an actual Notion Product Build story exists and read its current scope, status and dependencies. If missing, create or refine it first. Record deferred requirements, acceptance criteria, blockers and sequencing, link it from the current story, and cite its Work ID and URL in the handover. Distinguish backlog plans from selected execution and verified delivery. Never defer work into an unnamed future story.
-
-Owner-authorised exception for GBD-10 / PR #22 only: two Copilot reviews are allowed because the first ran prematurely. Request the final review only after sandbox integration and its tests are complete. All other stories retain one review.
+Compare the fetched context with actual GitHub branches, claims, PRs, exact commits and checks. Technical commands and contracts are in [delivery/README.md](delivery/README.md); domain and architecture references begin at [the OKF index](knowledge/okf/index.md). Follow relevant links as needed; record the sources and Git revision actually inspected in the story/review evidence.

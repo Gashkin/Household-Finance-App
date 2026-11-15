@@ -476,7 +476,7 @@ class LedgerJourneyTest {
         json.readValue(
             BackupCrypto.decrypt(encrypted, "synthetic-backup-passphrase-1234"),
             WorkspaceBackupService.Archive.class);
-    assertEquals(2, archive.version());
+    assertEquals(3, archive.version());
     var tables = new ArrayList<>(before.keySet());
     Collections.reverse(tables);
     for (String table : tables) jdbc.update("DELETE FROM " + table);
@@ -490,7 +490,7 @@ class LedgerJourneyTest {
         service.history("HOUSEHOLD").stream()
             .anyMatch(e -> e.source.equals("Snapshot " + snapshot.id())));
     var old = new LinkedHashMap<>(archive.tables());
-    old.keySet().removeIf(k -> k.startsWith("LEDGER_"));
+    old.keySet().removeIf(k -> k.startsWith("LEDGER_") || k.equals("FORECAST_PLANS"));
     byte[] v1 =
         BackupCrypto.encrypt(
             json.writeValueAsBytes(new WorkspaceBackupService.Archive(1, archive.createdAt(), old)),
