@@ -22,7 +22,10 @@ test("plan transport exposes stale writes and unknown save outcomes without retr
     await assert.rejects(plans("/id", {}, "PUT"), /Plan changed; reload/);
     globalThis.fetch = async () =>
       new Response("private database details", { status: 500 });
-    await assert.rejects(plans(), /Could not save. Reload/);
+    await assert.rejects(plans(), /Could not load financial plans. Retry loading/);
+    await assert.rejects(plans("/id", {}, "PUT"), /Could not save. Reload/);
+    globalThis.fetch = async () => { throw Error("offline"); };
+    await assert.rejects(plans(), /Could not load financial plans. Check the connection/);
   } finally {
     globalThis.fetch = original;
   }

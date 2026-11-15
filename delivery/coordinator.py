@@ -185,6 +185,24 @@ class Coordinator:
         self.review_gate(number, story)
         return pr
 
+    @staticmethod
+    def owned_delta_receipt(pr, review):
+        # This is the existing owner's attestation, not a second independent review.
+        # PR writers already control story metadata; the claim token is not a secret.
+        entries = re.findall(r'<!-- gbd-owned-verification (.*?) -->', pr.get('body') or '', re.DOTALL)
+        if len(entries) != 1: return False
+        try: receipt = json.loads(entries[0])
+        except (ValueError, TypeError): return False
+        return (isinstance(receipt, dict)
+                and set(receipt) == {'head_sha', 'base_sha', 'review_id', 'reviewed_sha'}
+                and receipt['head_sha'] == pr['head']['sha']
+                and bool(pr['base'].get('sha'))
+                and receipt['base_sha'] == pr['base'].get('sha')
+                and type(receipt['review_id']) is int
+                and receipt['review_id'] == review['id']
+                and bool(review.get('commit_id'))
+                and receipt['reviewed_sha'] == review['commit_id'])
+
     def pr_readiness(self, story, number):
         pr = self.pr_identity(story, number)
         pending = []
@@ -194,14 +212,19 @@ class Coordinator:
                    and r['user'].get('type') == 'Bot' and r['state'] != 'PENDING']
         expected = story.get('copilot_review_exception', {}).get('count', 1)
         require(len(reviews) <= expected, 'Too many Copilot reviews; inspect review sequence')
+        owned_delta = False
+        reviewed_sha = reviews[-1].get('commit_id') if reviews else None
         if len(reviews) < expected: pending.append('Required Copilot review pending; owner requests it after independent GPT review and corrections')
+        elif reviewed_sha != pr['head']['sha']:
+            owned_delta = self.owned_delta_receipt(pr, reviews[-1])
+            if not owned_delta: pending.append('Copilot reviewed an earlier or unknown head; current-head owner delta verification is required, not another Copilot request')
         if any(not t['isResolved'] for t in self.git.threads(number)): pending.append('Review conversations require disposition and resolution')
         # Missing checks are represented by required_check's pending sentinel; API errors fail closed.
         check = self.git.required_check(pr['head']['sha']) or {}
         if check.get('status') != 'completed': pending.append('Required CI pending on current head')
         else: require(check.get('conclusion') == 'success', 'Required CI failed on current head')
         require(self.git.pr(number)['head']['sha'] == pr['head']['sha'], 'PR changed during readiness verification; refresh')
-        return {'pr': number, 'head_sha': pr['head']['sha'], 'review_ready': not pending, 'pending': pending}
+        return {'pr': number, 'head_sha': pr['head']['sha'], 'review_ready': not pending, 'pending': pending, 'copilot_reviewed_sha': reviewed_sha, 'owned_delta_verified': owned_delta}
 
     def verify(self, story, number, expected_main=None):
         validate_definition(story)

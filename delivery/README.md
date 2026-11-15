@@ -79,3 +79,12 @@ python -m delivery.coordinator finish --definition .delivery/stories/GBD-N.json 
 GBD-8's own initial claim was bootstrapped with connected GitHub/Notion tools before this code existed; its record is committed with that fact. Its current delivery status is held in Notion; this runbook is not a status ledger. The GraphQL mergeCommit field normalizes current REST responses that omit merge_commit_sha. The coordinator improves reliability within a shared trusted repository; it is not tenant isolation, access control against repository writers, a hidden background service, or automatic financial-product functionality.
 
 API contracts: https://docs.github.com/en/rest/git/refs · https://docs.github.com/en/graphql/reference/git#updaterefs · https://developers.notion.com/reference/patch-page
+
+
+For `Story merge readiness`, a Copilot review on an older SHA cannot silently carry forward. After correcting its findings, the owner records the actual final-head tests and dispositions in the PR, then adds exactly one PR-description receipt using this shape (with real values):
+
+```text
+<!-- gbd-owned-verification {"head_sha":"<final head>","base_sha":"<current base>","review_id":123,"reviewed_sha":"<Copilot reviewed head>"} -->
+```
+
+The check binds all four fields to the current GitHub PR and actual completed Copilot review, and still requires current-head CI and resolved threads. A missing/stale/ambiguous receipt leaves readiness pending. Moving the head or base invalidates the receipt. This records the already-required owner's verification of post-review changes; it is not a second independent review or permission to request Copilot again. It trusts the same PR writers as the existing story metadata/claim protocol, not a new authentication boundary. Independent GPT coverage/order and high-risk exceptions remain owner-verified under the live Notion authority. Existing `pr-check`/post-merge historical receipts keep their documented review-count semantics; this new binding belongs to the named readiness check.

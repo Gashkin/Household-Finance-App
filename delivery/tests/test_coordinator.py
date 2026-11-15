@@ -61,7 +61,7 @@ class MemoryGit:
         if self.open_barrier: self.open_barrier.wait(timeout=5)
         with self.lock:
             if any(p['head']['ref'] == head for p in self.prs): raise Blocked('PR already exists')
-            pr = {'number': len(self.prs)+1, 'head': {'ref': head, 'sha': self.refs[head]}, 'base': {'ref': base},
+            pr = {'number': len(self.prs)+1, 'head': {'ref': head, 'sha': self.refs[head]}, 'base': {'ref': base, 'sha': self.refs[base]},
                   'title': title, 'body': body, 'state': 'open', 'merged': False, 'merged_at': None,
                   'html_url': f'https://example.test/pull/{len(self.prs)+1}'}
             self.prs.append(pr)
@@ -81,7 +81,7 @@ class MemoryGit:
             if descendant == ancestor: return True
             descendant = self.parents.get(descendant)
         return False
-    def reviews(self, number): return deepcopy(self.review_items)
+    def reviews(self, number): return [{**deepcopy(r), 'commit_id': r.get('commit_id', self.pr(number)['head']['sha'])} for r in self.review_items]
     def threads(self, number): return deepcopy(self.thread_items)
     def required_check(self, sha): return deepcopy(self.check)
 
@@ -325,6 +325,39 @@ class CoordinationIntegrationTests(unittest.TestCase):
         self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'])
         self.git.review_items *= 2
         with self.assertRaisesRegex(Blocked, 'Too many'): self.c.pr_readiness(STORY, 1)
+
+    def test_stale_review_requires_bound_owner_delta_receipt_without_another_review(self):
+        pr = self.ready_pr()
+        self.git.review_items[0]['commit_id'] = 'reviewed-old-head'
+        self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'])
+        receipt = {'head_sha': pr['head']['sha'], 'base_sha': pr['base']['sha'],
+                   'review_id': self.git.review_items[0]['id'], 'reviewed_sha': 'reviewed-old-head'}
+        prefix = pr['body']
+        def attest(value): self.git.prs[0]['body'] = prefix + '\n<!-- gbd-owned-verification ' + json.dumps(value) + ' -->'
+        attest(receipt)
+        result = self.c.pr_readiness(STORY, 1)
+        self.assertTrue(result['review_ready'])
+        self.assertTrue(result['owned_delta_verified'])
+        self.assertEqual(result['copilot_reviewed_sha'], 'reviewed-old-head')
+        for field in ['head_sha', 'base_sha', 'review_id', 'reviewed_sha']:
+            bad = {**receipt, field: 99 if field == 'review_id' else 'wrong'}
+            attest(bad)
+            self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'], field)
+        attest({**receipt, 'review_id': True})
+        self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'])
+        attest(receipt)
+        self.git.prs[0]['body'] += '\n<!-- gbd-owned-verification ' + json.dumps(receipt) + ' -->'
+        self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'])
+        self.git.prs[0]['body'] = prefix + '\n<!-- gbd-owned-verification invalid-json -->'
+        self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'])
+        attest(receipt)
+        self.git.check = {'status': 'completed', 'conclusion': 'failure'}
+        with self.assertRaisesRegex(Blocked, 'CI failed'): self.c.pr_readiness(STORY, 1)
+        self.git.check = {'status': 'completed', 'conclusion': 'success'}
+        self.git.review_items[0]['commit_id'] = None
+        self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'])
+        self.assertEqual(len(self.git.review_items), 1)
+
 
 
 class WireContractTests(unittest.TestCase):

@@ -59,6 +59,7 @@ export async function plans<T>(
   body?: unknown,
   method = "POST",
 ): Promise<T> {
+  const mutation = body !== undefined;
   let response: Response;
   try {
     response = await fetch("/api/plans" + path, {
@@ -70,7 +71,9 @@ export async function plans<T>(
     });
   } catch {
     throw Error(
-      "Cannot confirm this request. Reload saved plans before retrying; the save may have completed.",
+      mutation
+        ? "Cannot confirm this request. Reload saved plans before retrying; the save may have completed."
+        : "Could not load financial plans. Check the connection and retry loading.",
     );
   }
   if (!response.ok) {
@@ -84,7 +87,9 @@ export async function plans<T>(
       response.status === 401
         ? "Unlock the workspace to continue"
         : response.status >= 500
-          ? "Could not save. Reload saved plans before retrying."
+          ? mutation
+            ? "Could not save. Reload saved plans before retrying."
+            : "Could not load financial plans. Retry loading."
           : message || "Plan request failed",
     );
   }
