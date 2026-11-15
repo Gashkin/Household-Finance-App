@@ -134,9 +134,26 @@ try {
 $env:LOCALAPPDATA=Join-Path $instance 'profile'
 $activeVersion=(Get-Content -LiteralPath (Join-Path $installed 'active.txt') -Raw).Trim()
 $startScript=Join-Path $installed ('versions\'+$activeVersion+'\Start.ps1')
+function Stop-SyntheticInstance {
+    param($Previous)
+    if(-not $Previous.HasExited) { & taskkill.exe /PID $Previous.Id /T /F | Out-Null; $Previous.WaitForExit() }
+    # A killed PowerShell parent can leave a JVM exiting asynchronously. Wait for
+    # this exact fixture's Java processes, not any unrelated Java on the runner.
+    for($attempt=0;$attempt -lt 30;$attempt++) {
+        $children=@(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'java.exe' -and $_.CommandLine -like ('*'+$installed+'*app.jar*') })
+        if($children.Count -eq 0) { break }
+        foreach($child in $children) { Stop-Process -Id $child.ProcessId -Force -ErrorAction SilentlyContinue }
+        Start-Sleep -Milliseconds 300
+    }
+    if(@(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'java.exe' -and $_.CommandLine -like ('*'+$installed+'*app.jar*') }).Count -ne 0) {
+        throw 'Previous synthetic Java process was not terminated; refusing overlapping database use.'
+    }
+    # Give H2/Windows time to release file locks and the listen port before restart.
+    Start-Sleep -Milliseconds 500
+}
 function Restart-SyntheticInstance {
     param($Previous)
-    if(-not $Previous.HasExited){ & taskkill.exe /PID $Previous.Id /T /F | Out-Null; $Previous.WaitForExit() }
+    Stop-SyntheticInstance $Previous
     $next=Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-File',('"'+$startScript+'"')) -WorkingDirectory $instance -PassThru -RedirectStandardOutput (Join-Path $instance 'restart.log') -RedirectStandardError (Join-Path $instance 'restart-error.log')
     for($attempt=0;$attempt -lt 90;$attempt++) {
         if($next.HasExited){throw 'Synthetic restart failed.'}
@@ -183,11 +200,13 @@ try {
     Invoke-WebRequest 'http://127.0.0.1:8080/api/workspace/backup' -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body '{"password":"synthetic-recovery-passphrase"}' -WebSession $session -UseBasicParsing -OutFile $backupFile | Out-Null
     $bytes=[IO.File]::ReadAllBytes($backupFile)
     if($bytes.Length -lt 45 -or [Text.Encoding]::UTF8.GetString($bytes).Contains('Synthetic Windows recovery account')){throw 'Encrypted backup failed.'}
+    $beforeRestart=Invoke-RestMethod ('http://127.0.0.1:8080/api/ledger?asOf='+$today) -WebSession $session
+    if($beforeRestart.cashMinor -ne 12345){throw 'Synthetic opening position was not committed before restart.'}
     $process=Restart-SyntheticInstance $process
     $session=Unlock-SyntheticInstance
     $position=Invoke-RestMethod ('http://127.0.0.1:8080/api/ledger?asOf='+$today) -WebSession $session
-    if($position.cashMinor -ne 12345){throw 'Synthetic records lost after actual Windows restart.'}
-    & taskkill.exe /PID $process.Id /T /F | Out-Null; $process.WaitForExit()
+    if($position.cashMinor -ne 12345){throw ('Synthetic records lost after actual Windows restart: observed '+$position.cashMinor+' minor units.')}
+    Stop-SyntheticInstance $process
     Move-Item -LiteralPath (Join-Path $installed 'data') -Destination (Join-Path $installed 'original-synthetic-data')
     $process=Restart-SyntheticInstance $process
     $session=Unlock-SyntheticInstance
@@ -199,6 +218,9 @@ try {
     Write-Host 'Packaged Windows runtime, actual launcher/restart/encrypted restore, static app, callback, private ACLs, DPAPI and authenticated banking checks passed using synthetic data.'
 } finally {
     $env:LOCALAPPDATA=$originalLocalAppData
-    if(-not $process.HasExited){ & taskkill.exe /PID $process.Id /T /F | Out-Null; $process.WaitForExit() }
-    Remove-Item -LiteralPath $instance -Recurse -Force
+    Stop-SyntheticInstance $process
+    for($attempt=0;$attempt -lt 12;$attempt++) {
+        try { Remove-Item -LiteralPath $instance -Recurse -Force -ErrorAction Stop; break }
+        catch { if($attempt -eq 11){throw}; Start-Sleep -Seconds 1 }
+    }
 }
