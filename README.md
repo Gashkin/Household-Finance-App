@@ -51,3 +51,7 @@ Open **Money position** to record account evidence, review manual/CSV activity, 
 ## GBD-10 sandbox connection
 
 Read-only Enable Banking SANDBOX / Mock ASPSP connection is included in the same GBD-10 PR: [setup, consent, review and protection details](product/stories/enable-banking-sandbox.md). Synthetic protocol/browser evidence is distinct from an owner-run external sandbox smoke test. Production/AIB is tracked by [GBD-14](https://www.notion.so/418d3419fef081808864ca465d4eff7a), after GBD-10 integration and production security readiness/consent. No production access is enabled.
+
+## Dated affordability
+
+Open **Plan ahead** to save a dated cash plan, see bill/payday shortfalls and compare an unsaved purchase or income delay. Use reconciled cash-ledger evidence or an explicitly labelled manual estimate. Expected income stays separate from bank cash. [Financial rules, source staleness and operation](product/stories/dated-affordability.md). Encrypted backup payload v3 includes the plan and retains complete v1/v2 restore compatibility.

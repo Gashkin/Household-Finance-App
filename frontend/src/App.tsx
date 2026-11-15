@@ -1,3 +1,4 @@
+import ForecastWorkspace from "./components/ForecastWorkspace";
 import MoneyPositionWorkspace from './components/MoneyPositionWorkspace';
 import WorkspaceRecovery from './components/WorkspaceRecovery';
 import { useState } from 'react';
@@ -7,13 +8,14 @@ import MigraterWorkspace from './components/MigraterWorkspace';
 import PlannerWorkspace from './components/PlannerWorkspace';
 
 function App() {
-  const [role, setRole] = useState<'decision' | 'planner' | 'migrater' | 'consumer' | 'recovery' | 'money'>(location.pathname === '/bank/callback' ? 'money' : 'decision');
+  const [role, setRole] = useState<'decision' | 'planner' | 'migrater' | 'consumer' | 'recovery' | 'money' | 'forecast'>(location.pathname === '/bank/callback' ? 'money' : 'decision');
 
   return (
     <div className="app-shell">
       <header className="app-header">
         <h1>Household Finance</h1>
         <nav className="role-switcher" aria-label="Workspaces">
+          <button onClick={() => setRole('forecast')} className={role === 'forecast' ? 'active' : ''}>Plan ahead</button>
           <button onClick={() => setRole('money')} className={role === 'money' ? 'active' : ''}>Money position</button>
           <button onClick={() => setRole('decision')} className={role === 'decision' ? 'active' : ''}>Debt decision</button>
           <button onClick={() => setRole('planner')} className={role === 'planner' ? 'active' : ''}>
@@ -29,6 +31,7 @@ function App() {
       </header>
 
       <main className="app-main">
+        {role === 'forecast' ? <ForecastWorkspace /> : null}
         {role === 'money' ? <MoneyPositionWorkspace openDecision={() => setRole('decision')} /> : null}
         {role === 'recovery' ? <WorkspaceRecovery /> : null}
         {role === 'decision' ? <DebtDecisionWorkspace /> : null}
