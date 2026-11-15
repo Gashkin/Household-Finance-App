@@ -169,7 +169,7 @@ class Coordinator:
         require(not any(not t['isResolved'] for t in self.git.threads(number)), "Review conversations remain open; assess, reply with evidence and resolve them")
         return reviews[-1]['id']
 
-    def pr_gate(self, story, number):
+    def pr_identity(self, story, number):
         validate_definition(story)
         pr = self.git.pr(number)
         require(story_tags(pr.get('body')) == [story['work_id']], 'PR must contain exactly one canonical story marker')
@@ -178,8 +178,30 @@ class Coordinator:
         require(claim['branch'] == story['branch'] and claim['work_id'] == story['work_id'], 'PR claim does not belong to this story')
         self.owned(story, claim['token'])
         require(len(self.matching_prs(story)) == 1, "Duplicate story PR detected")
+        return pr
+
+    def pr_gate(self, story, number):
+        pr = self.pr_identity(story, number)
         self.review_gate(number, story)
         return pr
+
+    def pr_readiness(self, story, number):
+        pr = self.pr_identity(story, number)
+        pending = []
+        if pr.get('draft'): pending.append('Draft PR; human merge readiness is not asserted')
+        actors = {'copilot', 'copilot-pull-request-reviewer', 'copilot-pull-request-reviewer[bot]'}
+        reviews = [r for r in self.git.reviews(number) if r['user']['login'].lower() in actors
+                   and r['user'].get('type') == 'Bot' and r['state'] != 'PENDING']
+        expected = story.get('copilot_review_exception', {}).get('count', 1)
+        require(len(reviews) <= expected, 'Too many Copilot reviews; inspect review sequence')
+        if len(reviews) < expected: pending.append('Required Copilot review pending; owner requests it after independent GPT review and corrections')
+        if any(not t['isResolved'] for t in self.git.threads(number)): pending.append('Review conversations require disposition and resolution')
+        # Missing checks are represented by required_check's pending sentinel; API errors fail closed.
+        check = self.git.required_check(pr['head']['sha']) or {}
+        if check.get('status') != 'completed': pending.append('Required CI pending on current head')
+        else: require(check.get('conclusion') == 'success', 'Required CI failed on current head')
+        require(self.git.pr(number)['head']['sha'] == pr['head']['sha'], 'PR changed during readiness verification; refresh')
+        return {'pr': number, 'head_sha': pr['head']['sha'], 'review_ready': not pending, 'pending': pending}
 
     def verify(self, story, number, expected_main=None):
         validate_definition(story)

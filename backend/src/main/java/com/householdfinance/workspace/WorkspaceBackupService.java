@@ -14,7 +14,8 @@ public class WorkspaceBackupService {
     // Fixed dependency order, controlled by code. Names in a backup never become SQL identifiers.
     static final List<String> V1_TABLES = List.of("ACCOUNTS", "CATEGORIES", "COMMITMENTS", "MONTHLY_COMMITMENTS", "TRANSACTIONS", "MIGRATION_ARTIFACTS", "CASH_POSITION_SNAPSHOTS", "CASH_POSITION_LINES");
     static final List<String> V2_TABLES = java.util.stream.Stream.concat(V1_TABLES.stream(), java.util.stream.Stream.of("LEDGER_ACCOUNTS","LEDGER_ENTRIES","LEDGER_AUDIT")).toList();
-    static final List<String> TABLES = java.util.stream.Stream.concat(V2_TABLES.stream(), java.util.stream.Stream.of("FORECAST_PLANS")).toList();
+    static final List<String> V3_TABLES = java.util.stream.Stream.concat(V2_TABLES.stream(), java.util.stream.Stream.of("FORECAST_PLANS")).toList();
+    static final List<String> TABLES = java.util.stream.Stream.concat(V3_TABLES.stream(), java.util.stream.Stream.of("DECISION_PLANS")).toList();
     public record TableData(List<String> columns, List<List<String>> rows) {}
     public record Archive(int version, String createdAt, Map<String, TableData> tables) {}
     private final JdbcTemplate jdbc;
@@ -68,7 +69,7 @@ public class WorkspaceBackupService {
             tables.put(table, new TableData(cols, rows));
         }
         byte[] plain = null;
-        try { plain = json.writeValueAsBytes(new Archive(3, Instant.now().toString(), tables)); return BackupCrypto.encrypt(plain,password); }
+        try { plain = json.writeValueAsBytes(new Archive(4, Instant.now().toString(), tables)); return BackupCrypto.encrypt(plain,password); }
         catch (java.io.IOException e) { throw new IllegalStateException("Cannot encode backup", e); }
         finally { if (plain != null) Arrays.fill(plain,(byte)0); }
     }
@@ -82,8 +83,8 @@ public class WorkspaceBackupService {
         try { archive = json.readValue(plain,Archive.class); }
         catch (Exception e) { throw new IllegalArgumentException("Invalid backup contents"); }
         finally { Arrays.fill(plain,(byte)0); }
-        if (archive==null || (archive.version()!=1 && archive.version()!=2 && archive.version()!=3) || archive.createdAt()==null || archive.tables()==null) throw new IllegalArgumentException("Incomplete or unsupported backup");
-        List<String> restoreTables = archive.version()==1 ? V1_TABLES : archive.version()==2 ? V2_TABLES : TABLES;
+        if (archive==null || (archive.version()!=1 && archive.version()!=2 && archive.version()!=3 && archive.version()!=4) || archive.createdAt()==null || archive.tables()==null) throw new IllegalArgumentException("Incomplete or unsupported backup");
+        List<String> restoreTables = archive.version()==1 ? V1_TABLES : archive.version()==2 ? V2_TABLES : archive.version()==3 ? V3_TABLES : TABLES;
         if (!archive.tables().keySet().equals(new HashSet<>(restoreTables))) throw new IllegalArgumentException("Incomplete or unsupported backup");
         try { Instant.parse(archive.createdAt()); } catch (Exception e) { throw new IllegalArgumentException("Invalid backup timestamp"); }
         // Validate the entire manifest before the first insert. A later constraint error rolls back all tables.

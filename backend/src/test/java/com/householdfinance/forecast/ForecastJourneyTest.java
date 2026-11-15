@@ -397,13 +397,14 @@ class ForecastJourneyTest {
     byte[] plain = BackupCrypto.decrypt(backup, password);
     var archive = json.readValue(plain, WorkspaceBackupService.Archive.class);
     Arrays.fill(plain, (byte) 0);
-    assertEquals(3, archive.version());
+    assertEquals(4, archive.version());
     assertTrue(archive.tables().containsKey("FORECAST_PLANS"));
     clear();
     backups.restore(backup, password, "RESTORE INTO EMPTY WORKSPACE");
     assertEquals(p.inputs(), service.get().plan().inputs());
     var v2 = new LinkedHashMap<>(archive.tables());
     v2.remove("FORECAST_PLANS");
+    v2.remove("DECISION_PLANS");
     clear();
     backups.restore(
         BackupCrypto.encrypt(
