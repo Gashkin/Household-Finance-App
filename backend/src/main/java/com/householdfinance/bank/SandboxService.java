@@ -44,10 +44,13 @@ public class SandboxService {
 
   public record Balance(String type, String amountEuro, String date) {}
 
-  private record ProviderAccount(String uid, String identity, Account publicAccount) {}
+  record ProviderAccount(String uid, String identity, Account publicAccount) {}
 
   private record Pending(String state, String binding, Instant expires, Instant consentUntil) {}
 
+  record Saved(String sessionId, Instant expires, Instant lastSuccess, boolean blocked,
+      boolean reauthorize, List<ProviderAccount> accounts, int fetches, Instant fetchWindow) {}
+  private final ConnectionStore store;
   private final SandboxGateway gateway;
   private final LedgerService ledger;
   private Pending pending;
@@ -58,10 +61,25 @@ public class SandboxService {
   private final Map<String, ProviderAccount> accounts = new LinkedHashMap<>();
   private Instant attemptWindow = Instant.EPOCH;
   private int attempts, fetches;
+  private Instant fetchWindow = Instant.EPOCH;
 
   public SandboxService(SandboxGateway gateway, LedgerService ledger) {
     this.gateway = gateway;
     this.ledger = ledger;
+    this.store = new ConnectionStore(gateway.production());
+    Saved saved = store.read(Saved.class);
+    if (saved != null) {
+      sessionId = saved.sessionId(); expires = saved.expires(); lastSuccess = saved.lastSuccess();
+      blocked = saved.blocked(); reauthorize = saved.reauthorize(); fetches = saved.fetches();
+      fetchWindow = saved.fetchWindow();
+      for(var a : saved.accounts()) accounts.put(a.publicAccount().handle(), a);
+    }
+  }
+  private void persist() {
+    try {
+      store.write(new Saved(sessionId, expires, lastSuccess, blocked, reauthorize,
+          List.copyOf(accounts.values()), fetches, fetchWindow));
+    } catch (IllegalArgumentException e) { blocked = true; throw e; }
   }
 
   private void check(boolean ok, String message) {
@@ -82,7 +100,7 @@ public class SandboxService {
     try {
       return UUID.fromString(value).toString();
     } catch (Exception e) {
-      throw new IllegalArgumentException("Invalid sandbox response identifier");
+      throw new IllegalArgumentException("Invalid bank response identifier");
     }
   }
 
@@ -108,7 +126,7 @@ public class SandboxService {
                     : !Instant.now().isBefore(expires) ? "EXPIRED" : "CONNECTED";
     return new Status(
         gateway.configured(),
-        "SANDBOX",
+        gateway.environment(),
         state,
         expires,
         lastSuccess,
@@ -123,21 +141,22 @@ public class SandboxService {
     JsonNode values = gateway.request("GET", "/aspsps", null).path("aspsps");
     check(values.isArray() && values.size() <= 500, "Invalid sandbox bank list");
     for (var bank : values)
-      if (bank.path("name").asText().equals("Mock ASPSP")) {
+      if (bank.path("name").asText().equals(gateway.isProduction() ? "AIB" : "Mock ASPSP")
+          && (!gateway.isProduction() || (bank.path("country").asText().equals("IE")
+          && bank.path("psu_types").toString().contains("\"personal\"")))) {
         String country = text(bank, "country", 2);
         long max = bank.path("maximum_consent_validity").asLong(0);
-        if (country.matches("[A-Z]{2}") && max > 0) banks.add(new Bank("Mock ASPSP", country, max));
+        if (country.matches("[A-Z]{2}") && max > 0) banks.add(new Bank(bank.path("name").asText(), country, max));
       }
-    check(!banks.isEmpty(), "Mock ASPSP is unavailable for this sandbox application");
+    check(!banks.isEmpty(), "Selected bank is unavailable for this application");
     return banks;
   }
 
   public synchronized Map<String, String> start(Start input, String binding) {
     check(
         input != null && Boolean.TRUE.equals(input.acknowledged()),
-        "Confirm that only synthetic sandbox accounts will be connected for read-only"
-            + " balances/transactions");
-    check(sessionId == null, "Disconnect the existing sandbox session before connecting again");
+        "Confirm read-only account, balance and transaction access through Enable Banking; select only your own accounts in the bank consent flow");
+    check(sessionId == null, "Disconnect the existing bank session before connecting again");
     Instant now = Instant.now();
     if (!now.isBefore(attemptWindow.plusSeconds(60))) {
       attemptWindow = now;
@@ -148,9 +167,9 @@ public class SandboxService {
         banks().stream()
             .filter(b -> b.name().equals(input.name()) && b.country().equals(input.country()))
             .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("Select a listed Mock ASPSP"));
+            .orElseThrow(() -> new IllegalArgumentException("Select a listed bank"));
     String state = Base64.getUrlEncoder().withoutPadding().encodeToString(random());
-    Instant until = now.plusSeconds(Math.min(3600, selected.maximumConsentSeconds()));
+    Instant until = now.plusSeconds(Math.min(gateway.isProduction() ? 15552000 : 3600, selected.maximumConsentSeconds()));
     var response =
         gateway.request(
             "POST",
@@ -207,25 +226,25 @@ public class SandboxService {
     String id = uuid(text(response, "session_id", 36));
     try {
       Instant expiry = Instant.parse(text(response.path("access"), "valid_until", 80));
-      check(expiry.isAfter(Instant.now()), "Sandbox consent already expired");
+      check(expiry.isAfter(Instant.now()), "Bank consent already expired");
       var source = response.path("accounts");
       check(
           source.isArray() && !source.isEmpty() && source.size() <= 30,
-          "Expected 1–30 sandbox accounts");
+          "Expected 1–30 bank accounts");
       Map<String, ProviderAccount> selected = new LinkedHashMap<>();
       int number = 0;
       for (var a : source) {
-        check(text(a, "currency", 3).equals("EUR"), "Only EUR sandbox accounts are supported");
+        check(text(a, "currency", 3).equals("EUR"), "Only EUR bank accounts are supported");
         String type = text(a, "cash_account_type", 8);
         check(
             Set.of("CACC", "CASH", "SVGS", "CARD", "LOAN").contains(type),
-            "Unsupported sandbox account type");
+            "Unsupported bank account type");
         String uid = uuid(text(a, "uid", 36));
-        String identity = digest(text(a, "identification_hash", 4096));
+        String identity = digest((gateway.isProduction() ? "PRODUCTION\u0000" : "") + text(a, "identification_hash", 4096));
         String handle = UUID.randomUUID().toString();
         String kind = Set.of("CARD", "LOAN").contains(type) ? "DEBT" : "CASH";
         var publicAccount =
-            new Account(handle, "Sandbox account " + (++number) + " (" + type + ")", "EUR", kind);
+            new Account(handle, (gateway.isProduction() ? "AIB account " : "Sandbox account ") + (++number) + " (" + type + ")", "EUR", kind);
         selected.put(handle, new ProviderAccount(uid, identity, publicAccount));
       }
       sessionId = id;
@@ -234,48 +253,56 @@ public class SandboxService {
       accounts.putAll(selected);
       blocked = false;
       reauthorize = false;
-      fetches = 0;
+      if (!gateway.isProduction()) fetches = 0;
       lastSuccess = null;
       lastError = "";
+      persist();
       return status();
     } catch (Exception e) {
       try {
         gateway.request("DELETE", "/sessions/" + id, null);
       } catch (Exception ignored) {
+        sessionId = id; expires = flow.consentUntil(); blocked = true; accounts.clear();
+        persist();
+        throw new IllegalArgumentException("Invalid bank session; revocation failed. Disconnect again or revoke at the bank/provider before forgetting.");
       }
-      throw new IllegalArgumentException(
-          "Sandbox session response was invalid; reconnect using synthetic EUR accounts");
+      sessionId = null; expires = null; accounts.clear(); blocked = false;
+      persist();
+      throw new IllegalArgumentException("Bank session response was invalid; reconnect using supported EUR accounts");
     }
   }
 
   private void active(String uid) {
     check(
         sessionId != null && !blocked && !reauthorize && Instant.now().isBefore(expires),
-        "Sandbox session expired or disconnected; reconnect before fetching");
+        "Bank session expired or disconnected; reconnect before fetching");
     gateway.verifySandbox();
     var session = gateway.request("GET", "/sessions/" + sessionId, null);
     if (!session.path("status").asText().equals("AUTHORIZED")) reauthorize = true;
-    check(!reauthorize, "Sandbox consent is no longer authorized; disconnect/reconnect");
+    persist();
+    check(!reauthorize, "Bank consent is no longer authorized; disconnect/reconnect");
     boolean selected = false;
     for (var item : session.path("accounts")) if (item.asText().equals(uid)) selected = true;
     if (!selected) reauthorize = true;
+    persist();
     check(selected, "Selected account is no longer authorized");
     try {
       Instant remoteExpiry = Instant.parse(text(session.path("access"), "valid_until", 80));
       if (remoteExpiry.isBefore(expires)) expires = remoteExpiry;
-      check(remoteExpiry.isAfter(Instant.now()), "Sandbox consent expired");
+      persist();
+      check(remoteExpiry.isAfter(Instant.now()), "Bank consent expired");
     } catch (DateTimeException e) {
       reauthorize = true;
-      throw new IllegalArgumentException("Invalid sandbox session expiry");
+      throw new IllegalArgumentException("Invalid bank session expiry");
     }
   }
 
   public synchronized Fetched fetch(Fetch input) {
     check(
         input != null && Boolean.TRUE.equals(input.acknowledged()),
-        "Confirm this explicit synthetic data refresh");
+        "Confirm this explicit read-only data refresh");
     var a = accounts.get(input.accountHandle());
-    check(a != null, "Select an authorized sandbox account");
+    check(a != null, "Select an authorized bank account");
     var target =
         ledger.position(LocalDate.now(ZoneId.of("Europe/Dublin"))).accounts().stream()
             .filter(v -> v.id().equals(input.ledgerAccountId()))
@@ -291,7 +318,11 @@ public class SandboxService {
             && !input.to().isAfter(LocalDate.now(ZoneId.of("Europe/Dublin")))
             && java.time.temporal.ChronoUnit.DAYS.between(input.from(), input.to()) <= 90,
         "Choose at most 90 days from the ledger opening date through today");
-    check(fetches++ < 20, "Sandbox session refresh limit reached; reconnect later");
+    if (gateway.isProduction() && !Instant.now().isBefore(fetchWindow.plusSeconds(86400))) {
+      fetchWindow = Instant.now(); fetches = 0;
+    }
+    check(fetches++ < (gateway.isProduction() ? 4 : 20), "Refresh limit reached; wait until the next daily window");
+    persist();
     Instant deadline = Instant.now().plusSeconds(40);
     try {
       active(a.uid());
@@ -352,7 +383,7 @@ public class SandboxService {
           String value = amount(r.path("transaction_amount"), false);
           String direction = text(r, "credit_debit_indicator", 4);
           check(Set.of("CRDT", "DBIT").contains(direction), "Invalid transaction direction");
-          String description = "Sandbox activity";
+          String description = gateway.isProduction() ? "Bank activity" : "Sandbox activity";
           var remittance = r.path("remittance_information");
           if (remittance.isArray() && !remittance.isEmpty())
             description = remittance.get(0).asText("Sandbox activity");
@@ -389,7 +420,7 @@ public class SandboxService {
               a.identity(),
               new LedgerService.PreviewInput(
                   csv.toString(),
-                  "Enable Banking SANDBOX; fetched "
+                  "Enable Banking " + gateway.environment() + "; fetched "
                       + Instant.now()
                       + "; "
                       + input.from()
@@ -397,28 +428,29 @@ public class SandboxService {
                       + input.to()));
       lastSuccess = Instant.now();
       lastError = "";
+      persist();
       return new Fetched(
           preview,
           List.copyOf(balances),
           List.of(
-              "Synthetic SANDBOX evidence only; review every row and transfer classification before"
-                  + " approval.",
+              (gateway.isProduction() ? "Bank evidence; " : "Synthetic SANDBOX evidence only; ")
+                  + "review every row and transfer classification before approval.",
               "Balances are informational evidence with their provider dates/types. They do not"
                   + " automatically reconcile or change cash.",
               "Only stable entry references are imported. Date history can be incomplete; reconcile"
                   + " against the booked statement."),
           lastSuccess);
     } catch (IllegalArgumentException e) {
-      lastError = "Sandbox refresh failed; no partial activity was imported";
+      lastError = "Bank refresh failed; no partial activity was imported";
       throw e;
     } catch (Exception e) {
-      lastError = "Sandbox refresh failed; no partial activity was imported";
+      lastError = "Bank refresh failed; no partial activity was imported";
       throw new IllegalArgumentException(lastError);
     }
   }
 
   private String amount(JsonNode value, boolean signed) {
-    check(value.path("currency").asText().equals("EUR"), "Only EUR sandbox amounts are supported");
+    check(value.path("currency").asText().equals("EUR"), "Only EUR bank amounts are supported");
     String amount = text(value, "amount", 40);
     check(
         amount.matches((signed ? "-?" : "") + "(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,2})?"),
@@ -429,6 +461,7 @@ public class SandboxService {
   public synchronized Status disconnect() {
     pending = null;
     blocked = true;
+    persist();
     if (sessionId != null) {
       gateway.request("DELETE", "/sessions/" + sessionId, null);
     }
@@ -445,6 +478,7 @@ public class SandboxService {
     reauthorize = false;
     lastError =
         "Local connection cleared. Provider revocation is separate if disconnect did not succeed.";
+    persist();
     return status();
   }
 }

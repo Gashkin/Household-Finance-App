@@ -1,0 +1,62 @@
+{
+  "work_id": "GBD-14",
+  "page_id": "418d3419-fef0-8180-8864-ca465d4eff7a",
+  "branch": "story/14-delivery",
+  "artifacts": [
+    {
+      "path": "backend/src/main/java/com/householdfinance/bank/ConnectionStore.java",
+      "contains": [
+        "AES/GCM/NoPadding",
+        "ATOMIC_MOVE"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/householdfinance/bank/SandboxGateway.java",
+      "contains": [
+        "onlyAis",
+        "PRODUCTION"
+      ]
+    },
+    {
+      "path": "backend/src/test/java/com/householdfinance/bank/ProductionProtocolTest.java",
+      "contains": [
+        "dailyLimitCannotBeResetByRestartOrReconnect",
+        "failedRevocationIsDurablyBlockedAndRetryable"
+      ]
+    },
+    {
+      "path": "frontend/e2e/production-connection.spec.ts",
+      "contains": [
+        "packaged single-origin production protocol simulation"
+      ]
+    },
+    {
+      "path": "windows/Install.ps1",
+      "contains": [
+        "active.next",
+        "BACKUP VERIFIED"
+      ]
+    },
+    {
+      "path": "windows/Readiness.ps1",
+      "contains": [
+        "Test-EncryptedDevice",
+        "ReadinessCommit"
+      ]
+    },
+    {
+      "path": "windows/Test-Release.ps1",
+      "contains": [
+        "DPAPI",
+        "Packaged Windows runtime"
+      ]
+    },
+    {
+      "path": "product/stories/persistent-aib-instance.md",
+      "contains": [
+        "No real AIB consent",
+        "Trust boundaries"
+      ]
+    }
+  ]
+}

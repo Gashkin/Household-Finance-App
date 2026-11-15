@@ -29,7 +29,7 @@ export type SandboxFetched = {
 export async function sandbox<T>(path: string, body?: unknown): Promise<T> {
   let response: Response;
   try {
-    response = await fetch("/api/bank-sandbox/" + path, {
+    response = await fetch("/api/banking/" + path, {
       method: body === undefined ? "GET" : "POST",
       headers:
         body === undefined ? undefined : { "Content-Type": "application/json" },
@@ -38,7 +38,7 @@ export async function sandbox<T>(path: string, body?: unknown): Promise<T> {
     });
   } catch {
     throw Error(
-      "Sandbox service unavailable; no activity has been approved. Reload status before retrying.",
+      "Bank service unavailable; no activity has been approved. Reload status before retrying.",
     );
   }
   if (!response.ok) {
@@ -50,8 +50,8 @@ export async function sandbox<T>(path: string, body?: unknown): Promise<T> {
     }
     throw Error(
       response.status >= 500
-        ? "Sandbox service unavailable; reconnect after checking local setup."
-        : message || "Sandbox request failed",
+        ? "Bank service unavailable; reconnect after checking local setup."
+        : message || "Bank request failed",
     );
   }
   return response.json();
@@ -76,7 +76,7 @@ export function completeSandboxCallback() {
   callback = null;
   completion = value.denied
     ? Promise.reject(
-        Error("Sandbox consent was cancelled. Start a new connection."),
+        Error("Bank consent was cancelled. Start a new connection."),
       )
     : sandbox<SandboxStatus>("complete", {
         state: value.state,

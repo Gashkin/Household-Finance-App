@@ -107,16 +107,18 @@ export default function BankSandboxPanel({
       onPreview(value);
     });
   }
+  const production = status?.environment === "PRODUCTION";
   return (
     <section
       className="ledger-card"
-      aria-label="Enable Banking sandbox connection"
+      aria-label={production ? "AIB bank connection" : "Enable Banking sandbox connection"}
     >
-      <h3>Enable Banking sandbox connection</h3>
+      <h3>{production ? "AIB bank connection" : "Enable Banking sandbox connection"}</h3>
       <p>
-        Read-only connection to synthetic <strong>Mock ASPSP</strong> accounts.
-        Production applications, real AIB access and payment operations are
-        blocked.
+        {production ? <>Read-only balances and transactions through Enable Banking for your own AIB accounts.
+          Choose the accounts you authorise at the bank. No payments. Credit-card coverage is unverified.
+          Manual and CSV entry remain available.</> : <>Read-only connection to synthetic <strong>Mock ASPSP</strong> accounts.
+          Production applications, real AIB access and payment operations are blocked.</>}
       </p>
       {error && <p role="alert">{error}</p>}
       {!status ? (
@@ -140,9 +142,7 @@ export default function BankSandboxPanel({
           )}
           <p>
             Registered redirect must be exactly <code>{status.callback}</code>.
-            Credentials and provider session references remain server-side and
-            are not saved in backups or browser storage. Restarting the backend
-            requires reconnecting.
+            {production ? "Connection references stay encrypted on this device across restarts and are excluded from recovery backups. New-device recovery requires reconnecting. Refresh is manual, limited to four attempts per day across the connection. No background refresh or AI forwarding." : "Credentials and provider session references remain server-side and are not saved in backups or browser storage. Restarting the backend requires reconnecting."}
           </p>
           <fieldset
             disabled={busy || !status.configured}
@@ -154,13 +154,12 @@ export default function BankSandboxPanel({
                 checked={consent}
                 onChange={(e) => setConsent(e.target.checked)}
               />
-              I will use only synthetic sandbox accounts and allow read-only
-              account, balance and transaction access
+              {production ? "I authorise Enable Banking to access only my selected AIB accounts, balances and transactions, and retain reviewed records locally" : "I will use only synthetic sandbox accounts and allow read-only account, balance and transaction access"}
             </label>
             {status.state === "DISCONNECTED" ? (
               <>
                 <button type="button" disabled={!consent} onClick={load}>
-                  Check sandbox application and load mock banks
+                  {production ? "Check AIB production application" : "Check sandbox application and load mock banks"}
                 </button>
                 {banks.length > 0 && (
                   <>
@@ -178,7 +177,7 @@ export default function BankSandboxPanel({
                       </select>
                     </label>
                     <button type="button" disabled={!consent} onClick={connect}>
-                      Connect to Enable Banking sandbox
+                      {production ? "Connect my AIB accounts" : "Connect to Enable Banking sandbox"}
                     </button>
                   </>
                 )}
@@ -186,7 +185,7 @@ export default function BankSandboxPanel({
             ) : (
               <>
                 <label>
-                  Authorized sandbox account
+                  {production ? "Authorized bank account" : "Authorized sandbox account"}
                   <select
                     value={account}
                     onChange={(e) => {
@@ -202,13 +201,12 @@ export default function BankSandboxPanel({
                   </select>
                 </label>
                 <p>
-                  Map the selected synthetic account to the local ledger
-                  selected below. Create a matching cash/debt ledger with dated
+                  Map the selected {production ? "bank" : "synthetic"} account to the local ledger selected below. Create a matching cash/debt ledger with dated
                   opening evidence first. Reconnecting must reuse that same
                   ledger.
                 </p>
                 <label>
-                  Sandbox activity from
+                  {production ? "Bank activity from" : "Sandbox activity from"}
                   <input
                     type="date"
                     value={from}
@@ -218,7 +216,7 @@ export default function BankSandboxPanel({
                   />
                 </label>
                 <label>
-                  Sandbox activity through
+                  {production ? "Bank activity through" : "Sandbox activity through"}
                   <input
                     type="date"
                     value={to}
@@ -237,7 +235,7 @@ export default function BankSandboxPanel({
                   }
                   onClick={fetchPreview}
                 >
-                  Fetch sandbox activity for review
+                  {production ? "Fetch bank activity for review" : "Fetch sandbox activity for review"}
                 </button>
                 <button
                   type="button"
@@ -249,7 +247,7 @@ export default function BankSandboxPanel({
                     })
                   }
                 >
-                  Disconnect and revoke sandbox session
+                  {production ? "Disconnect and revoke bank session" : "Disconnect and revoke sandbox session"}
                 </button>
                 <label className="ledger-check">
                   <input
@@ -276,7 +274,7 @@ export default function BankSandboxPanel({
                     })
                   }
                 >
-                  Forget local sandbox connection only
+                  {production ? "Forget local bank connection only" : "Forget local sandbox connection only"}
                 </button>
               </>
             )}
@@ -289,8 +287,8 @@ export default function BankSandboxPanel({
             . {status.lastError}
           </p>
           {balance && (
-            <div aria-label="Sandbox balance evidence">
-              <h4>Sandbox balance evidence</h4>
+            <div aria-label={production ? "Bank balance evidence" : "Sandbox balance evidence"}>
+              <h4>{production ? "Bank balance evidence" : "Sandbox balance evidence"}</h4>
               {balance.balances.map((b, i) => (
                 <p key={i}>
                   {b.type}: €{b.amountEuro} · {b.date}
@@ -310,7 +308,8 @@ export default function BankSandboxPanel({
           )}
         </>
       )}
-      {busy && <p role="status">Connecting to the sandbox provider…</p>}
+      {production && <p>Disconnect revokes this API session; use your bank or <a href="https://enablebanking.com/data-sharing-consents/" target="_blank" rel="noreferrer">Enable Banking consent controls</a> to terminate wider consent. Forgetting keeps approved records and backups. To erase local records, stop the app and use Remove-LocalData.ps1 from your installed release. Delete backup copies separately.</p>}
+      {busy && <p role="status">Connecting to the bank provider…</p>}
     </section>
   );
 }

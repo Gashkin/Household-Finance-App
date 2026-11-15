@@ -79,7 +79,7 @@ public final class SyntheticProvider implements AutoCloseable {
                 "active",
                 true,
                 "services",
-                List.of("AIS", "PIS"),
+                environment.equals("PRODUCTION") && !mode.equals("pis") ? List.of("AIS") : List.of("AIS", "PIS"),
                 "redirect_urls",
                 List.of(callback));
       else if (path.equals("/aspsps"))
@@ -88,7 +88,7 @@ public final class SyntheticProvider implements AutoCloseable {
                 "aspsps",
                 List.of(
                     Map.of(
-                        "name", "Mock ASPSP", "country", "FI", "maximum_consent_validity", 3600)));
+                        "name", environment.equals("PRODUCTION") ? "AIB" : "Mock ASPSP", "country", environment.equals("PRODUCTION") ? "IE" : "FI", "psu_types", List.of("personal"), "maximum_consent_validity", 15552000)));
       else if (path.equals("/auth")) {
         auth = json.readTree(ex.getRequestBody());
         state = auth.path("state").asText();

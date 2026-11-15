@@ -9,7 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/bank-sandbox")
+@RequestMapping({"/api/bank-sandbox", "/api/banking"})
 public class SandboxController {
   private final SandboxService service;
   private final WorkspaceFilter workspace;
