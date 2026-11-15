@@ -4,7 +4,7 @@ Canonical story: https://www.notion.so/418d3419fef081808864ca465d4eff7a
 
 ## Release status and boundaries
 
-**Production release HOLD.** Packaged manifests set `productionEligible=false`. Both readiness and an already-enabled local configuration are rejected before key provisioning or runtime launch. The earlier local attestation cannot clear the amended security requirements. Removing this source-controlled hold requires the evidence and independent reviews below; editing a manifest locally is not authorisation. Manual/CSV synthetic verification remains available.
+**GBD-14 production release HOLD.** This release is unconditionally production-disabled in reviewed executable source; `Assert-ProductionReleaseCleared` rejects readiness and previously enabled configurations regardless of any `manifest.json` edit. The packaged manifest also records `productionEligible=false`, but unsigned manifest metadata is not an authorisation boundary. A separate GBD-15 PR must implement and verify a genuinely authorised production deployment boundary before enabling any AIB connection. Manual/CSV remains available. Neither locally changing a manifest nor typing an attestation clears the hold.
 
 Preparation is synthetic. No real AIB consent, provider production activation, account coverage, Windows device protection or successful live retrieval is claimed by code or CI. The story remains open until controlled Windows/owner validation, human merge and main verification. The instance serves the compiled React app and authenticated backend together on `http://127.0.0.1:8080`, without Node, Maven, a checkout or Java installation on the operator's machine. The release includes a Windows runtime.
 
@@ -50,7 +50,9 @@ AIB → HTTPS Enable Banking AIS → exact HTTPS backend allowlist → bounded i
 
 Synthetic protocol tests cover production metadata, payment rejection, signed transport, callback binding, partial pagination, duplicates, encrypted restart, tamper/wrong-key failure, persistent revocation failure and refresh budget. Existing file-backed recovery tests cover financial plans/ledger backup compatibility. Browser tests run a test-classpath-only production simulator against the compiled single-origin app; no runtime transport override is packaged. Windows hosted CI packages a runtime and verifies ACL/DPAPI, startup, shell/callback and authentication with synthetic data. Hosted CI cannot attest the owner's actual Windows disk, provider registration, registry entry or live AIB accounts.
 
-## Amended security completion — evidence required to remove the hold
+
+**Story boundary (15 November 2026):** [GBD-14](https://www.notion.so/418d3419fef081808864ca465d4eff7a) delivers an installable, synthetic-tested application with banking permanently disabled by its code-level hold. [GBD-15](https://www.notion.so/419d3419fef08126ba7ce9278f572384) owns production identity isolation, repository exposure containment, provider-entitlement proof, device provisioning and owner-only AIB activation. The historical requirements below remain relevant to GBD-15, not a reason to claim live banking readiness for this PR. GBD-14 still requires final code review and Windows CI before human merge.
+## GBD-15 activation security — not delivered by GBD-14
 
 ### Windows identity boundary
 
