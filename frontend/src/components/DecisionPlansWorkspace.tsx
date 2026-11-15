@@ -13,6 +13,11 @@ const today = () =>
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+const nextReview = () => {
+  const date = new Date(today() + "T12:00:00Z");
+  date.setUTCDate(date.getUTCDate() + 7);
+  return date.toISOString().slice(0, 10);
+};
 const fresh = (): PlanContent => ({
   title: "",
   goal: "",
@@ -80,7 +85,7 @@ export default function DecisionPlansWorkspace({
   const [notice, setNotice] = useState("");
   const [optionId, setOptionId] = useState("");
   const [rationale, setRationale] = useState("");
-  const [reviewOn, setReviewOn] = useState(today);
+  const [reviewOn, setReviewOn] = useState(nextReview);
   const [confirmed, setConfirmed] = useState(false);
   const [actions, setActions] = useState([
     { id: itemId(), label: "", dueOn: today() },
@@ -95,7 +100,7 @@ export default function DecisionPlansWorkspace({
     setConfirmed(false);
     setOutcomes({});
     setActions([{ id: itemId(), label: "", dueOn: today() }]);
-    setReviewOn(today());
+    setReviewOn(nextReview());
     setError("");
     setNotice("");
   }
@@ -225,6 +230,7 @@ export default function DecisionPlansWorkspace({
               <textarea
                 maxLength={2000}
                 required
+                aria-label="What are you trying to achieve?"
                 value={draft.goal}
                 onChange={(e) => edit({ ...draft, goal: e.target.value })}
               />
@@ -237,6 +243,7 @@ export default function DecisionPlansWorkspace({
                   <input
                     required
                     maxLength={500}
+                    aria-label={`Evidence ${i + 1} source`}
                     value={e.source}
                     onChange={(v) =>
                       edit({
@@ -253,6 +260,7 @@ export default function DecisionPlansWorkspace({
                   <input
                     required
                     type="date"
+                    aria-label={`Evidence ${i + 1} observed on`}
                     value={e.observedOn}
                     onChange={(v) =>
                       edit({
@@ -271,6 +279,7 @@ export default function DecisionPlansWorkspace({
                   <textarea
                     required
                     maxLength={2000}
+                    aria-label={`Evidence ${i + 1} summary`}
                     value={e.summary}
                     onChange={(v) =>
                       edit({
@@ -287,6 +296,7 @@ export default function DecisionPlansWorkspace({
                   <textarea
                     required
                     maxLength={1000}
+                    aria-label={`Evidence ${i + 1} assumptions and uncertainty`}
                     value={e.uncertainty}
                     onChange={(v) =>
                       edit({
@@ -351,6 +361,7 @@ export default function DecisionPlansWorkspace({
                     <input
                       required
                       maxLength={120}
+                      aria-label={`Option ${i + 1} name`}
                       value={o.label}
                       onChange={(e) =>
                         edit({
@@ -367,6 +378,7 @@ export default function DecisionPlansWorkspace({
                     <textarea
                       required
                       maxLength={2000}
+                      aria-label={`Option ${i + 1} impact`}
                       value={o.impact}
                       onChange={(e) =>
                         edit({
@@ -385,6 +397,7 @@ export default function DecisionPlansWorkspace({
                     <textarea
                       required
                       maxLength={1000}
+                      aria-label={`Option ${i + 1} uncertainty`}
                       value={o.uncertainty}
                       onChange={(e) =>
                         edit({
@@ -501,6 +514,7 @@ export default function DecisionPlansWorkspace({
               <textarea
                 required
                 maxLength={2000}
+                aria-label="Why this choice?"
                 value={rationale}
                 onChange={(e) => setRationale(e.target.value)}
               />
@@ -521,6 +535,7 @@ export default function DecisionPlansWorkspace({
                   <input
                     required
                     maxLength={500}
+                    aria-label={`Follow-up ${i + 1}`}
                     value={a.label}
                     onChange={(e) =>
                       setActions((items) =>
@@ -536,6 +551,7 @@ export default function DecisionPlansWorkspace({
                   <input
                     required
                     type="date"
+                    aria-label={`Follow-up ${i + 1} due`}
                     value={a.dueOn}
                     onChange={(e) =>
                       setActions((items) =>
@@ -633,6 +649,7 @@ export default function DecisionPlansWorkspace({
                       <textarea
                         required
                         maxLength={2000}
+                        aria-label={`Observed outcome for ${a.label}`}
                         value={outcomes[a.id] ?? ""}
                         onChange={(e) =>
                           setOutcomes((items) => ({

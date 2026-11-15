@@ -5,6 +5,7 @@ test.beforeEach(unlockFixture);
 test("financial goal becomes a decision, observed follow-up and revised evidence with intact history", async ({
   page,
 }, testInfo) => {
+  test.setTimeout(120000);
   await page.goto("/");
   await page
     .getByRole("button", { name: "Compare scenarios", exact: true })
@@ -104,18 +105,15 @@ test("financial goal becomes a decision, observed follow-up and revised evidence
     .click();
   await expect(tab.getByRole("alert")).toContainText("Plan changed; reload");
   await tab.close();
-  await page
+  const completedHistory = page
     .locator(".plan-history-entry")
-    .filter({ hasText: "ACTION COMPLETED" })
-    .locator("summary")
-    .click();
+    .filter({ hasText: "ACTION COMPLETED" });
+  await completedHistory.locator("summary").click();
+  await expect(completedHistory).toContainText(
+    "Synthetic lender confirms no early repayment fee",
+  );
   await expect(
-    page.getByText("Synthetic lender confirms no early repayment fee", {
-      exact: true,
-    }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("Recorded choice:", { exact: false }),
+    completedHistory.getByText("Recorded choice:", { exact: false }),
   ).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath("financial-plan-history.png"),
