@@ -179,6 +179,7 @@ export default function DecisionPlansWorkspace({
           <label>
             Saved plans
             <select
+              aria-label="Saved plans"
               value={selected?.id ?? ""}
               onChange={(e) =>
                 load(saved.find((p) => p.id === e.target.value) ?? null)
@@ -497,6 +498,7 @@ export default function DecisionPlansWorkspace({
             <label>
               Chosen option
               <select
+                aria-label="Chosen option"
                 required
                 value={optionId}
                 onChange={(e) => setOptionId(e.target.value)}
