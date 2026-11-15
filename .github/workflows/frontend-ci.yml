@@ -30,6 +30,9 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+      - name: Check frontend dependency advisories
+        working-directory: frontend
+        run: npm audit --audit-level=high
       - name: Run frontend domain tests
         working-directory: frontend
         shell: bash

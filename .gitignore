@@ -33,6 +33,10 @@ backend/target/
 
 # Generated frontend build output
 frontend/dist/
+frontend/node_modules/
+*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
 
 # Never commit household runtime data or personal source workbooks
 /data/
