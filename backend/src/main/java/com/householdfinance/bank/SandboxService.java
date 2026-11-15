@@ -300,6 +300,7 @@ public class SandboxService {
       check(remoteExpiry.isAfter(Instant.now()), "Bank consent expired");
     } catch (DateTimeException e) {
       reauthorize = true;
+      persist(); // Keep the fail-closed state after restart, not just in memory.
       throw new IllegalArgumentException("Invalid bank session expiry");
     }
   }
