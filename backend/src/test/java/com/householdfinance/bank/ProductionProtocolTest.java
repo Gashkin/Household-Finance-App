@@ -44,6 +44,11 @@ class ProductionProtocolTest {
     var target=ledger.create(new LedgerService.AccountInput("Synthetic AIB "+UUID.randomUUID(),"CASH",today,"1000","Synthetic booked statement"));
     return new SandboxService.Fetch(status.accounts().getFirst().handle(),target.id(),today,today,true);
   }
+  @Test void realRuntimeGatewayCannotBeEnabledByDirectEnvironmentProvisioning() {
+    assertThrows(IllegalArgumentException.class, () -> new SandboxGateway(
+        false, "", "", "http://127.0.0.1:8080/bank/callback",
+        new ObjectMapper(), config));
+  }
   @Test void persistentProductionReferencesSurviveRestartWithoutPlaintextOrImplicitApproval() throws Exception {
     var status=connect(); var request=input(status);
     var fetched=service.fetch(request);
