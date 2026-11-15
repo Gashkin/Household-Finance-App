@@ -88,18 +88,22 @@ public class WorkspaceFilter extends OncePerRequestFilter {
         response.setHeader("Cache-Control", "no-store");
         response.setHeader("X-Content-Type-Options", "nosniff");
         response.setHeader("X-Frame-Options", "DENY");
+        response.setHeader("Referrer-Policy", "no-referrer");
+        response.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
         if (!Set.of("127.0.0.1", "::1", "0:0:0:0:0:0:0:1").contains(request.getRemoteAddr())) { deny(response, 403, "Loopback connection required"); return; }
         String path = request.getRequestURI();
         // Reject DNS rebinding hosts even if a caller supplies no Origin header.
         if (!Set.of("localhost", "127.0.0.1", "[::1]", "::1").contains(request.getServerName())) { deny(response, 403, "Local workspace host required"); return; }
         String origin = request.getHeader("Origin");
         String fetchSite = request.getHeader("Sec-Fetch-Site");
-        if ((origin != null && !allowedOrigin(origin, request)) || "cross-site".equals(fetchSite)) { deny(response, 403, "Untrusted workspace origin"); return; }
+        boolean callbackNavigation = path.equals("/bank/callback") && request.getMethod().equals("GET") && "navigate".equals(request.getHeader("Sec-Fetch-Mode")) && "document".equals(request.getHeader("Sec-Fetch-Dest"));
+        if ((origin != null && !allowedOrigin(origin, request)) || ("cross-site".equals(fetchSite) && !callbackNavigation)) { deny(response, 403, "Untrusted workspace origin"); return; }
         if (path.equals("/health") && request.getMethod().equals("GET")) { chain.doFilter(request,response); return; }
         if (path.startsWith("/h2-console")) { deny(response, 404, "Not found"); return; }
         boolean safe = Set.of("GET", "HEAD").contains(request.getMethod());
         if (!safe && !"1".equals(request.getHeader("X-Workspace-Request"))) { deny(response, 403, "Workspace request header required"); return; }
-        boolean publicRoute = (path.equals("/api/workspace/status") && request.getMethod().equals("GET")) || (path.equals("/api/workspace/unlock") && request.getMethod().equals("POST"));
+        boolean shell = request.getMethod().equals("GET") && (path.equals("/") || path.equals("/index.html") || path.equals("/bank/callback") || path.matches("/assets/[A-Za-z0-9_-]+\\.(?:js|css|svg)"));
+        boolean publicRoute = shell || (path.equals("/api/workspace/status") && request.getMethod().equals("GET")) || (path.equals("/api/workspace/unlock") && request.getMethod().equals("POST"));
         if (!publicRoute && (!configured || !authenticated(request))) { response.setHeader("X-Workspace-Locked", "1"); deny(response, configured ? 401 : 503, configured ? "Unlock the workspace" : "Configure WORKSPACE_PASSWORD (16–256 characters) and restart"); return; }
         var guard = safe ? lock.readLock() : lock.writeLock();
         guard.lock();

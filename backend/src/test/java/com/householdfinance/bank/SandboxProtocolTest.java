@@ -178,7 +178,8 @@ class SandboxProtocolTest {
     assertThrows(IllegalArgumentException.class, () -> service.disconnect());
     assertEquals("REVOCATION_PENDING", service.status().state());
     assertThrows(IllegalArgumentException.class, () -> service.fetch(request));
-    assertEquals("DISCONNECTED", service.forget().state());
+    assertThrows(IllegalArgumentException.class, () -> service.forget());
+    assertEquals("DISCONNECTED", service.confirmExternalRevocation(true).state());
   }
 
   @Test
@@ -213,6 +214,7 @@ class SandboxProtocolTest {
   }
 
   @Test
+  @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.LINUX)
   void privateKeyFileMustBeOwnerOnlyAndOutsideRepository() throws Exception {
     var file = java.nio.file.Files.createTempFile("synthetic-signing-", ".pem");
     try {
@@ -303,6 +305,13 @@ class SandboxProtocolTest {
   @Test
   void unauthenticatedHttpAndMissingCsrfCannotOperateConnector() throws Exception {
     mvc.perform(get("/api/bank-sandbox/status")).andExpect(status().isUnauthorized());
+    mvc.perform(get("/api/banking/status")).andExpect(status().isUnauthorized());
+    mvc.perform(get("/bank/callback?state=synthetic-state&code=synthetic-code")
+        .header("Sec-Fetch-Site","cross-site").header("Sec-Fetch-Mode","navigate").header("Sec-Fetch-Dest","document"))
+        .andExpect(status().isOk()).andExpect(forwardedUrl("/index.html"))
+        .andExpect(header().string("Referrer-Policy","no-referrer"));
+    mvc.perform(get("/api/banking/status").header("Sec-Fetch-Site","cross-site").header("Sec-Fetch-Mode","navigate").header("Sec-Fetch-Dest","document"))
+        .andExpect(status().isForbidden());
     mvc.perform(post("/api/bank-sandbox/start").contentType("application/json").content("{}"))
         .andExpect(status().isForbidden());
   }

@@ -51,7 +51,7 @@ public final class SyntheticProvider implements AutoCloseable {
   }
 
   Map<String, Object> access() {
-    return Map.of("valid_until", mode.equals("expired") ? Instant.EPOCH.toString() : until());
+    return Map.of("valid_until", mode.equals("bad-expiry") ? "not-an-instant" : mode.equals("expired") ? Instant.EPOCH.toString() : until());
   }
 
   void handle(HttpExchange ex) throws java.io.IOException {
@@ -71,15 +71,19 @@ public final class SyntheticProvider implements AutoCloseable {
         ex.getResponseBody().write(html);
         return;
       }
+      if (path.equals("/sessions") && mode.equals("session-exchange-fail")) { ex.sendResponseHeaders(503,-1); return; }
+      if (path.equals("/sessions") && mode.equals("session-bad-json")) {
+        byte[] invalid="not-json".getBytes(StandardCharsets.UTF_8); ex.sendResponseHeaders(200,invalid.length); ex.getResponseBody().write(invalid); return;
+      }
       if (path.equals("/application"))
         result =
             Map.of(
                 "environment",
                 environment,
                 "active",
-                true,
+                !mode.equals("inactive"),
                 "services",
-                List.of("AIS", "PIS"),
+                mode.equals("pis-only") ? List.of("PIS") : mode.equals("unknown-scope") ? List.of("AIS", "UNKNOWN") : mode.equals("empty-scope") ? List.of() : environment.equals("PRODUCTION") && !mode.equals("pis") ? List.of("AIS") : List.of("AIS", "PIS"),
                 "redirect_urls",
                 List.of(callback));
       else if (path.equals("/aspsps"))
@@ -88,7 +92,7 @@ public final class SyntheticProvider implements AutoCloseable {
                 "aspsps",
                 List.of(
                     Map.of(
-                        "name", "Mock ASPSP", "country", "FI", "maximum_consent_validity", 3600)));
+                        "name", environment.equals("PRODUCTION") ? "AIB" : "Mock ASPSP", "country", environment.equals("PRODUCTION") ? "IE" : "FI", "psu_types", List.of("personal"), "maximum_consent_validity", 15552000)));
       else if (path.equals("/auth")) {
         auth = json.readTree(ex.getRequestBody());
         state = auth.path("state").asText();
@@ -100,7 +104,7 @@ public final class SyntheticProvider implements AutoCloseable {
         result =
             Map.of(
                 "session_id",
-                session,
+                mode.equals("malformed-session") ? "not-a-session-identifier" : session,
                 "access",
                 access(),
                 "accounts",

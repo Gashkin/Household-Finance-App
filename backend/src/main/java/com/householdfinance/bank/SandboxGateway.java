@@ -19,10 +19,11 @@ import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.*;
 import org.springframework.stereotype.Component;
 
-/** Sandbox only, closed network allowlist, no payment API or production override. */
+/** Closed AIS allowlist; sandbox and explicitly provisioned production are mutually exclusive. */
 @Component
 public class SandboxGateway {
   private final boolean enabled;
+  private ProductionConfig production = ProductionConfig.disabled();
   private final String appId;
   private final URI callback, base;
   private final Supplier<PrivateKey> signingKey;
@@ -39,14 +40,22 @@ public class SandboxGateway {
       @Value("${bank.sandbox.app-id:}") String id,
       @Value("${bank.sandbox.key-path:}") String path,
       @Value("${bank.sandbox.callback:http://127.0.0.1:5173/bank/callback}") String callback,
-      ObjectMapper json) {
+      ObjectMapper json, ProductionConfig production) {
     this(
-        enabled,
-        id,
-        callback,
+        production.enabled() || enabled,
+        production.enabled() ? production.appId() : id,
+        production.enabled() ? production.callback() : callback,
         URI.create("https://api.enablebanking.com"),
-        () -> loadPrivateKey(path),
+        () -> loadPrivateKey(production.enabled() ? production.keyPath() : path),
         json);
+    if (production.enabled()) {
+      // GBD-14 must also reject a direct Java launch that bypasses Start.ps1.
+      // Test-only synthetic gateways use the package-private injected transport,
+      // not this runtime Spring constructor. GBD-15 owns production activation.
+      throw new IllegalArgumentException("GBD-14 production release hold: live banking is disabled");
+    }
+    this.production = production;
+    if (production.enabled()) new ConnectionStore(production);
   }
 
   // Package-private test transport: not exposed as runtime configuration or included in the UI.
@@ -76,6 +85,16 @@ public class SandboxGateway {
         && !("http".equals(base.getScheme()) && "127.0.0.1".equals(base.getHost())))
       throw new IllegalArgumentException("Unsupported test transport");
   }
+
+  SandboxGateway(ProductionConfig config, URI base, Supplier<PrivateKey> key, ObjectMapper json) {
+    this(true, config.appId(), config.callback(), base, key, json);
+    this.production = config;
+    new ConnectionStore(config);
+  }
+
+  ProductionConfig production() { return production; }
+  boolean isProduction() { return production.enabled(); }
+  String environment() { return isProduction() ? "PRODUCTION" : "SANDBOX"; }
 
   public boolean configured() {
     return enabled && !appId.isBlank();
@@ -185,7 +204,7 @@ public class SandboxGateway {
             || (method.equals("POST") && Set.of("/auth", "/sessions").contains(plain))
             || (method.equals("DELETE") && plain.matches("/sessions/[0-9a-f-]{36}"));
     if (!allowed || path.contains("#") || path.contains(".."))
-      throw new IllegalArgumentException("Only sandbox AIS operations are allowed");
+      throw new IllegalArgumentException("Only bank AIS operations are allowed");
     CompletableFuture<HttpResponse<byte[]>> future = null;
     try {
       var builder =
@@ -204,7 +223,7 @@ public class SandboxGateway {
         return json.createObjectNode();
       if (response.statusCode() < 200 || response.statusCode() >= 300)
         throw new IllegalArgumentException(
-            "Sandbox provider request failed (HTTP "
+            "Bank provider request failed (HTTP "
                 + response.statusCode()
                 + "); no ledger activity was imported");
       if (response.body().length == 0) return json.createObjectNode();
@@ -217,7 +236,7 @@ public class SandboxGateway {
       if (e instanceof InterruptedException) Thread.currentThread().interrupt();
       if (future != null) future.cancel(true);
       throw new IllegalArgumentException(
-          "Sandbox provider unavailable or response invalid/too large; no partial ledger import");
+          "Bank provider unavailable or response invalid/too large; no partial ledger import");
     }
   }
 
@@ -227,13 +246,14 @@ public class SandboxGateway {
     for (var service : app.path("services")) if (service.asText().equals("AIS")) ais = true;
     boolean redirect = false;
     for (var url : app.path("redirect_urls")) if (callback().equals(url.asText())) redirect = true;
-    if (!app.path("environment").asText().equals("SANDBOX")
+    boolean onlyAis = app.path("services").isArray() && app.path("services").size() == 1 && ais;
+    if (!app.path("environment").asText().equals(environment())
+        || (isProduction() && (!production.readiness() || !onlyAis))
         || !app.path("active").asBoolean(false)
         || !ais
         || !redirect)
       throw new IllegalArgumentException(
-          "An active SANDBOX AIS application with this exact callback URL is required; production"
-              + " is blocked");
+          "An active " + environment() + " AIS application with this exact callback URL is required; production requires AIS-only registration and local readiness");
   }
 
   String safeRedirect(String value) {
@@ -249,12 +269,13 @@ public class SandboxGateway {
             && "127.0.0.1".equals(uri.getHost())
             && uri.getPort() == base.getPort();
     if (uri.getUserInfo() != null
-        || ("auth.enablebanking.com".equals(uri.getHost()) && !uri.getPath().startsWith("/ais/"))
+        || ("auth.enablebanking.com".equals(uri.getHost()) && !"/ais/start".equals(uri.getRawPath()))
         || uri.getFragment() != null
         || (!mock
             && !("https".equals(uri.getScheme())
-                && Set.of("auth.enablebanking.com", "tilisy-sandbox.enablebanking.com")
-                    .contains(Objects.toString(uri.getHost(), "")))))
+                && (isProduction() ? Set.of("auth.enablebanking.com") : Set.of("auth.enablebanking.com", "tilisy-sandbox.enablebanking.com"))
+                    .contains(Objects.toString(uri.getHost(), ""))
+                && (uri.getPort() == -1 || uri.getPort() == 443))))
       throw new IllegalArgumentException("Untrusted sandbox consent redirect");
     return value;
   }

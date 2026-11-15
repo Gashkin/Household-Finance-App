@@ -9,7 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/bank-sandbox")
+@RequestMapping({"/api/bank-sandbox", "/api/banking"})
 public class SandboxController {
   private final SandboxService service;
   private final WorkspaceFilter workspace;
@@ -27,6 +27,12 @@ public class SandboxController {
         .setCoercion(
             com.fasterxml.jackson.databind.cfg.CoercionInputShape.String,
             com.fasterxml.jackson.databind.cfg.CoercionAction.Fail);
+  }
+
+  @ModelAttribute
+  public void environmentGuard(HttpServletRequest request) {
+    if (request.getRequestURI().startsWith("/api/bank-sandbox") && service.status().environment().equals("PRODUCTION"))
+      throw new IllegalArgumentException("Legacy sandbox routes are disabled in production");
   }
 
   private <T> T body(HttpServletRequest request, Class<T> type) throws IOException {
@@ -83,6 +89,11 @@ public class SandboxController {
       throw new IllegalArgumentException(
           "Acknowledge that local forgetting does not revoke provider consent");
     return service.forget();
+  }
+
+  @PostMapping("/external-revocation")
+  public SandboxService.Status externalRevocation(HttpServletRequest request) throws IOException {
+    return service.confirmExternalRevocation(body(request, Forget.class).acknowledged());
   }
 
   @ExceptionHandler({IllegalArgumentException.class, java.time.DateTimeException.class})

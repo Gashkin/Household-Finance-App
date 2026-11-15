@@ -16,6 +16,15 @@ Back up local copies of the database and workbook outside the repository first. 
 5. Keep real household evidence in protected local storage until application authentication, tenant isolation, retention and deployment security have been implemented and audited.
 
 ## Current application boundary
+
+GBD-14 currently has an explicit production release hold. The prepared Windows
+package cannot clear readiness or launch a previously enabled production config.
+Owner-requested identity isolation, provider-side entitlement, historical exposure
+containment, actual-device evidence and additional whole-PR independent reviews
+are still prerequisites. See [the current security completion evidence and local
+audit instructions](product/stories/persistent-aib-instance.md#amended-security-completion--evidence-required-to-remove-the-hold).
+Current-user DPAPI is not isolation from coding agents or runners under that user;
+an administrator/SYSTEM runner on the host can bypass ordinary user ACLs.
 The household finance backend is a single-operator local system. Password sessions protect financial HTTP endpoints, while live database files depend on private OS permissions and full-disk encryption. No household tenancy or network deployment is supplied. Do not expose the backend or Vite frontend publicly.
 
 ## Private local workspace (GBD-13)

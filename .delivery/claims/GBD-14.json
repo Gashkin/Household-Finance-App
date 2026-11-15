@@ -1,0 +1,14 @@
+{
+  "work_id": "GBD-14",
+  "page_id": "418d3419-fef0-8180-8864-ca465d4eff7a",
+  "branch": "story/14-delivery",
+  "token": "claim-token:work-14-20261115-n4sawvc31ml",
+  "claimed_at": "2026-11-15T17:28:00Z",
+  "base_sha": "3bdace1154d59f8493039313cf756557f835c887",
+  "history": [
+    {
+      "event": "claim",
+      "method": "Connected GitHub create-only branch followed by Notion ownership write and readback. Linux preparation authorised; Windows provisioning deferred to Desktop."
+    }
+  ]
+}

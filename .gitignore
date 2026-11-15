@@ -60,3 +60,10 @@ delivery-receipt.json
 
 # Recovery archives must never enter Git
 *.hfb
+
+# Local release packages and provider state
+/release/
+*.pem
+*.key
+**/bank-connection.bin
+**/bank-connection.bin.initialized
