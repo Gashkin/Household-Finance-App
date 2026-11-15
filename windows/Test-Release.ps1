@@ -30,6 +30,8 @@ Assert-Rejected { Assert-ProductionReleaseCleared $release }
 $same=($release | ConvertTo-Json -Depth 5 | ConvertFrom-Json)
 $same.productionEligible=$true
 Assert-Rejected { Assert-SameRelease $same $release }
+# Even a locally modified manifest that claims eligibility cannot activate banking.
+Assert-Rejected { Assert-ProductionReleaseCleared $same }
 # Hosted runner is an administrator and must never qualify as the production
 # runtime even with a filtered token. This does not certify the owner's users.
 Assert-Rejected { Assert-StandardRuntimeIdentity }
@@ -73,6 +75,16 @@ try {
     & (Join-Path $Package 'Install.ps1')
     $installed=Join-Path $env:LOCALAPPDATA 'HouseholdFinance'
     $first=(Get-Content -LiteralPath (Join-Path $installed 'active.txt') -Raw).Trim()
+    $versionsPath=Join-Path $installed 'versions'
+    Assert-PrivatePath $versionsPath
+    # A weak versions ACL must prevent reinstalling even if the root stays private.
+    $versionsAcl=Get-Acl -LiteralPath $versionsPath
+    $everyone=New-Object Security.Principal.SecurityIdentifier('S-1-1-0')
+    $versionsAcl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($everyone,'Read','Allow')))
+    Set-Acl -LiteralPath $versionsPath -AclObject $versionsAcl
+    try { Assert-Rejected { & (Join-Path $Package 'Install.ps1') } }
+    finally { Set-PrivatePath $versionsPath $true }
+    Assert-PrivatePath $versionsPath
     # A coherent but stale local manifest cannot replace the incoming reviewed release.
     $versionRoot=Join-Path $installed ('versions\'+$first)
     $storedManifestPath=Join-Path $versionRoot 'manifest.json'
