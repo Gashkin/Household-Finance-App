@@ -648,6 +648,7 @@ public class WorkbookIngestionService {
 
     private void validateMappedCommitments(List<MappedCommitment> commitments, List<ValidationIssue> issues) {
         for (var commitment : commitments) {
+            LegacyMoney.require(java.math.BigDecimal.valueOf(commitment.amount()), false);
             if (commitment.title() == null || commitment.title().isBlank()) {
                 issues.add(new ValidationIssue("COMMITMENTS", rowRef(commitment.sourceSheet(), commitment.sourceRow()), ValidationSeverity.ERROR.name(), "Commitment title is required."));
             }
@@ -673,7 +674,7 @@ public class WorkbookIngestionService {
             }
 
             var title = cellValue(row, formatter, headerIndex, "metric", "commitment", "title", "name", "category");
-            var amount = parseAmount(cellValue(row, formatter, headerIndex, "amount", "value", "budget"));
+            var amount = parseAmount(amountValue(row, formatter, headerIndex, "amount", "value", "budget"));
 
             if (title.isBlank()) {
                 warnings.add(new MappingWarning(sheetName, rowIndex + 1, "Monthly Budget row skipped: commitment title is missing."));
@@ -701,7 +702,7 @@ public class WorkbookIngestionService {
             }
 
             var name = cellValue(row, formatter, headerIndex, "metric", "name", "account", "title", "category");
-            var amount = parseAmount(cellValue(row, formatter, headerIndex, "amount", "value", "balance", "budget"));
+            var amount = parseAmount(amountValue(row, formatter, headerIndex, "amount", "value", "balance", "budget"));
 
             if (name.isBlank()) {
                 warnings.add(new MappingWarning(sheetName, rowIndex + 1, "Month-suffix row skipped: name/metric is missing."));
@@ -968,7 +969,7 @@ public class WorkbookIngestionService {
         }
 
         var type = cellValue(row, formatter, headerIndex, "type", "kind");
-        var balance = parseAmount(cellValue(row, formatter, headerIndex, "balance", "amount", "value"));
+        var balance = parseAmount(amountValue(row, formatter, headerIndex, "balance", "amount", "value"));
         accounts.add(new MappedAccount(name, type.isBlank() ? "Unspecified" : type, round(balance), sheetName, rowIndex + 1));
     }
 
@@ -987,7 +988,7 @@ public class WorkbookIngestionService {
             return;
         }
 
-        var budgetAmount = parseAmount(cellValue(row, formatter, headerIndex, "budget", "amount", "value"));
+        var budgetAmount = parseAmount(amountValue(row, formatter, headerIndex, "budget", "amount", "value"));
         var budget = "$" + String.format(Locale.US, "%,.2f", budgetAmount);
         categories.add(new MappedCategory(name, budget, sheetName, rowIndex + 1));
     }
@@ -1007,7 +1008,7 @@ public class WorkbookIngestionService {
             return;
         }
 
-        var amount = parseAmount(cellValue(row, formatter, headerIndex, "amount", "value", "budget"));
+        var amount = parseAmount(amountValue(row, formatter, headerIndex, "amount", "value", "budget"));
         var dueDate = cellValue(row, formatter, headerIndex, "due", "duedate", "date");
         commitments.add(new MappedCommitment(title, round(amount), dueDate, sheetName, rowIndex + 1));
     }
@@ -1029,7 +1030,7 @@ public class WorkbookIngestionService {
 
         var date = cellValue(row, formatter, headerIndex, "date", "posted", "transactiondate");
         var account = cellValue(row, formatter, headerIndex, "account", "source", "from");
-        var amount = parseAmount(cellValue(row, formatter, headerIndex, "amount", "value", "debit", "credit"));
+        var amount = parseAmount(amountValue(row, formatter, headerIndex, "amount", "value", "debit", "credit"));
         transactions.add(new MappedTransaction(date, description, round(amount), account, sheetName, rowIndex + 1));
     }
 
@@ -1069,20 +1070,28 @@ public class WorkbookIngestionService {
         return value == null ? "" : value.toLowerCase(Locale.ROOT).replace("_", "").replace(" ", "");
     }
 
-    private double parseAmount(String rawAmount) {
-        if (rawAmount == null || rawAmount.isBlank()) {
-            return 0.0;
+    private String amountValue(Row row, DataFormatter formatter, Map<String, Integer> headers, String... candidates) {
+        for (var candidate : candidates) {
+            var index=findHeaderIndex(headers,candidate);
+            if (index==null || row.getCell(index)==null) continue;
+            var cell=row.getCell(index);
+            if (cell.getCellType()==org.apache.poi.ss.usermodel.CellType.FORMULA)
+                throw new IllegalArgumentException("Financial formula cells require explicit manual review; cached results are not accepted.");
+            if (cell.getCellType()==org.apache.poi.ss.usermodel.CellType.NUMERIC)
+                return java.math.BigDecimal.valueOf(cell.getNumericCellValue()).toPlainString();
+            var text=formatter.formatCellValue(cell).trim();
+            if (!text.isEmpty()) return text;
         }
+        return "";
+    }
 
-        try {
-            return Double.parseDouble(rawAmount.replace("$", "").replace(",", ""));
-        } catch (NumberFormatException ignored) {
-            return 0.0;
-        }
+    private double parseAmount(String rawAmount) {
+        return LegacyMoney.parse(rawAmount, true);
     }
 
     private double round(double value) {
-        return Math.round(value * 100.0) / 100.0;
+        // Admission already proved exact cent precision; never round a financial input.
+        return value;
     }
 
     private List<List<String>> extractSampleRows(org.apache.poi.ss.usermodel.Sheet sheet, DataFormatter formatter, int limit) {

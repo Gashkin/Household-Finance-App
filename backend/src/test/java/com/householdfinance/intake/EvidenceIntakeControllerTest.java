@@ -12,7 +12,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties={"evidence.intake.access-key=synthetic-test-access-0000","evidence.ai.enabled=false"}) @AutoConfigureMockMvc(addFilters=false)
+@SpringBootTest(properties={"spring.datasource.url=jdbc:h2:mem:evidence-intake-tests;DB_CLOSE_DELAY=-1","evidence.intake.access-key=synthetic-test-access-0000","evidence.ai.enabled=false"}) @AutoConfigureMockMvc(addFilters=false)
 class EvidenceIntakeControllerTest {
     @Autowired MockMvc mvc; @Autowired ObjectMapper mapper; @Autowired CashPositionSnapshotRepository repository;
     @Autowired org.springframework.web.context.WebApplicationContext context;

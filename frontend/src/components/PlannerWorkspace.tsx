@@ -71,7 +71,7 @@ interface EditableMonthlyCommitment {
 
 interface MonthlyCommitmentPayload {
   title: string;
-  amount: number;
+  amount: string;
   dueDate: 'Recurring';
   category: string | null;
   dayOfMonth: number;
@@ -86,7 +86,7 @@ interface EditableOneOffCommitment {
 
 interface OneOffCommitmentPayload {
   title: string;
-  amount: number;
+  amount: string;
   dueDate: string;
   category: string | null;
   dayOfMonth: null;
@@ -592,7 +592,7 @@ function PlannerWorkspace() {
           id: selected.id,
           name: selected.name,
           type: selected.type,
-          balance: parsedBalance,
+          balance: accountBalanceInput.trim(),
         }),
       });
 
@@ -632,7 +632,7 @@ function PlannerWorkspace() {
 
     return {
       title: edit.title.trim(),
-      amount: parsedAmount,
+      amount: edit.amount.trim(),
       dueDate: 'Recurring',
       category: edit.category.trim() ? edit.category.trim() : null,
       dayOfMonth: parsedDay,
@@ -777,7 +777,7 @@ function PlannerWorkspace() {
         body: JSON.stringify({
           id: `MC-${Date.now()}`,
           title: newMonthlyCommitment.title.trim(),
-          amount: parsedAmount,
+          amount: newMonthlyCommitment.amount.trim(),
           dueDate: 'Recurring',
           category: newMonthlyCommitment.category.trim() ? newMonthlyCommitment.category.trim() : null,
           dayOfMonth: parsedDay,
@@ -929,7 +929,7 @@ function PlannerWorkspace() {
 
     return {
       title: edit.title.trim(),
-      amount: parsedAmount,
+      amount: edit.amount.trim(),
       dueDate: edit.dueDate.trim(),
       category: edit.category.trim() ? edit.category.trim() : null,
       dayOfMonth: null,

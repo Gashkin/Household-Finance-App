@@ -48,6 +48,8 @@ public class WorkspaceBackupService {
     }
     private void checkSchema() {
         Set<String> actual = new HashSet<>(jdbc.queryForList("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='PUBLIC' AND TABLE_TYPE='BASE TABLE'", String.class));
+        // Flyway owns its checksum/version ledger; recovery never imports schema history.
+        actual.remove("flyway_schema_history");
         if (!actual.equals(new HashSet<>(TABLES))) throw new IllegalArgumentException("Database schema is not supported by this backup version");
     }
     // Hold admission through transaction completion, including direct domain-service callers.
@@ -139,12 +141,32 @@ public class WorkspaceBackupService {
         // Validate the entire manifest before the first insert. A later constraint error rolls back all tables.
         for (String table : restoreTables) {
             TableData data = archive.tables().get(table);
-            if (data==null || !columns(table).equals(data.columns()) || data.rows()==null || data.rows().size()>50_000) throw new IllegalArgumentException("Backup schema mismatch");
-            for (var row : data.rows()) if (row==null || row.size()!=data.columns().size()) throw new IllegalArgumentException("Incomplete backup row");
+            var expected=columns(table);
+            if (data==null || data.columns()==null || data.columns().size()!=expected.size()
+                || !new HashSet<>(expected).equals(new HashSet<>(data.columns()))
+                || data.rows()==null || data.rows().size()>50_000) throw new IllegalArgumentException("Backup schema mismatch");
+            for (var row : data.rows()) {
+                if (row==null || row.size()!=data.columns().size()) throw new IllegalArgumentException("Incomplete backup row");
+                String amountColumn=switch(table) {
+                    case "ACCOUNTS" -> "BALANCE";
+                    case "COMMITMENTS", "MONTHLY_COMMITMENTS", "TRANSACTIONS" -> "AMOUNT";
+                    default -> null;
+                };
+                if (amountColumn!=null) {
+                    String value=row.get(data.columns().indexOf(amountColumn));
+                    if (value==null) throw new IllegalArgumentException("Missing legacy amount in backup");
+                    com.householdfinance.service.LegacyMoney.require(new java.math.BigDecimal(value),
+                        table.equals("ACCOUNTS") || table.equals("TRANSACTIONS"));
+                }
+                if (table.equals("CATEGORIES"))
+                    com.householdfinance.service.LegacyMoney.parse(row.get(data.columns().indexOf("BUDGET")),false);
+            }
         }
         for (String table : restoreTables) {
             TableData data = archive.tables().get(table);
-            List<String> cols = columns(table);
+            // Column identities are validated against the fixed schema above.
+            // Preserve archive order: ORM upgrades can reorder physical columns.
+            List<String> cols = data.columns();
             String sql = "INSERT INTO " + table + " (" + String.join(",",cols) + ") VALUES (" + String.join(",",Collections.nCopies(cols.size(),"?")) + ")";
             for (List<String> row : data.rows()) jdbc.update(sql, statement -> {
                 for (int i=0; i<row.size(); i++) statement.setString(i+1,row.get(i));

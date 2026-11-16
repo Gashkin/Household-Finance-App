@@ -11,7 +11,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties="spring.datasource.url=jdbc:h2:mem:debt-scenario-tests;DB_CLOSE_DELAY=-1")
 @AutoConfigureMockMvc(addFilters=false)
 class DebtScenarioControllerTest {
     @Autowired MockMvc mvc;

@@ -57,7 +57,7 @@ jobs:
         run: mkdir -p backend/target/classes/static && cp -r frontend/dist/. backend/target/classes/static/
       - name: Test and package backend
         working-directory: backend
-        run: mvn --batch-mode --no-transfer-progress verify
+        run: mvn --settings ../.mvn/settings.xml --batch-mode --no-transfer-progress verify
       - name: Install browser for the report journey
         working-directory: frontend
         run: npx playwright install --with-deps chromium

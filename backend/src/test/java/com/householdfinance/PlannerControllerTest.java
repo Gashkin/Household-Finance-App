@@ -54,7 +54,7 @@ class PlannerControllerTest {
 
                 @Test
                 void createAccountReturnsCreatedAccount() throws Exception {
-                                var request = new PlannerService.AccountUpsertRequest("A4", "Cash", "Cash", 150.0);
+                                var request = new PlannerService.AccountUpsertRequest("A4", "Cash", "Cash", new java.math.BigDecimal("150.0"));
                                 var result = new PlannerService.Account("A4", "Cash", "Cash", 150.0);
 
                                 given(plannerService.createAccount(request)).willReturn(result);

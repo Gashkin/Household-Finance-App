@@ -67,6 +67,7 @@ delivery-receipt.json
 
 # Local release packages and provider state
 /release/
+/.tools/
 *.pem
 *.key
 **/bank-connection.bin

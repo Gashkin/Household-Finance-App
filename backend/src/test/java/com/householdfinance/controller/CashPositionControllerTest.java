@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc(addFilters=false)
 @TestPropertySource(properties = {
     "spring.datasource.url=jdbc:h2:mem:cash-position-tests;DB_CLOSE_DELAY=-1",
-    "spring.jpa.hibernate.ddl-auto=create-drop"
+    "spring.jpa.hibernate.ddl-auto=validate"
 })
 class CashPositionControllerTest {
     @Autowired private MockMvc mvc;

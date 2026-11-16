@@ -12,6 +12,7 @@ timestamp: 2026-07-27T00:00:00Z
 ## Concepts
 - [Service Boundaries](service-boundaries.md)
 - [Workspace Recoverability](workspace-recoverability.md)
+- [Legacy Amount Admission](legacy-amount-admission.md)
 
 ## Source Anchors
 - ops/pass1/service-boundaries.md

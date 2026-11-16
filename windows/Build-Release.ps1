@@ -24,6 +24,14 @@ try {
     if ($dirty.Count -ne 0) { throw 'Refusing to package an uncommitted or untracked checkout; use a clean exact commit.' }
     $commit = (git rev-parse --verify HEAD).Trim()
     if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-f]{40}$') { throw 'Could not determine the reviewed release commit.' }
+    $pins=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'build-toolchain.json') -Raw | ConvertFrom-Json
+    $javaRelease=Get-Content -LiteralPath (Join-Path $env:JAVA_HOME 'release') -Raw
+    if ($javaRelease -notmatch ('(?m)^JAVA_RUNTIME_VERSION="'+[regex]::Escape($pins.javaRuntimeVersion)+'"\r?$') -or
+        $javaRelease -notmatch ('(?m)^IMPLEMENTOR="'+[regex]::Escape($pins.javaVendor)+'"\r?$')) { throw 'Use the reviewed Java runtime from build-toolchain.json.' }
+    $nodeVersion=(& node --version).Trim()
+    if ($LASTEXITCODE -ne 0 -or $nodeVersion -cne $pins.nodeVersion) { throw 'Use the reviewed Node runtime from build-toolchain.json.' }
+    $mavenInfo=(& mvn -v | Out-String)
+    if ($LASTEXITCODE -ne 0 -or $mavenInfo -notmatch ('Apache Maven '+[regex]::Escape($pins.mavenVersion)+'\b')) { throw 'Use the reviewed Maven runtime from build-toolchain.json.' }
     # Git cleanliness does not clear ignored output. Remove only checked build
     # paths before any compiler or Vite configuration can consume stale files.
     foreach ($relative in @('frontend/dist','frontend/tsconfig.app.tsbuildinfo','frontend/tsconfig.node.tsbuildinfo','frontend/vite.config.js','frontend/vite.config.d.ts')) {
@@ -37,13 +45,13 @@ try {
     finally { Pop-Location }
     # Ignored classes/resources must not survive an earlier local build and
     # masquerade as output from the manifest's exact source commit (audit F7).
-    & mvn -B -ntp -f backend/pom.xml clean test
+    & mvn -s .mvn/settings.xml -B -ntp -f backend/pom.xml clean test
     if ($LASTEXITCODE) { throw 'Backend tests failed' }
     $static = Get-SafeBuildOutput 'backend/target/classes/static'
     if (Test-Path -LiteralPath $static) { Remove-Item -LiteralPath $static -Recurse -Force }
     New-Item -ItemType Directory -Path $static | Out-Null
     Copy-Item -Path 'frontend\dist\*' -Destination $static -Recurse
-    & mvn -B -ntp -f backend/pom.xml package org.springframework.boot:spring-boot-maven-plugin:4.1.2:repackage -DskipTests
+    & mvn -s .mvn/settings.xml -B -ntp -f backend/pom.xml package org.springframework.boot:spring-boot-maven-plugin:4.1.2:repackage -DskipTests
     if ($LASTEXITCODE) { throw 'Backend packaging failed' }
     if (Test-Path -LiteralPath $Output) { throw 'Choose an empty release destination.' }
     New-Item -ItemType Directory -Path $Output | Out-Null
@@ -56,7 +64,7 @@ try {
     $files = @(Get-ChildItem -LiteralPath $Output -Recurse -File | Sort-Object FullName | ForEach-Object { @{path=$_.FullName.Substring($absolute.Length+1).Replace('\','/'); sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash} })
     # Do not remove the hold until actual-device/entitlement/containment evidence
     # and the owner-requested independent review sequence have been completed.
-    @{version=1;commit=$commit;productionEligible=$false;files=$files} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $Output 'manifest.json') -Encoding UTF8
+    @{version=1;commit=$commit;productionEligible=$false;toolchain=@{java=$pins.javaRuntimeVersion;node=$nodeVersion;maven=$pins.mavenVersion};files=$files} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $Output 'manifest.json') -Encoding UTF8
     Compress-Archive -Path (Join-Path $Output '*') -DestinationPath ($absolute+'.zip')
     Write-Host 'Windows release packaged with a private local runtime. Installation and real-device readiness remain separate checks.'
 } finally { Pop-Location }

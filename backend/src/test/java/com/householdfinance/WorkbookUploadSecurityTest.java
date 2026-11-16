@@ -59,6 +59,28 @@ class WorkbookUploadSecurityTest {
                 .andExpect(status().isOk());
     }
 
+    @Test void displayedRoundingMissingAmountsAndFormulaCachesCannotBecomeApprovedMoney() throws Exception {
+        for(String invalid:new String[]{"fractional","missing","formula","NaN","1,23"}) {
+            byte[] bytes;
+            try(var workbook=new XSSFWorkbook();var output=new ByteArrayOutputStream()) {
+                var sheet=workbook.createSheet("Monthly Budget");
+                var header=sheet.createRow(0);header.createCell(0).setCellValue("Metric");header.createCell(1).setCellValue("Amount");
+                var row=sheet.createRow(1);row.createCell(0).setCellValue("Synthetic rent");
+                var amount=row.createCell(1);
+                if(invalid.equals("fractional")) {
+                    amount.setCellValue(1.005);
+                    var format=workbook.createCellStyle();format.setDataFormat(workbook.createDataFormat().getFormat("0.00"));
+                    amount.setCellStyle(format);
+                } else if(invalid.equals("formula")) amount.setCellFormula("1+1");
+                else amount.setCellValue(invalid.equals("missing")?"":invalid);
+                workbook.write(output);bytes=output.toByteArray();
+            }
+            for(String route:new String[]{"map","validate"})
+                http.perform(multipart("/migration/workbook/"+route).file(file(bytes))).andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(artifacts,accounts,categories,commitments,transactions);
+    }
+
     private void rejectAll(byte[] bytes,String message) throws Exception {
         for(String route:new String[]{"preview","map","validate"})
             http.perform(multipart("/migration/workbook/"+route).file(file(bytes)))

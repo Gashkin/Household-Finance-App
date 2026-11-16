@@ -66,6 +66,20 @@ Consent expiry/status is displayed and revalidated at the provider before every 
 
 For suspected compromise stop the app; revoke consent at AIB/provider, revoke/rotate the application signing key, secure the Windows account/device, and rebuild/recover from a known reviewed release and encrypted backup. Do not attach raw logs, data folders, dumps, screenshots, keys or transactions to issues. A protected initialization marker distinguishes a deliberately provisioned empty workspace from a subsequently lost connection file. Missing initialized state, corruption or wrong keys stop production startup without overwriting it; deletion of the whole private data directory is a separate deliberate reset. Windows reparse points, including junctions, are rejected by both launcher and Java store checks. A failed/corrupt/wrong-key connection store must be investigated without overwriting it; manual/CSV remains available after deliberately disabling production. Keep a compromised device offline until assessed.
 
+## Database compatibility and recovery
+
+This release uses versioned Flyway migrations and Hibernate schema validation.
+It refuses an unversioned nonempty database, a newer schema or changed migration
+checksums. Do not enable automatic baselining, schema updates, repair or cleaning
+to force launch. Retain the original instance offline; export and verify an
+encrypted backup under its original reviewed release, then restore into an empty
+versioned instance. Prove exact old/new release recovery with synthetic records
+before using real records. An old binary without compatibility guards must be
+retired and denied access through production identity isolation; these changes
+cannot retrofit every historical binary. Flyway currently warns that bundled H2
+2.4.240 is newer than its upstream verified H2 baseline; retain this in the
+independent compatibility assessment.
+
 ## Trust boundaries and verification
 
 AIB → HTTPS Enable Banking AIS → exact HTTPS backend allowlist → bounded in-memory response → owner review → local ledger/H2 → forecast/decision/export. Only bank/provider receives bank authentication. Keys and provider references stay server-side, AES-GCM/DPAPI and ACL protected. No telemetry or bank data goes to model vendors. Local HTTP is loopback only; sessions are HttpOnly/SameSite, mutating requests require CSRF header/origin checks, and all data routes are protected. Public routes contain only the app shell and static assets. Callback responses use no-referrer, no-store and a same-origin CSP. A hostile local administrator/process remains out of scope for software-only isolation.

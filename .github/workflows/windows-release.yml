@@ -24,6 +24,9 @@ jobs:
           distribution: temurin
           java-version: '21.0.13+9'
           cache: maven
+      - name: Prepare checksum-pinned Maven
+        shell: pwsh
+        run: ./windows/Initialize-Maven.ps1
       - name: Build complete Windows release
         shell: pwsh
         run: |

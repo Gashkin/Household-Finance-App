@@ -180,3 +180,47 @@ zero errors/warnings. Previous browser/frontend evidence applies to the precedin
 checkpoint; no new exact-final-head browser/package/independent PASS is implied.
 The advisory inventory hash now normalizes CRLF to LF for reproducibility across
 Git checkouts; refreshed query still reports zero matches for 121 coordinates.
+
+## Amount, migration and toolchain remediation — source checkpoint
+
+Continued under the same claim after the owner's instruction to proceed. Live
+Notion authority/story and GitHub main were re-fetched; main remains
+`9f607c4d2fbea6224ae47671c52cbf3a3e3e0845`, with no open story PR.
+
+Strict decimal admission now rejects missing/null, non-finite, fractional-cent,
+out-of-range and double-unrepresentable legacy values. The UI sends decimal text.
+Workbook amounts use raw numeric values and reject formula caches, malformed and
+missing amounts rather than manufacturing zero. Backup import applies the same
+legacy amount validation before inserts.
+
+Flyway owns a versioned, seed-free V1 schema; Hibernate only validates. Unversioned
+nonempty, future-version and checksum-mismatched databases block startup without
+changing synthetic records. Legacy recovery accepts physical column reordering
+but still validates exact column identities and rolls back failed imports. Three
+older tests that implicitly used a persistent default database now explicitly use
+isolated synthetic memory databases. The schema-export-only probe initially failed
+its subsequent insert because exporting suppresses database creation; it is not
+counted as a passing regression. The first migration run also correctly rejected
+those unversioned test databases; the fixture configuration was then corrected.
+
+Verification before packaging: full Windows backend **148 discovered /132 passed /
+16 OS-conditional skips**, zero failures/errors. Pinned-toolchain desktop/mobile
+browser **29 passed /one existing duplicate recovery skip**. Frontend production
+build passed. Refreshed Maven inventory **124 coordinates /zero OSV matches**.
+These results do not establish independent closure or arbitrary old-binary safety.
+Flyway warns that H2 2.4.240 is newer than its upstream-verified H2 baseline; this
+remains explicit compatibility evidence for independent review.
+
+Java/Node archives were downloaded from official release endpoints and verified
+against pinned SHA256 values before extraction. Maven 3.10.1 is pinned to its
+official SHA512, using a workspace-local preparation script. Release builds enforce
+Temurin 21.0.13+9-LTS, Node22.23.5 and Maven3.10.1 and record them in the manifest.
+Build and browser resolution now use a single reviewed Maven Central mirror;
+dependency-declared vendor repositories cannot redirect release resolution.
+
+The synthetic Windows test now uses a temporary shortcut directory and dynamically
+allocated loopback port, so it can avoid the owner's desktop and occupied 8080.
+Background helpers are hidden; move/delete targets are checked within the synthetic
+temporary instance. Testing a standard identity predicate does not certify actual
+production isolation. Updated package assembly and installed tests are still pending
+at this source checkpoint. Both production holds remain intact; F6/B1–B4 remain open.
