@@ -15,7 +15,8 @@ import urllib.request
 
 def main():
     source, destination = map(pathlib.Path, sys.argv[1:])
-    raw = source.read_bytes()
+    # Git checkouts use platform line endings; hash the same canonical inventory on either OS.
+    raw = source.read_bytes().replace(b"\r\n", b"\n")
     dependencies = []
     for line in raw.decode("utf-8").splitlines():
         match = re.search(r"([\w.-]+):([\w.-]+):jar:(?:[^:\s]+:)?([^:\s]+):(compile|runtime|test|provided)(?:\s|$)", line)
@@ -47,6 +48,7 @@ def main():
     report = {"source": "https://api.osv.dev/v1/querybatch",
         "queriedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "inventorySha256": hashlib.sha256(raw).hexdigest(), "queried": len(dependencies),
+        "inventoryHashEncoding": "UTF-8, CRLF normalized to LF",
         "dependencies": dependencies, "affected": affected,
         "limitation": "Version matches only; excludes JDK, Maven plugins, actions and unknown/unindexed vulnerabilities."}
     destination.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")

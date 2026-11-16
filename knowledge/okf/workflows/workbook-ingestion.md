@@ -22,7 +22,9 @@ timestamp: 2026-11-16T00:00:00Z
 - `WorkbookUploadSecurityTest` exercises the actual HTTP/controller/parser path with synthetic duplicate parts, extreme sparse references, expansion and XML entity cases. Its existence is not evidence of a passing execution; consult story evidence.
 - Transactions from workbook mapping are currently skipped for persistence in this phase.
 - Replace mode clears planner persistence tables before apply.
-- Legacy whole-planner rollback lacks a revision boundary and pending validations have no expiry. These remain explicit unresolved security findings in the [audit disposition](../../../product/stories/security-audit-disposition.md); no production approval is implied.
+- Validation captures the complete sorted planner state, expires after five minutes and permits at most four pending reviews. Execution consumes its token once and rejects changed planner evidence before any replacement writes.
+- Each successful load atomically records before/after planner snapshots. Rollback requires current planner state to equal its recorded after-state inside the application write-admission transaction; it rejects later edits and old receipts lacking after-state evidence. It preserves migration audit records. This is a single-process application boundary, not protection against external SQL/processes.
+- [Audit disposition](../../../product/stories/security-audit-disposition.md) tracks independent verification and remaining release gates; no production approval is implied.
 
 ## Linked Concepts
 - [Accounts](../domain/accounts.md)

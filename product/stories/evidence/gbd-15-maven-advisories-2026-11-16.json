@@ -1,8 +1,9 @@
 {
   "source": "https://api.osv.dev/v1/querybatch",
-  "queriedAt": "2026-11-16T10:37:01.470428+00:00",
-  "inventorySha256": "2e39afaaa73dd158a4a0f4743d73e4391e8aa1546d74ee8396a6330173da73c6",
+  "queriedAt": "2026-11-16T10:41:06.836476+00:00",
+  "inventorySha256": "97e4c2cbbcede6fdb371a0dc19c18d583f0c8c85deb338d7ed88a7ba9d048a95",
   "queried": 121,
+  "inventoryHashEncoding": "UTF-8, CRLF normalized to LF",
   "dependencies": [
     {
       "name": "org.springframework.boot:spring-boot-starter-webmvc",

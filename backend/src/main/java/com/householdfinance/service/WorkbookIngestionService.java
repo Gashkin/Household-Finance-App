@@ -18,12 +18,15 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -55,6 +58,8 @@ public class WorkbookIngestionService {
     }
 
     private static final String CURRENT_MONTH_SHEET = "Jun26";
+    private static final Duration VALIDATION_LIFETIME = Duration.ofMinutes(5);
+    private static final int MAX_PENDING_VALIDATIONS = 4;
     private static final Pattern MONTH_SUFFIX_TAB_PATTERN = Pattern.compile(".*26$");
         private static final DateTimeFormatter DUE_MONTH_LABEL = new DateTimeFormatterBuilder()
             .parseCaseInsensitive()
@@ -167,23 +172,35 @@ public class WorkbookIngestionService {
                 String validationId,
                 LoadMode mode,
                 WorkbookMappingResult mapping,
-                Instant createdAt
+                Instant createdAt,
+                PlannerSnapshotPayload validatedState
             ) {}
 
     private final MigrationArtifactService migrationArtifactService;
+    private final Clock clock;
             private final AccountRepository accountRepository;
             private final CategoryRepository categoryRepository;
             private final MonthlyCommitmentRepository monthlyCommitmentRepository;
             private final TransactionRepository transactionRepository;
             private final Map<String, PendingValidation> pendingValidations = new ConcurrentHashMap<>();
 
-            public WorkbookIngestionService(
+              @org.springframework.beans.factory.annotation.Autowired
+              public WorkbookIngestionService(
                 MigrationArtifactService migrationArtifactService,
                 AccountRepository accountRepository,
                 CategoryRepository categoryRepository,
                 MonthlyCommitmentRepository monthlyCommitmentRepository,
                 TransactionRepository transactionRepository
             ) {
+        this(migrationArtifactService, accountRepository, categoryRepository,
+            monthlyCommitmentRepository, transactionRepository, Clock.systemUTC());
+    }
+
+    WorkbookIngestionService(MigrationArtifactService migrationArtifactService,
+        AccountRepository accountRepository, CategoryRepository categoryRepository,
+        MonthlyCommitmentRepository monthlyCommitmentRepository,
+        TransactionRepository transactionRepository, Clock clock) {
+        this.clock = clock;
         this.migrationArtifactService = migrationArtifactService;
             this.accountRepository = accountRepository;
             this.categoryRepository = categoryRepository;
@@ -230,6 +247,7 @@ public class WorkbookIngestionService {
         return mappingResult;
     }
 
+    @Transactional
     public WorkbookLoadValidationResult validateWorkbookLoad(MultipartFile file, String mode) {
         var loadMode = parseLoadMode(mode);
         var mappingResult = mapWorkbookInternal(file);
@@ -284,7 +302,13 @@ public class WorkbookIngestionService {
         );
 
         if (!token.isBlank()) {
-            pendingValidations.put(token, new PendingValidation(validationId, loadMode, mappingResult, Instant.now()));
+            synchronized (pendingValidations) {
+                var now = clock.instant();
+                pendingValidations.values().removeIf(p -> expired(p, now));
+                if (pendingValidations.size() >= MAX_PENDING_VALIDATIONS)
+                    throw new IllegalArgumentException("Too many pending workbook reviews. Complete a review or wait five minutes.");
+                pendingValidations.put(token, new PendingValidation(validationId, loadMode, mappingResult, now, snapshotPlannerState()));
+            }
         }
 
         migrationArtifactService.recordArtifact(validationId, "WORKBOOK_LOAD_VALIDATE", result);
@@ -298,7 +322,7 @@ public class WorkbookIngestionService {
         }
 
         var pending = pendingValidations.remove(request.confirmationToken());
-        if (pending == null) {
+        if (pending == null || expired(pending, clock.instant())) {
             throw new IllegalArgumentException("Invalid or expired confirmation token. Re-run validation.");
         }
 
@@ -312,6 +336,8 @@ public class WorkbookIngestionService {
         }
 
         var beforeSnapshot = snapshotPlannerState();
+        if (!beforeSnapshot.equals(pending.validatedState()))
+            throw new IllegalArgumentException("Planner changed after validation. Review and validate the workbook again.");
 
         if (pending.mode() == LoadMode.REPLACE) {
             transactionRepository.deleteAll();
@@ -363,6 +389,7 @@ public class WorkbookIngestionService {
         migrationArtifactService.recordArtifact(result.executionId(), "WORKBOOK_LOAD_SUMMARY", summary);
         migrationArtifactService.recordArtifact(result.executionId(), "WORKBOOK_LOAD_REJECTIONS", new LoadRejectedRowsPayload(rejectedRows));
         migrationArtifactService.recordArtifact(result.executionId(), "WORKBOOK_LOAD_SNAPSHOT", beforeSnapshot);
+        migrationArtifactService.recordArtifact(result.executionId(), "WORKBOOK_LOAD_AFTER_SNAPSHOT", snapshotPlannerState());
         return result;
     }
 
@@ -417,6 +444,11 @@ public class WorkbookIngestionService {
             throw new IllegalArgumentException("No rollback snapshot found for load execution: " + executionId);
         }
 
+        var appliedState = migrationArtifactService.getLatestPayload(
+                executionId, "WORKBOOK_LOAD_AFTER_SNAPSHOT", PlannerSnapshotPayload.class);
+        // Old receipts have no trustworthy post-load boundary; fail closed.
+        if (appliedState == null || !appliedState.equals(snapshotPlannerState()))
+            throw new IllegalArgumentException("Planner changed after this load, or its revision evidence is unavailable. Rollback would overwrite later work.");
         restorePlannerState(snapshot);
 
         var updatedSummary = new WorkbookLoadPostSummary(
@@ -440,12 +472,15 @@ public class WorkbookIngestionService {
 
     private PlannerSnapshotPayload snapshotPlannerState() {
         var accounts = accountRepository.findAll().stream()
+                .sorted(Comparator.comparing(AccountEntity::getId))
                 .map(entity -> new SnapshotAccount(entity.getId(), entity.getName(), entity.getType(), entity.getBalance()))
                 .toList();
         var categories = categoryRepository.findAll().stream()
+                .sorted(Comparator.comparing(CategoryEntity::getId))
                 .map(entity -> new SnapshotCategory(entity.getId(), entity.getName(), entity.getBudget()))
                 .toList();
         var monthlyCommitments = monthlyCommitmentRepository.findAll().stream()
+            .sorted(Comparator.comparing(MonthlyCommitmentEntity::getId))
             .map(entity -> new SnapshotMonthlyCommitment(
                 entity.getId(),
                 entity.getTitle(),
@@ -455,6 +490,7 @@ public class WorkbookIngestionService {
             ))
             .toList();
         var transactions = transactionRepository.findAll().stream()
+            .sorted(Comparator.comparing(TransactionEntity::getId))
             .map(entity -> new SnapshotTransaction(
                 entity.getId(),
                 entity.getTxnDate().toString(),
@@ -467,6 +503,10 @@ public class WorkbookIngestionService {
                 .toList();
 
         return new PlannerSnapshotPayload(accounts, categories, monthlyCommitments, transactions);
+    }
+
+    private boolean expired(PendingValidation pending, Instant now) {
+        return pending.createdAt().isAfter(now) || !pending.createdAt().plus(VALIDATION_LIFETIME).isAfter(now);
     }
 
     private void restorePlannerState(PlannerSnapshotPayload snapshot) {

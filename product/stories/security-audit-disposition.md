@@ -56,9 +56,11 @@ production readiness, account activation or story completion is claimed.
 
 - AI recipient/retention disclosure and a minimised preview before any real-evidence
   opt-in; regex masking is not de-identification. Packaged runtime keeps AI disabled.
-- Legacy doubles/permissive validation, whole-planner rollback without a revision
-  check and unexpired pending validations: remediate or remove unsafe legacy
-  mutation surfaces; modern reviewed ledger controls do not protect those routes.
+- Legacy doubles/permissive validation still require review. Follow-up remediation
+  adds complete before/after planner-state checks to workbook execution/rollback,
+  consumes validation tokens once, expires them after five minutes and bounds
+  pending reviews to four. Real-persistence/controlled-clock regressions passed
+  below; modern reviewed ledger controls do not protect legacy routes.
 - Live database upgrade/downgrade safety: `ddl-auto=update` is not a versioned
   migration or old-binary rejection boundary. Verify failure/recovery on disposable
   exact releases before deployment.
@@ -78,7 +80,7 @@ Preserve these limits during final re-verification.
 1. Incorporate the independent consolidated report without losing findings,
    severity, coverage or blind spots.
 2. Give every finding a concrete fix, justified disposition or explicit unresolved
-   evidence owner/gate; preserve one canonical story/branch/PR.
+evidence owner/gate; preserve one canonical story/branch/PR.
 3. Run focused regressions and full build/browser/Linux/Windows verification on
    the corrected exact commit.
 4. Obtain independent re-verification of security-sensitive fixes and the final
@@ -92,7 +94,7 @@ Related implementation evidence:
 
 F1–F5/F7 changes above are candidates, not closed findings. The separate audit is
 fully incorporated before a new focused regression pass. F6 and B1–B4 remain
-explicit external gates. Additional legacy rollback/validation expiry, database
+explicit external gates. Additional legacy amount-validation, database
 migration/downgrade, host isolation and AI opt-in risks remain unresolved and
 block production readiness; they have not been silently waived or promised to
 an unnamed future story. The production holds remain enforced.
@@ -159,3 +161,22 @@ does not authenticate the independent GPT receipt, so a green check alone cannot
 close this gate. The historical two-review main receipt mismatch remains open
 pending source-grounded exception reconciliation; no global count rule was weakened.
 No repository protection was changed by this checkpoint.
+
+## Follow-up: workbook review and rollback integrity
+
+After `e98284d7f726bf222760b8ee2024c017953d0f31`, workbook validation gained a
+five-minute expiry, four-review bound and complete sorted planner-state capture.
+Execution consumes its token once and rejects any changed planner state before
+replacement. Successful loads atomically retain before/after planner snapshots;
+rollback rejects later changes and historical receipts lacking after-state
+evidence. The shared write-admission transaction serializes managed writers during
+comparison/restoration. External writers/processes remain outside that boundary.
+
+Full Windows backend suite after this follow-up: **141 discovered /125 passed /
+16 OS-conditional skips**, zero failures/errors. New tests prove expired tokens
+cannot execute/occupy review capacity, changed planner evidence prevents REPLACE,
+later edits prevent rollback, and unchanged loads roll back once. OKF remains
+zero errors/warnings. Previous browser/frontend evidence applies to the preceding
+checkpoint; no new exact-final-head browser/package/independent PASS is implied.
+The advisory inventory hash now normalizes CRLF to LF for reproducibility across
+Git checkouts; refreshed query still reports zero matches for 121 coordinates.
