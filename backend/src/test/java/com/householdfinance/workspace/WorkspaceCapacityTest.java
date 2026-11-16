@@ -2,6 +2,8 @@ package com.householdfinance.workspace;
 
 import static org.junit.jupiter.api.Assertions.*;
 import com.householdfinance.service.MigrationArtifactService;
+import com.householdfinance.service.CashPositionService;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.concurrent.*;
 import org.junit.jupiter.api.*;
@@ -14,6 +16,7 @@ class WorkspaceCapacityTest {
   @Autowired MigrationArtifactService artifacts;
   @Autowired WorkspaceBackupService backups;
   @Autowired JdbcTemplate jdbc;
+  @Autowired CashPositionService cash;
 
   @BeforeEach void clear() {
     var tables=new ArrayList<>(WorkspaceBackupService.TABLES);
@@ -32,6 +35,25 @@ class WorkspaceCapacityTest {
     clear();
     assertEquals(before,backups.restore(archive,"synthetic-separate-backup-password","RESTORE INTO EMPTY WORKSPACE"));
     assertEquals("x".repeat(1_100_000),artifacts.getLatestPayload("kept","SYNTHETIC",String.class));
+  }
+
+  @Test void repeatedLegalCashSnapshotsStopBeforeBackupBecomesUnrecoverable() {
+    var lines=java.util.stream.IntStream.range(0,30)
+        .mapToObj(i->new CashPositionService.Line("Synthetic line "+i+"x".repeat(80),100L)).toList();
+    var input=new CashPositionService.Input(LocalDate.now(),"Synthetic capacity audit","REVIEWED",lines,lines,0);
+    int accepted=0;
+    for(int i=0;i<400;i++) {
+      try { cash.save(input);accepted++; }
+      catch(IllegalArgumentException full) { break; }
+    }
+    assertTrue(accepted>0 && accepted<400,"The audit's 400-snapshot growth must be rejected before exceeding backup capacity");
+    var before=backups.counts();
+    assertThrows(IllegalArgumentException.class,()->cash.save(input));
+    assertEquals(before,backups.counts(),"Rejected snapshot and its lines must both roll back");
+    byte[] archive=backups.exportBackup("synthetic-separate-backup-password");
+    clear();
+    assertEquals(before,backups.restore(archive,"synthetic-separate-backup-password","RESTORE INTO EMPTY WORKSPACE"));
+    assertEquals(30,cash.latest().orElseThrow().cashBalances().size());
   }
 
   @Test void concurrentNonPlanTransactionsCannotOverbookCapacityAndRollbackReleasesAdmission() throws Exception {

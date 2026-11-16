@@ -62,11 +62,6 @@ interface PlannerData {
   commitments: Commitment[];
 }
 
-interface SuggestedMatch {
-  commitmentId: string;
-  score: number;
-}
-
 interface EditableMonthlyCommitment {
   title: string;
   amount: string;
@@ -135,22 +130,6 @@ const commitmentCategoryLookup: Record<string, string> = {
 
 function normalizeCommitmentTitle(title: string) {
   return title.toLowerCase().replace(/\s+/g, ' ').trim();
-}
-
-function normalizeText(value: string) {
-  return (value || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
-function extractCategoryTagFromDescription(description: string) {
-  const match = description.match(/\[([^\]]+)\]\s*$/);
-  if (!match) {
-    return '';
-  }
-  return normalizeText(match[1]);
-}
-
-function stripCategoryTagFromDescription(description: string) {
-  return description.replace(/\s*\[[^\]]+\]\s*$/, '').trim();
 }
 
 function getCommitmentCategory(commitment: Commitment) {
@@ -289,7 +268,6 @@ function PlannerWorkspace() {
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [accountBalanceInput, setAccountBalanceInput] = useState('');
   const [transactionHistory, setTransactionHistory] = useState<TransactionHistoryItem[]>([]);
-  const [historyMapSelection, setHistoryMapSelection] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPlannerLoading, setIsPlannerLoading] = useState(false);
   const [plannerError, setPlannerError] = useState('');
@@ -345,64 +323,7 @@ function PlannerWorkspace() {
     }))
     .sort((left, right) => left.dueDate.localeCompare(right.dueDate) || left.title.localeCompare(right.title));
 
-  const oneOffCommitmentOptions = oneOffCommitments.map((commitment) => ({
-    id: commitment.id,
-    label: `${commitment.title} (${commitment.dueDate})`,
-  }));
-
   const oneOffCommitmentTotal = oneOffCommitments.reduce((sum, commitment) => sum + commitment.amount, 0);
-
-  const suggestedMatchesByHistoryId = transactionHistory.reduce<Record<string, SuggestedMatch>>((result, item) => {
-    if (item.mappedFutureCommitmentId) {
-      return result;
-    }
-
-    const itemTitle = normalizeText(stripCategoryTagFromDescription(item.description));
-    const itemCategoryTag = extractCategoryTagFromDescription(item.description);
-    const itemAmountAbs = Math.abs(item.amount);
-
-    let best: SuggestedMatch | null = null;
-
-    for (const commitment of oneOffCommitments) {
-      const commitmentTitle = normalizeText(commitment.title);
-      const commitmentCategory = normalizeText(commitment.resolvedCategory ?? commitment.category ?? '');
-      const commitmentAmountAbs = Math.abs(commitment.amount);
-      const amountDelta = Math.abs(itemAmountAbs - commitmentAmountAbs);
-
-      let score = 0;
-
-      if (amountDelta < 0.01) {
-        score += 5;
-      } else if (amountDelta <= 2) {
-        score += 2;
-      }
-
-      if (Math.sign(item.amount) === Math.sign(commitment.amount)) {
-        score += 1;
-      }
-
-      if (itemTitle && commitmentTitle && (itemTitle.includes(commitmentTitle) || commitmentTitle.includes(itemTitle))) {
-        score += 4;
-      }
-
-      if (itemCategoryTag && commitmentCategory && itemCategoryTag === commitmentCategory) {
-        score += 2;
-      }
-
-      if (!best || score > best.score) {
-        best = {
-          commitmentId: commitment.id,
-          score,
-        };
-      }
-    }
-
-    if (best && best.score >= 4) {
-      result[item.historyId] = best;
-    }
-
-    return result;
-  }, {});
 
   const monthlyDirtyIds = monthlyCommitments
     .filter((commitment) => {
@@ -683,39 +604,6 @@ function PlannerWorkspace() {
       await loadPlannerData();
     } catch {
       setImportStatus('Unable to update account balance. Ensure backend is running on port 8080.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const mapHistoryToFuture = async (historyId: string, explicitCommitmentId?: string) => {
-    const futureCommitmentId = explicitCommitmentId ?? historyMapSelection[historyId];
-    if (!futureCommitmentId) {
-      setImportStatus('Select a future one-off commitment before mapping.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const response = await fetch('/imports/map-to-future', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          historyId,
-          futureCommitmentId,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Map to future failed.');
-      }
-
-      setImportStatus('Transaction mapped to future commitment.');
-      await loadTransactionHistory();
-    } catch {
-      setImportStatus('Unable to map transaction to future commitment. Ensure backend is running on port 8080.');
     } finally {
       setIsSubmitting(false);
     }
@@ -1769,7 +1657,8 @@ function PlannerWorkspace() {
             </table>
           )}
 
-          <h4>Transaction history</h4>
+          <h4>Legacy session history</h4>
+          <p className="ledger-caption">These rows are session-only. Legacy matching cannot change balances; use Money position to review and approve financial activity.</p>
           {transactionHistory.length === 0 && <p className="ledger-caption">No imported transaction history yet.</p>}
           {transactionHistory.length > 0 && (
             <table>
@@ -1779,9 +1668,6 @@ function PlannerWorkspace() {
                   <th>Description</th>
                   <th>Amount</th>
                   <th>Account</th>
-                  <th>Mapped future</th>
-                  <th>Suggested</th>
-                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -1791,32 +1677,6 @@ function PlannerWorkspace() {
                     <td>{item.description}</td>
                     <td>{formatCurrency(item.amount)}</td>
                     <td>{item.account}</td>
-                    <td>{item.mappedFutureCommitmentId ?? 'Not mapped'}</td>
-                    <td>{suggestedMatchesByHistoryId[item.historyId]?.commitmentId ?? 'No suggestion'}</td>
-                    <td>
-                      <div className="grid-action-row">
-                        <select
-                          value={historyMapSelection[item.historyId] ?? suggestedMatchesByHistoryId[item.historyId]?.commitmentId ?? ''}
-                          onChange={(event) => setHistoryMapSelection((current) => ({ ...current, [item.historyId]: event.target.value }))}
-                        >
-                          <option value="">Select future one-off</option>
-                          {oneOffCommitmentOptions.map((option) => (
-                            <option key={option.id} value={option.id}>{option.label}</option>
-                          ))}
-                        </select>
-                        <button type="button" className="grid-action" onClick={() => void mapHistoryToFuture(item.historyId)} disabled={isSubmitting}>
-                          Map
-                        </button>
-                        <button
-                          type="button"
-                          className="grid-action"
-                          onClick={() => void mapHistoryToFuture(item.historyId, suggestedMatchesByHistoryId[item.historyId]?.commitmentId)}
-                          disabled={isSubmitting || !suggestedMatchesByHistoryId[item.historyId]}
-                        >
-                          Use suggestion
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 ))}
               </tbody>

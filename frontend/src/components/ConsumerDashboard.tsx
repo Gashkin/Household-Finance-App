@@ -1,140 +1,58 @@
 import { useEffect, useState } from 'react';
 
-interface MonthlyTransaction {
-  date: string;
-  description: string;
-  amount: number;
-  account: string;
-}
-
 interface MonthlyOverview {
   month: string;
-  startingBalance: number;
-  actualInflow: number;
-  actualOutflow: number;
-  committedOutgoings: number;
-  projectedEndBalance: number;
-  allowableSpend: number;
-  recentTransactions: MonthlyTransaction[];
+  status: 'UNAVAILABLE';
+  explanation: string;
 }
 
-function formatCurrency(value: number) {
-  return value.toLocaleString(undefined, { style: 'currency', currency: 'EUR' });
-}
-
-function ConsumerDashboard() {
+function ConsumerDashboard({ onOpenMoney, onOpenForecast }: {
+  onOpenMoney: () => void;
+  onOpenForecast: () => void;
+}) {
   const [overview, setOverview] = useState<MonthlyOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const loadMonthlyOverview = async () => {
     setLoading(true);
+    setOverview(null);
     setError('');
-
     try {
-      const response = await fetch('/reports/monthly-overview');
-      if (!response.ok) {
-        throw new Error('Request failed.');
+      const response = await fetch('/reports/monthly-overview', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Summary unavailable');
+      const data = await response.json();
+      if (data.status !== 'UNAVAILABLE' || typeof data.explanation !== 'string') {
+        throw new Error('Unsupported summary evidence');
       }
-
-      const data = (await response.json()) as MonthlyOverview;
       setOverview(data);
     } catch {
-      setError('Unable to load monthly overview. Ensure backend is running on port 8080.');
+      setError('Unable to load the monthly summary. Unlock the workspace and try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    void loadMonthlyOverview();
-  }, []);
-
-  const cashflowNet = overview ? overview.actualInflow - overview.actualOutflow : 0;
-  const cashflowMagnitude = overview ? Math.max(overview.actualInflow, overview.actualOutflow, 1) : 1;
-  const cashflowRatio = Math.min(100, Math.round((Math.abs(cashflowNet) / cashflowMagnitude) * 100));
-  const healthState = cashflowNet >= 0 ? 'On Track' : 'Needs Attention';
+  useEffect(() => { void loadMonthlyOverview(); }, []);
 
   return (
     <section>
       <div className="dashboard-header">
-        <div>
-          <h2>Consumer dashboard</h2>
-          <p>Monthly overview of financial position and allowable spend.</p>
-        </div>
+        <h2>Consumer dashboard</h2>
         <button type="button" onClick={() => void loadMonthlyOverview()} disabled={loading}>
           Refresh summary
         </button>
       </div>
-
       {loading && <p>Loading monthly summary...</p>}
-      {error && <p className="dashboard-error">{error}</p>}
-
+      {error && <p role="alert" className="dashboard-error">{error}</p>}
       {overview && !loading && (
-        <>
-          <div className="workspace-card cashflow-card">
-            <h3>Cashflow health</h3>
-            <p className={cashflowNet >= 0 ? 'cashflow-positive' : 'cashflow-negative'}>
-              {healthState}: {formatCurrency(cashflowNet)}
-            </p>
-            <div className="cashflow-meter" aria-label="cashflow health meter">
-              <div className="cashflow-fill" style={{ width: `${cashflowRatio}%` }} />
-            </div>
-          </div>
-
-          <div className="summary-grid">
-            <div className="summary-card">
-              <h3>Month</h3>
-              <p>{overview.month}</p>
-            </div>
-            <div className="summary-card">
-              <h3>Starting balance</h3>
-              <p>{formatCurrency(overview.startingBalance)}</p>
-            </div>
-            <div className="summary-card">
-              <h3>Actual inflow</h3>
-              <p>{formatCurrency(overview.actualInflow)}</p>
-            </div>
-            <div className="summary-card">
-              <h3>Actual outflow</h3>
-              <p>{formatCurrency(overview.actualOutflow)}</p>
-            </div>
-            <div className="summary-card">
-              <h3>Committed outgoings</h3>
-              <p>{formatCurrency(overview.committedOutgoings)}</p>
-            </div>
-            <div className="summary-card highlight">
-              <h3>Allowable spend</h3>
-              <p>{formatCurrency(overview.allowableSpend)}</p>
-            </div>
-          </div>
-
-          <div className="workspace-card transactions-card">
-            <h3>Recent transactions</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Description</th>
-                  <th>Account</th>
-                  <th>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {overview.recentTransactions.map((transaction) => (
-                  <tr key={`${transaction.date}-${transaction.description}-${transaction.amount}`}>
-                    <td>{transaction.date}</td>
-                    <td>{transaction.description}</td>
-                    <td>{transaction.account}</td>
-                    <td className={transaction.amount >= 0 ? 'cashflow-positive' : 'cashflow-negative'}>
-                      {formatCurrency(transaction.amount)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
+        <div className="workspace-card">
+          <h3>No verified monthly summary</h3>
+          <p>{overview.explanation}</p>
+          <p>Period: {overview.month}. Missing evidence is not a zero balance or permission to spend.</p>
+          <button type="button" onClick={onOpenMoney}>View reviewed money position</button>
+          <button type="button" onClick={onOpenForecast}>Open dated affordability plan</button>
+        </div>
       )}
     </section>
   );

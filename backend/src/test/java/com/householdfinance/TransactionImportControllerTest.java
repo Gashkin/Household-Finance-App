@@ -4,8 +4,8 @@ import com.householdfinance.controller.TransactionImportController;
 import com.householdfinance.service.TransactionImportService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -16,14 +16,25 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc(addFilters=false)
+@org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc(addFilters=false)
 @WebMvcTest(TransactionImportController.class)
 class TransactionImportControllerTest {
+
+    @Test void retiredMatchingRoutesNeverInvokeLegacyFinancialMutations() throws Exception {
+        for(String path:List.of("/imports/map-to-future","/imports/resolve-history")) {
+            for(int attempt=0;attempt<2;attempt++) {
+                mockMvc.perform(post(path).contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"historyId\":\"synthetic-replayed\",\"futureCommitmentId\":\"synthetic-future\",\"action\":\"CREATE_FUTURE\"}"))
+                    .andExpect(status().isGone());
+            }
+        }
+        org.mockito.Mockito.verifyNoInteractions(transactionImportService);
+    }
 
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private TransactionImportService transactionImportService;
 
     @Test

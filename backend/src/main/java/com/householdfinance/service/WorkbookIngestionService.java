@@ -12,7 +12,6 @@ import com.householdfinance.repository.TransactionRepository;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -197,7 +196,7 @@ public class WorkbookIngestionService {
             throw new IllegalArgumentException("Workbook file is required.");
         }
 
-        try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
+        try (Workbook workbook = WorkbookSafety.open(file)) {
             var formatter = new DataFormatter();
             var sheetPreviews = new ArrayList<WorkbookSheetPreview>();
             var totalRows = 0;
@@ -509,7 +508,7 @@ public class WorkbookIngestionService {
             throw new IllegalArgumentException("Workbook file is required.");
         }
 
-        try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
+        try (Workbook workbook = WorkbookSafety.open(file)) {
             var formatter = new DataFormatter();
             var accounts = new ArrayList<MappedAccount>();
             var categories = new ArrayList<MappedCategory>();

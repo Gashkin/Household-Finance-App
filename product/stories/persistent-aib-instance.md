@@ -10,6 +10,28 @@ Preparation is synthetic. No real AIB consent, provider production activation, a
 
 ## Install, use, update and recover
 
+### Verify the download before running any package script
+
+The expected source commit must come from the independent review and explicit
+owner release approval, not from the downloaded ZIP's manifest. Open the successful
+**Windows release verification** run on the authenticated GitHub repository, verify
+its repository, workflow, source SHA and synthetic Windows job results, and read
+the **Package ZIP SHA256** in that run's job summary. Download the artifact from
+that same run. If GitHub wraps it in an artifact archive, extract the inner
+`household-finance.zip` as data without running any scripts. Calculate its SHA256
+with `Get-FileHash` and compare against the independently obtained summary digest
+before extracting/executing the package's installer or dot-sourcing `Common.ps1`.
+
+A missing/mismatched source, run, review or digest blocks installation. A PR
+artifact is a test candidate, never approval for real-data use. The source-level
+production hold and GBD-15 readiness/owner-consent gates still apply. Package
+self-hashes only detect corruption after this external trust check; they cannot
+authenticate their own verifier. GitHub/repository administration and the accepted
+build runner remain trusted supply-chain boundaries and must be assessed under
+F6/F7; this procedure does not waive those controls.
+
+### Install and operate the accepted package
+
 1. Obtain the Windows ZIP for the reviewed exact commit from **Windows release verification**. Confirm the workflow, repository/commit and review evidence; hashes detect corruption, not a malicious replacement of both manifest and files. Extract to an ordinary local directory; do not put a private key or financial files there. Run `Install.ps1` in Windows PowerShell under a dedicated standard Windows runtime account that has no development, coding-agent or runner workloads. Do not reuse the coding/runner Windows profile for production. Organisation script policies may require locally unblocking a downloaded trusted release; do not disable machine-wide script policy.
 2. Choose a workspace password of 16–256 characters and save it in your password manager. Installation stores password and the connection encryption key using Windows current-user DPAPI, with an owner-only directory and ACL. They are not portable to a different Windows profile or device.
 3. Use the **Household Finance** desktop shortcut. Open the displayed loopback URL and unlock. Keep the foreground window open; Ctrl+C stops the instance. Banking and AI egress are disabled by default. Manual and CSV operation remain available.

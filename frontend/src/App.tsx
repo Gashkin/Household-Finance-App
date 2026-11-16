@@ -42,7 +42,7 @@ function App() {
         {role === 'decision' ? <DebtDecisionWorkspace onPlanCreated={id => { setPlanId(id); setRole('plans'); }} /> : null}
         {role === 'planner' ? <PlannerWorkspace /> : null}
         {role === 'migrater' ? <MigraterWorkspace /> : null}
-        {role === 'consumer' ? <ConsumerDashboard /> : null}
+        {role === 'consumer' ? <ConsumerDashboard onOpenMoney={() => setRole('money')} onOpenForecast={() => setRole('forecast')} /> : null}
       </main>
     </div>
   );

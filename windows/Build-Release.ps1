@@ -1,6 +1,20 @@
 param([string]$Output = (Join-Path $PSScriptRoot '..\release'))
 $ErrorActionPreference = 'Stop'
 $source = Split-Path $PSScriptRoot
+function Get-SafeBuildOutput([string]$Relative) {
+    $workspace=[IO.Path]::GetFullPath($source)
+    $target=[IO.Path]::GetFullPath((Join-Path $workspace $Relative))
+    if (-not $target.StartsWith($workspace+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) { throw 'Build output escapes the checkout.' }
+    $ancestor=$target
+    while ($ancestor -and $ancestor.StartsWith($workspace,[StringComparison]::OrdinalIgnoreCase)) {
+        if (Test-Path -LiteralPath $ancestor) {
+            if ((Get-Item -LiteralPath $ancestor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Build output must not traverse reparse points.' }
+        }
+        if ($ancestor -eq $workspace) { break }
+        $ancestor=Split-Path $ancestor
+    }
+    $target
+}
 Push-Location $source
 try {
     # Reject a dirty checkout before packaging so the manifest's commit matches
@@ -10,16 +24,26 @@ try {
     if ($dirty.Count -ne 0) { throw 'Refusing to package an uncommitted or untracked checkout; use a clean exact commit.' }
     $commit = (git rev-parse --verify HEAD).Trim()
     if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-f]{40}$') { throw 'Could not determine the reviewed release commit.' }
+    # Git cleanliness does not clear ignored output. Remove only checked build
+    # paths before any compiler or Vite configuration can consume stale files.
+    foreach ($relative in @('frontend/dist','frontend/tsconfig.app.tsbuildinfo','frontend/tsconfig.node.tsbuildinfo','frontend/vite.config.js','frontend/vite.config.d.ts')) {
+        $generated=Get-SafeBuildOutput $relative
+        if (Test-Path -LiteralPath $generated) { Remove-Item -LiteralPath $generated -Recurse -Force }
+    }
+    Get-SafeBuildOutput 'frontend/node_modules' | Out-Null
+    Get-SafeBuildOutput 'backend/target' | Out-Null
     Push-Location frontend
     try { npm ci; if ($LASTEXITCODE) { throw 'npm ci failed' }; npm run build; if ($LASTEXITCODE) { throw 'Frontend build failed' } }
     finally { Pop-Location }
-    & mvn -B -ntp -f backend/pom.xml test
+    # Ignored classes/resources must not survive an earlier local build and
+    # masquerade as output from the manifest's exact source commit (audit F7).
+    & mvn -B -ntp -f backend/pom.xml clean test
     if ($LASTEXITCODE) { throw 'Backend tests failed' }
-    $static = Join-Path $source 'backend\target\classes\static'
+    $static = Get-SafeBuildOutput 'backend/target/classes/static'
     if (Test-Path -LiteralPath $static) { Remove-Item -LiteralPath $static -Recurse -Force }
     New-Item -ItemType Directory -Path $static | Out-Null
     Copy-Item -Path 'frontend\dist\*' -Destination $static -Recurse
-    & mvn -B -ntp -f backend/pom.xml package org.springframework.boot:spring-boot-maven-plugin:3.2.5:repackage -DskipTests
+    & mvn -B -ntp -f backend/pom.xml package org.springframework.boot:spring-boot-maven-plugin:4.1.2:repackage -DskipTests
     if ($LASTEXITCODE) { throw 'Backend packaging failed' }
     if (Test-Path -LiteralPath $Output) { throw 'Choose an empty release destination.' }
     New-Item -ItemType Directory -Path $Output | Out-Null

@@ -40,16 +40,19 @@ public class TransactionImportController {
     }
 
     @PostMapping(path = "/imports/map-to-future", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public TransactionImportService.MapToFutureResult mapToFuture(
-            @RequestBody TransactionImportService.MapToFutureRequest request
-    ) {
-        return transactionImportService.mapToFuture(request);
+    public org.springframework.http.ResponseEntity<java.util.Map<String,String>> mapToFuture() {
+        return legacyMatchingUnavailable();
     }
 
     @PostMapping(path = "/imports/resolve-history", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public TransactionImportService.ResolveHistoryResult resolveHistory(
-            @RequestBody TransactionImportService.ResolveHistoryRequest request
-    ) {
-        return transactionImportService.resolveHistory(request);
+    public org.springframework.http.ResponseEntity<java.util.Map<String,String>> resolveHistory() {
+        return legacyMatchingUnavailable();
+    }
+
+    private org.springframework.http.ResponseEntity<java.util.Map<String,String>> legacyMatchingUnavailable() {
+        // Process-local history cannot authorise durable balance changes safely
+        // across retries, cross-import duplicates or restart (audit F2).
+        return org.springframework.http.ResponseEntity.status(org.springframework.http.HttpStatus.GONE)
+            .body(java.util.Map.of("error", "Legacy financial matching is unavailable. Use Money position to review and approve activity."));
     }
 }
