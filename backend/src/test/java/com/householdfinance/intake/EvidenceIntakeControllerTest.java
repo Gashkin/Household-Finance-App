@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(properties={"evidence.intake.access-key=synthetic-test-access-0000","evidence.ai.enabled=false"}) @AutoConfigureMockMvc(addFilters=false)
+@org.junit.jupiter.api.extension.ExtendWith(com.householdfinance.access.OwnerFixture.class)
 class EvidenceIntakeControllerTest {
     @Autowired MockMvc mvc; @Autowired ObjectMapper mapper; @Autowired CashPositionSnapshotRepository repository;
     @Autowired org.springframework.web.context.WebApplicationContext context;

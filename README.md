@@ -2,7 +2,7 @@
 
 ## Dated cash evidence → debt decision (current product slice)
 
-First configure `WORKSPACE_PASSWORD` (16–256 characters) in the backend environment. Then run the Java 21 / Spring Boot backend with `cd backend && mvn spring-boot:run`. In another terminal run
+First configure `WORKSPACE_PASSWORD` (16–256 characters) in the backend environment. This seeds the named `owner` account on its first sign-in. Then run the Java 21 / Spring Boot backend with `cd backend && mvn spring-boot:run`. In another terminal run
 `cd frontend && npm ci && npm run dev`, then open http://localhost:5173.
 
 The **Debt decision** workspace lets you save a dated household cash position (cash accounts, next 30 days'
@@ -10,7 +10,7 @@ commitments, source/status and protected reserve), then explicitly apply that po
 Both the cash totals and loan calculation run in the backend. Saved snapshots remain in local H2 storage;
 the comparison itself is not saved. See [the journey and API notes](product/dated-cash-position-journey.md).
 
-**Security boundary:** one password-protected local workspace, with server-enforced sessions and encrypted recovery backups. Use a private OS profile and encrypted disk: the live H2 database is not application-encrypted. No multi-user or network deployment. See [setup, backup and tested recovery](product/stories/private-workspace.md).
+**Security boundary:** one local household workspace with named users, combined roles, private accounts and explicit sharing. Use a private OS profile and encrypted disk: the live H2 database is not application-encrypted, and application permissions do not isolate people who can read its files. Loopback access only; remote or public deployment is unsupported. See [named access and recovery](product/stories/household-access.md) and [encrypted backup setup](product/stories/private-workspace.md).
 
 ## OKF Knowledge Model
 

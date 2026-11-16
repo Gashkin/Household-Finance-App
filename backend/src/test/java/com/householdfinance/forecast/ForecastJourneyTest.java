@@ -23,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
       "spring.datasource.url=jdbc:h2:mem:forecast-journey;DB_CLOSE_DELAY=-1"
     })
 @AutoConfigureMockMvc
+@org.junit.jupiter.api.extension.ExtendWith(com.householdfinance.access.OwnerFixture.class)
 class ForecastJourneyTest {
   @Autowired ForecastService service;
   @Autowired ForecastPlanRepository repository;
@@ -397,12 +398,12 @@ class ForecastJourneyTest {
     byte[] plain = BackupCrypto.decrypt(backup, password);
     var archive = json.readValue(plain, WorkspaceBackupService.Archive.class);
     Arrays.fill(plain, (byte) 0);
-    assertEquals(4, archive.version());
+    assertEquals(5, archive.version());
     assertTrue(archive.tables().containsKey("FORECAST_PLANS"));
     clear();
     backups.restore(backup, password, "RESTORE INTO EMPTY WORKSPACE");
     assertEquals(p.inputs(), service.get().plan().inputs());
-    var v2 = new LinkedHashMap<>(archive.tables());
+    var v2 = new LinkedHashMap<>(com.householdfinance.workspace.LegacyArchiveFixture.tables(archive,2));
     v2.remove("FORECAST_PLANS");
     v2.remove("DECISION_PLANS");
     clear();

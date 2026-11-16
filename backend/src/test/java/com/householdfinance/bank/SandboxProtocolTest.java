@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
       "spring.datasource.url=jdbc:h2:mem:bank-protocol;DB_CLOSE_DELAY=-1"
     })
 @AutoConfigureMockMvc
+@org.junit.jupiter.api.extension.ExtendWith(com.householdfinance.access.OwnerFixture.class)
 class SandboxProtocolTest {
   @Autowired LedgerService ledger;
   @Autowired MockMvc mvc;

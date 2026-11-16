@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
       "spring.datasource.url=jdbc:h2:mem:decision-journey;DB_CLOSE_DELAY=-1"
     })
 @AutoConfigureMockMvc
+@org.junit.jupiter.api.extension.ExtendWith(com.householdfinance.access.OwnerFixture.class)
 class DecisionPlanJourneyTest {
   @Autowired DecisionPlanService service;
   @Autowired DecisionPlanRepository repository;
@@ -282,11 +283,11 @@ class DecisionPlanJourneyTest {
     var archive =
         json.readValue(
             BackupCrypto.decrypt(backup, password), WorkspaceBackupService.Archive.class);
-    assertEquals(4, archive.version());
+    assertEquals(5, archive.version());
     clear();
     backups.restore(backup, password, "RESTORE INTO EMPTY WORKSPACE");
     assertEquals(expected, service.get(p.id()).data());
-    var tables = new LinkedHashMap<>(archive.tables());
+    var tables = new LinkedHashMap<>(com.householdfinance.workspace.LegacyArchiveFixture.tables(archive,3));
     tables.remove("DECISION_PLANS");
     clear();
     backups.restore(
@@ -482,12 +483,15 @@ class DecisionPlanJourneyTest {
       java.util.concurrent.Callable<String> create =
           () -> {
             barrier.await();
+            new com.householdfinance.access.OwnerFixture().beforeEach(null);
             try {
               service.create(content);
               return "accepted";
             } catch (IllegalArgumentException e) {
               if (!e.getMessage().contains("backup limit")) throw e;
               return "capacity";
+            } finally {
+              com.householdfinance.access.AccessContext.clear();
             }
           };
       var a = executor.submit(create);

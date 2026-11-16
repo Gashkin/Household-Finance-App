@@ -72,6 +72,7 @@ public class TransactionImportService {
     }
 
     public ImportPreview previewCsv(String csvContent) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         var importId = UUID.randomUUID().toString();
         var transactions = new ArrayList<ImportedTransaction>();
         var duplicateKeys = new HashSet<String>();
@@ -119,6 +120,7 @@ public class TransactionImportService {
     }
 
     public ImportAcceptResult acceptImport(ImportAcceptRequest request) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         var importId = request.importId();
         var acceptedRowIds = request.acceptedRowIds() == null ? List.<String>of() : request.acceptedRowIds();
         var previewRows = previewCacheByImportId.getOrDefault(importId, List.of());
@@ -157,12 +159,14 @@ public class TransactionImportService {
     }
 
     public List<TransactionHistoryItem> getHistory() {
+        com.householdfinance.access.AccessContext.requireLegacy();
         return historyItems.stream()
                 .sorted(Comparator.comparing(TransactionHistoryItem::historyId))
                 .toList();
     }
 
     public MapToFutureResult mapToFuture(MapToFutureRequest request) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         resolveHistory(new ResolveHistoryRequest(
                 request == null ? null : request.historyId(),
                 ACTION_MAP_TO_FUTURE,
@@ -174,6 +178,7 @@ public class TransactionImportService {
     }
 
     public ResolveHistoryResult resolveHistory(ResolveHistoryRequest request) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         if (request == null || request.historyId() == null || request.historyId().isBlank()) {
             throw new IllegalArgumentException("historyId is required.");
         }

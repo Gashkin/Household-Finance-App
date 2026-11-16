@@ -23,6 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc(addFilters=false)
 @WebMvcTest(PlannerController.class)
+@org.springframework.boot.test.mock.mockito.MockBean(com.householdfinance.access.AccessService.class)
 class PlannerControllerTest {
 
     @Autowired

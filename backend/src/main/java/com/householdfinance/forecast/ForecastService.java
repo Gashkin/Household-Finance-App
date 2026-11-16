@@ -91,7 +91,7 @@ public class ForecastService {
       List<String> warnings,
       Projection projection) {}
 
-  public record Workspace(LocalDate today, LocalDate suggestedLedgerDate, View plan) {}
+  public record Workspace(LocalDate today, LocalDate suggestedLedgerDate, View plan, Long hiddenPlanRevision) {}
 
   public record WhatIf(
       Long revision,
@@ -315,6 +315,7 @@ public class ForecastService {
 
   @Transactional
   public synchronized Workspace save(Input input) {
+    com.householdfinance.access.AccessContext.requireEdit();
     check(
         input != null
             && input.revision() != null
@@ -322,7 +323,7 @@ public class ForecastService {
             && Boolean.TRUE.equals(input.acknowledged()),
         "Confirm starting evidence and exclude expenses already reserved, paid, or represented by"
             + " pending debits");
-    var plan = repository.findById("household").orElse(null);
+    var plan = repository.findById(com.householdfinance.access.AccessContext.forecastId()).orElse(null);
     check(
         input.revision() == (plan == null ? 0 : plan.version + 1),
         "Plan changed; reload before saving corrections");
@@ -331,6 +332,7 @@ public class ForecastService {
             ? capture(input.baseline())
             : plan == null ? null : read(plan).baseline();
     check(baseline != null, "Choose explicit starting evidence");
+    check(!baseline.mode().equals("LEDGER")||ledger.sourcesVisible(baseline.revisions().keySet()),"Access to starting evidence changed; choose new evidence");
     check(
         input.endDate() != null
             && input.endDate().isAfter(baseline.date())
@@ -348,7 +350,7 @@ public class ForecastService {
     projection(stored, stored.events(), false);
     if (plan == null) {
       plan = new ForecastPlan();
-      plan.id = "household";
+      plan.id = com.householdfinance.access.AccessContext.forecastId();
     }
     try {
       plan.payload = json.writeValueAsString(stored);
@@ -379,17 +381,20 @@ public class ForecastService {
 
   @Transactional(readOnly = true)
   public Workspace get() {
-    return workspace(repository.findById("household").orElse(null));
+    com.householdfinance.access.AccessContext.requireRead();
+    return workspace(repository.findById(com.householdfinance.access.AccessContext.forecastId()).orElse(null));
   }
 
   private Workspace workspace(ForecastPlan plan) {
-    return new Workspace(today(), suggestedLedgerDate(), plan == null ? null : view(plan));
+    if(plan!=null){var b=read(plan).baseline();if(b.mode().equals("LEDGER")&&!ledger.sourcesVisible(b.revisions().keySet()))return new Workspace(today(),suggestedLedgerDate(),null,plan.version+1);}
+    return new Workspace(today(), suggestedLedgerDate(), plan == null ? null : view(plan),null);
   }
 
   private View view(ForecastPlan plan) {
     var stored = read(plan);
     List<String> warnings = new ArrayList<>();
     Baseline b = stored.baseline();
+    check(!b.mode().equals("LEDGER")||ledger.sourcesVisible(b.revisions().keySet()),"Access to starting evidence changed; choose new evidence");
     String state = "REVIEWED";
     if (b.mode().equals("MANUAL")) {
       state = "ESTIMATED";
@@ -451,9 +456,10 @@ public class ForecastService {
 
   @Transactional(readOnly = true)
   public Comparison compare(WhatIf input) {
+    com.householdfinance.access.AccessContext.requireRead();
     var plan =
         repository
-            .findById("household")
+            .findById(com.householdfinance.access.AccessContext.forecastId())
             .orElseThrow(
                 () -> new IllegalArgumentException("Save reviewed plan inputs before comparing"));
     var view = view(plan);

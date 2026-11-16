@@ -6,6 +6,8 @@
     {"path":"backend/src/main/java/com/householdfinance/access/AccessService.java","contains":["class AccessService"]},
     {"path":"frontend/src/components/HouseholdAccess.tsx","contains":["HouseholdAccess"]},
     {"path":"backend/src/test/java/com/householdfinance/access/HouseholdAccessTest.java","contains":["class HouseholdAccessTest"]},
-    {"path":"product/stories/household-access.md","contains":["GBD-16"]}
+    {"path":"product/stories/household-access.md","contains":["GBD-16"]},
+    {"path":"backend/src/test/java/com/householdfinance/access/AccessRecoveryRestartTest.java","contains":["existingSingleOwnerDatabaseMigratesAccountsToPrivate"]},
+    {"path":"frontend/e2e/household-access.spec.ts","contains":["loses access on withdrawal","local recovery"]}
   ]
 }

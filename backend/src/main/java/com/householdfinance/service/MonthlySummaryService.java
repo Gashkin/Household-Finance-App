@@ -27,6 +27,7 @@ public class MonthlySummaryService {
     }
 
     public MonthlyOverview getMonthlyOverview() {
+        com.householdfinance.access.AccessContext.requireLegacy();
         var plannerData = plannerService.getPlannerData();
         var recentTransactions = sampleTransactions();
 

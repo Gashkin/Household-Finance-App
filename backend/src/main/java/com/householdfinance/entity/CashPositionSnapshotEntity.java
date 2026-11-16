@@ -17,6 +17,8 @@ import java.util.List;
 @Entity
 @Table(name = "cash_position_snapshots")
 public class CashPositionSnapshotEntity {
+    @Column(length=36) public String ownerId = com.householdfinance.access.AccessContext.actor()==null?"owner":com.householdfinance.access.AccessContext.userId();
+    @Column(length=40000) public String scopeRefs;
     @Id
     @Column(length = 36)
     private String id;

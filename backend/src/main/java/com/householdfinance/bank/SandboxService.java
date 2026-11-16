@@ -119,6 +119,7 @@ public class SandboxService {
   }
 
   public synchronized Status status() {
+        com.householdfinance.access.AccessContext.requireLegacy();
     String state =
         blocked ? "REVOCATION_PENDING" : sessionId == null
             ? "DISCONNECTED"
@@ -137,6 +138,7 @@ public class SandboxService {
   }
 
   public synchronized List<Bank> banks() {
+        com.householdfinance.access.AccessContext.requireLegacy();
     gateway.verifySandbox();
     List<Bank> banks = new ArrayList<>();
     JsonNode values = gateway.request("GET", "/aspsps", null).path("aspsps");
@@ -154,6 +156,7 @@ public class SandboxService {
   }
 
   public synchronized Map<String, String> start(Start input, String binding) {
+        com.householdfinance.access.AccessContext.requireLegacy();
     check(
         input != null && Boolean.TRUE.equals(input.acknowledged()),
         "Confirm read-only account, balance and transaction access through Enable Banking; select only your own accounts in the bank consent flow");
@@ -207,6 +210,7 @@ public class SandboxService {
   }
 
   public synchronized Status complete(Complete input, String binding) {
+        com.householdfinance.access.AccessContext.requireLegacy();
     check(
         input != null
             && pending != null
@@ -306,6 +310,7 @@ public class SandboxService {
   }
 
   public synchronized Fetched fetch(Fetch input) {
+        com.householdfinance.access.AccessContext.requireLegacy();
     check(
         input != null && Boolean.TRUE.equals(input.acknowledged()),
         "Confirm this explicit read-only data refresh");
@@ -467,6 +472,7 @@ public class SandboxService {
   }
 
   public synchronized Status disconnect() {
+        com.householdfinance.access.AccessContext.requireLegacy();
     pending = null;
     if (sessionId == null && !blocked) return forget();
     blocked = true;
@@ -478,12 +484,14 @@ public class SandboxService {
   }
 
   public synchronized Status confirmExternalRevocation(Boolean acknowledged) {
+        com.householdfinance.access.AccessContext.requireLegacy();
     check(blocked && Boolean.TRUE.equals(acknowledged), "Explicit confirmation of bank/provider revocation is required");
     blocked = false;
     return forget();
   }
 
   public synchronized Status forget() {
+        com.householdfinance.access.AccessContext.requireLegacy();
     check(!blocked, "Revocation is pending. Retry disconnect or revoke at the bank/provider and explicitly confirm before forgetting.");
     pending = null;
     sessionId = null;

@@ -6,9 +6,10 @@ test.beforeEach(unlockFixture);
 
 test('capture cash evidence, inspect and download a reproducible debt decision', async ({ page, request }, testInfo) => {
   await page.goto('/');
+  await expect(page.getByRole('heading',{name:'Cash position',exact:true})).toBeVisible();
   await expect(page.getByText('Loading saved cash position…')).toBeHidden();
   const editor = page.locator('.cash-editor');
-  await editor.evaluate(element => element.setAttribute('open', ''));
+  if(!await page.getByLabel('Evidence source or reference').isVisible())await editor.locator('summary').click();
   await page.getByLabel('Evidence source or reference').fill('Synthetic bank statement');
   await page.getByLabel('Evidence status').selectOption('REVIEWED');
   await page.getByLabel('Protected reserve (€)', { exact: true }).fill('400');
@@ -40,7 +41,7 @@ test('capture cash evidence, inspect and download a reproducible debt decision',
   expect(report.cashEvidence.sourceNote).toBe('Synthetic bank statement');
   expect(report.cashEvidence.committedMinor).toBe(10000);
   expect(report.input.cashPositionSnapshotId).toBe(report.cashEvidence.id);
-  const replay = await request.post('http://127.0.0.1:8080/api/debt-scenarios/report', { data: report.input });
+  const replay = await request.post((process.env.WORKSPACE_TEST_BACKEND || 'http://127.0.0.1:8080')+'/api/debt-scenarios/report', { data: report.input });
   expect(replay.ok()).toBeTruthy();
   expect((await replay.json()).result).toEqual(report.result);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
