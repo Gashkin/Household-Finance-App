@@ -1075,14 +1075,35 @@ public class WorkbookIngestionService {
             var index=findHeaderIndex(headers,candidate);
             if (index==null || row.getCell(index)==null) continue;
             var cell=row.getCell(index);
-            if (cell.getCellType()==org.apache.poi.ss.usermodel.CellType.FORMULA)
-                throw new IllegalArgumentException("Financial formula cells require explicit manual review; cached results are not accepted.");
-            if (cell.getCellType()==org.apache.poi.ss.usermodel.CellType.NUMERIC)
-                return java.math.BigDecimal.valueOf(cell.getNumericCellValue()).toPlainString();
-            var text=formatter.formatCellValue(cell).trim();
-            if (!text.isEmpty()) return text;
+            String location="Sheet "+(row.getSheet().getWorkbook().getSheetIndex(row.getSheet())+1)
+                +" cell "+cell.getAddress().formatAsString();
+            try {
+                if (cell.getCellType()==org.apache.poi.ss.usermodel.CellType.FORMULA)
+                    throw new IllegalArgumentException("Financial formula cells require explicit manual review; cached results are not accepted.");
+                if (cell.getCellType()==org.apache.poi.ss.usermodel.CellType.NUMERIC) {
+                    if (!(cell instanceof org.apache.poi.xssf.usermodel.XSSFCell numeric))
+                        throw new IllegalArgumentException("Only raw XLSX numeric values are supported.");
+                    String raw=numeric.getRawValue();
+                    if (raw==null || raw.isEmpty() || raw.length()>64)
+                        throw new IllegalArgumentException("An explicit bounded monetary value is required.");
+                    // Validate the original OOXML lexeme BEFORE any double conversion.
+                    var exact=new java.math.BigDecimal(raw);
+                    LegacyMoney.require(exact,true);
+                    // Normalize only after admission, so tiny/overflow exponents cannot
+                    // allocate huge decimal strings and exact exponent cents still work.
+                    return exact.stripTrailingZeros().toPlainString();
+                }
+                var text=formatter.formatCellValue(cell).trim();
+                if (!text.isEmpty()) {
+                    LegacyMoney.parse(text,true);
+                    return text;
+                }
+            } catch (IllegalArgumentException invalid) {
+                throw new IllegalArgumentException(location+": invalid or unsupported monetary value.",invalid);
+            }
         }
-        return "";
+        throw new IllegalArgumentException("Missing workbook amount in sheet "
+            +(row.getSheet().getWorkbook().getSheetIndex(row.getSheet())+1)+", row "+(row.getRowNum()+1)+".");
     }
 
     private double parseAmount(String rawAmount) {

@@ -271,3 +271,25 @@ The `49228ae` installed launcher reached Java, which rejected an inherited empty
 readiness false alongside both disabled banking environments instead of relying
 on an absent environment variable. The unconditional production holds are unchanged.
 This startup failure was fail-closed and did not enable banking or change records.
+
+## N1 raw OOXML precision remediation — owner-directed follow-up
+
+The [independent final-head report](https://www.notion.so/41ad3419fef08111bd56d9e0726b07b4)
+found one new Medium defect at `4908103`: numeric `1.000000000000000001` and
+`90071992547409.91` were rounded before validation. The owner directed fixing it
+and explicitly requested no additional independent verification round.
+
+Shared workbook amount extraction now validates bounded original XSSF numeric
+text as BigDecimal before conversion, retaining exact cent/range/round-trip
+admission. Only admitted decimals are normalized, preventing exponent expansion
+before validation. Formula rejection remains; failures carry sheet/cell/row
+attribution without including financial values. The shared helper covers every
+existing mapping amount caller. Regressions exercise actual HTTP mapping,
+validation and committed records for account and commitment routes, raw precision,
+underflow/overflow/exponents, malformed/empty/error/formula cells and valid cents.
+
+Verification results will be recorded in the canonical Notion story after checks.
+The new head must not inherit the previous independent verdict or artifact hashes.
+No repeat independent review will be requested, per the owner's instruction.
+F6, R1 parser containment and B1–B4 remain explicit unresolved release gates; both
+production holds remain intact. No production activation or story completion.
