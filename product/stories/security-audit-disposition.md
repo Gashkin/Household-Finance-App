@@ -245,3 +245,14 @@ Windows PowerShell 5.1; this security-sensitive native boundary requires the
 separate independent review. No real-user path or production permissions were changed.
 
 API reference: [Microsoft SetNamedSecurityInfoW](https://learn.microsoft.com/en-us/windows/win32/api/aclapi/nf-aclapi-setnamedsecurityinfow).
+
+The rebuilt `fadbd7f` candidate passed synthetic installation/update/weak-permission
+rejection, then failed actual launcher startup because `Get-FileHash` was unavailable
+in that Windows PowerShell child session. Release/runtime integrity and readiness
+key comparison now use an explicit streaming .NET SHA256 helper, retaining the same
+hash algorithm and fail-closed comparisons. Its output matched `Get-FileHash` under
+the build host and ran successfully under Windows PowerShell 5.1. The first in-sandbox
+PowerShell 5.1 probe was rejected by script authorization; the authorised out-of-sandbox
+probe passed. No execution policy or OS-wide module configuration was changed.
+Full rebuilt installed verification remains pending; the interrupted/failed tests
+are not reported as installed PASS.

@@ -35,6 +35,13 @@ namespace HouseholdFinance {
 }
 '@
 }
+function Get-ReleaseFileHash([string]$Path) {
+    # Avoid dependence on Get-FileHash module auto-loading across PS 5.1/7 hosts.
+    $stream=[IO.File]::OpenRead($Path)
+    $algorithm=[Security.Cryptography.SHA256]::Create()
+    try { [BitConverter]::ToString($algorithm.ComputeHash($stream)).Replace('-','') }
+    finally { $algorithm.Dispose(); $stream.Dispose() }
+}
 function Get-InstanceRoot {
     if ($env:OS -ne 'Windows_NT') { throw 'This installer requires Windows.' }
     Join-Path $env:LOCALAPPDATA 'HouseholdFinance'
@@ -102,7 +109,7 @@ function Get-PackageManifest([string]$Directory) {
         if ($entry.path -notmatch '^[A-Za-z0-9_./-]+$' -or $entry.path.Contains('..') -or [IO.Path]::IsPathRooted($entry.path)) { throw 'Invalid release path.' }
         $path = Join-Path $Directory $entry.path
         if ((Get-Item -LiteralPath $path).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Invalid release link.' }
-        if ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $entry.sha256) { throw 'Release integrity check failed.' }
+        if ((Get-ReleaseFileHash $path) -ne $entry.sha256) { throw 'Release integrity check failed.' }
     }
     $manifest
 }
