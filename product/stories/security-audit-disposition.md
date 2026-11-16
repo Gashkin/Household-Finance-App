@@ -256,3 +256,12 @@ PowerShell 5.1 probe was rejected by script authorization; the authorised out-of
 probe passed. No execution policy or OS-wide module configuration was changed.
 Full rebuilt installed verification remains pending; the interrupted/failed tests
 are not reported as installed PASS.
+
+The `df8b716` launcher next failed loading `Get-Acl` from its inherited module
+search path. Common now explicitly imports the security module from the running
+PowerShell host's own `$PSHOME`, while launcher/test subprocesses resolve Windows
+PowerShell through `%SystemRoot%` rather than an inherited executable search path.
+A Windows PowerShell 5.1 probe with an intentionally unusable `PSModulePath`
+passed security-command loading and SHA256 checks. No machine/user environment,
+execution policy or real-instance data was changed. Final assembled testing is
+required again; earlier installed startup failures remain recorded above.

@@ -1,5 +1,8 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+# Windows PowerShell children can inherit a PowerShell 7 module search path.
+# Load the security commands from this host's own installation, never that path.
+Import-Module -Name (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1') -ErrorAction Stop
 # Set only owner and protected DACL. Set-Acl can request SACL/audit privileges
 # when tightening an existing path under a standard Windows account.
 if (-not ('HouseholdFinance.WindowsDacl' -as [type])) {

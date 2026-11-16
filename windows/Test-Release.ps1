@@ -171,7 +171,7 @@ function Stop-SyntheticInstance {
 function Restart-SyntheticInstance {
     param($Previous)
     Stop-SyntheticInstance $Previous
-    $next=Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-File',('"'+$startScript+'"'),'-Port',[string]$fixturePort) -WorkingDirectory $instance -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $instance 'restart.log') -RedirectStandardError (Join-Path $instance 'restart-error.log')
+    $next=Start-Process -FilePath (Join-Path $env:WINDIR 'System32/WindowsPowerShell/v1.0/powershell.exe') -ArgumentList @('-NoProfile','-File',('"'+$startScript+'"'),'-Port',[string]$fixturePort) -WorkingDirectory $instance -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $instance 'restart.log') -RedirectStandardError (Join-Path $instance 'restart-error.log')
     for($attempt=0;$attempt -lt 90;$attempt++) {
         if($next.HasExited){throw 'Synthetic restart failed.'}
         try { $health=Invoke-WebRequest "${baseUrl}/health" -UseBasicParsing; if($health.StatusCode -eq 200){return $next} } catch {}
@@ -185,7 +185,7 @@ function Unlock-SyntheticInstance {
     Invoke-WebRequest "${baseUrl}/api/workspace/unlock" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body '{"password":"synthetic-install-password"}' -WebSession $web -UseBasicParsing | Out-Null
     return $web
 }
-$process=Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-File',('"'+$startScript+'"'),'-Port',[string]$fixturePort) -WorkingDirectory $instance -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $instance 'app.log') -RedirectStandardError (Join-Path $instance 'error.log')
+$process=Start-Process -FilePath (Join-Path $env:WINDIR 'System32/WindowsPowerShell/v1.0/powershell.exe') -ArgumentList @('-NoProfile','-File',('"'+$startScript+'"'),'-Port',[string]$fixturePort) -WorkingDirectory $instance -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $instance 'app.log') -RedirectStandardError (Join-Path $instance 'error.log')
 try {
     $ready=$false
     for($i=0;$i -lt 90;$i++) {
