@@ -1,0 +1,58 @@
+package com.householdfinance.workspace;
+
+import static org.junit.jupiter.api.Assertions.*;
+import com.householdfinance.service.MigrationArtifactService;
+import java.util.*;
+import java.util.concurrent.*;
+import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+
+@SpringBootTest(properties={"spring.datasource.url=jdbc:h2:mem:workspace-capacity;DB_CLOSE_DELAY=-1"})
+class WorkspaceCapacityTest {
+  @Autowired MigrationArtifactService artifacts;
+  @Autowired WorkspaceBackupService backups;
+  @Autowired JdbcTemplate jdbc;
+
+  @BeforeEach void clear() {
+    var tables=new ArrayList<>(WorkspaceBackupService.TABLES);
+    Collections.reverse(tables);
+    tables.forEach(t->jdbc.update("DELETE FROM "+t));
+  }
+
+  @Test void nonPlanWritesCannotCommitAnUnrecoverableWorkspace() {
+    artifacts.recordArtifact("kept","SYNTHETIC", "x".repeat(1_100_000));
+    var before=backups.counts();
+    assertThrows(IllegalArgumentException.class,
+        ()->artifacts.recordArtifact("rejected","SYNTHETIC", "y".repeat(800_000)));
+    assertEquals(before,backups.counts());
+    assertNull(artifacts.getLatestPayload("rejected","SYNTHETIC",String.class));
+    byte[] archive=backups.exportBackup("synthetic-separate-backup-password");
+    clear();
+    assertEquals(before,backups.restore(archive,"synthetic-separate-backup-password","RESTORE INTO EMPTY WORKSPACE"));
+    assertEquals("x".repeat(1_100_000),artifacts.getLatestPayload("kept","SYNTHETIC",String.class));
+  }
+
+  @Test void concurrentNonPlanTransactionsCannotOverbookCapacityAndRollbackReleasesAdmission() throws Exception {
+    artifacts.recordArtifact("baseline","SYNTHETIC", "x".repeat(1_100_000));
+    var barrier=new CyclicBarrier(2);
+    var pool=Executors.newFixedThreadPool(2);
+    try {
+      Callable<String> write=()->{
+        barrier.await();
+        try { artifacts.recordArtifact(UUID.randomUUID().toString(),"SYNTHETIC","y".repeat(400_000)); return "accepted"; }
+        catch (IllegalArgumentException e) { return "rejected"; }
+      };
+      var a=pool.submit(write);var b=pool.submit(write);
+      var results=List.of(a.get(30,TimeUnit.SECONDS),b.get(30,TimeUnit.SECONDS));
+      assertEquals(1,Collections.frequency(results,"accepted"));
+      assertEquals(1,Collections.frequency(results,"rejected"));
+      // A later write on another thread proves rejected commits release admission.
+      pool.submit(()->artifacts.recordArtifact("after-rollback","SYNTHETIC","small"))
+          .get(10,TimeUnit.SECONDS);
+      assertEquals(3L,backups.counts().get("MIGRATION_ARTIFACTS"));
+      assertNotNull(backups.exportBackup("synthetic-separate-backup-password"));
+    } finally { pool.shutdownNow(); }
+  }
+}

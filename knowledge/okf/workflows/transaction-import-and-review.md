@@ -4,7 +4,7 @@ title: Transaction Import and Review Workflow
 description: CSV import preview, dedupe review, acceptance, suggested matching, and optional mapping to future commitments.
 resource: backend/src/main/java/com/householdfinance/service/TransactionImportService.java
 tags: [okf, workflow, import, reconciliation]
-timestamp: 2026-07-27T00:00:00Z
+timestamp: 2026-11-16T00:00:00Z
 ---
 
 # Transaction Import and Review Workflow
@@ -21,6 +21,14 @@ timestamp: 2026-07-27T00:00:00Z
 - CSV content
 - accepted row id list
 - history id to future commitment id mapping
+
+## Integrity and bounds
+- Use the shared quoted CSV parser with the exact `date,description,amount,account` header, at most 100,000 characters and 500 complete rows.
+- Reject invalid ISO dates, missing account/description, malformed or non-finite amounts and fractional cents; do not silently replace bad amounts with zero.
+- Duplicate preview keys include account identity. Repeated selection, repeated acceptance and concurrent acceptance of the same import row create at most one history item.
+- Save the acceptance receipt before publishing in-memory history. Resolve each history item at most once; commit its balance and commitment writes together before publishing resolution state.
+- This legacy history cache remains process-local; it is not the durable reviewed ledger. Restarting does not restore the cache from backup. The durable manual/CSV/bank activity journey is documented in [Reviewed money position](../../../product/stories/reviewed-money-position.md).
+- Database writes are also subject to [Workspace recoverability](../services/workspace-recoverability.md).
 
 ## Outputs
 - ImportPreview

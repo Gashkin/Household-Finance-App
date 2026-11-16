@@ -113,6 +113,42 @@ rewrite public history autonomously.
   owner-only bank-controlled consent; controlled live import/review/dedupe/revoke
   and forecast verification. Manual/CSV fallback remains available.
 
+## 16 November remediation checkpoint
+
+Reproduced non-plan backup-budget overrun with two failing synthetic regressions:
+an oversized write committed, and both concurrent writers consumed capacity that
+could hold only one. `WorkspaceMutationGuard` now reserves admission before each
+new managed read-write transaction and registers flush/snapshot validation before
+commit, releasing admission after commit or rollback. The same complete archive
+budget applies to migration artifacts, ledger and other persisted records. Both
+regressions now pass, including full encrypted recovery and a later write proving
+the rejection released admission. External SQL/file access and multiple processes
+remain outside this single-process application control.
+
+Reproduced four legacy import failures: duplicate row selection, concurrent/replayed
+acceptance, invalid amounts silently becoming zero, and quoted CSV columns being
+misinterpreted. Acceptance now serializes and deduplicates import/row identity,
+publishing history only after its receipt commits. The shared bounded quoted CSV
+parser validates complete rows, dates, account/description and finite cent-precision
+amounts. Resolution now commits related balance/commitment writes together before
+publishing history state; a missing-account regression verifies complete rollback.
+The legacy history cache remains process-local; this is not a claim of durable
+legacy history or a replacement for the reviewed ledger journey.
+
+The synthetic browser backend now uses dedicated port 18080 consistently in its
+server, proxy and API helpers, leaving the unrelated application on 8080 intact.
+Full local verification after these changes: **130 backend tests discovered,
+114 passed / 16 OS-conditional skips**, zero failures/errors; **27 desktop/mobile
+browser passes / one existing skip**. Inspected retained mobile synthetic banking
+position and desktop financial-plan history screenshots. OKF validation passed
+with zero errors/warnings. Linux protocol checks, hosted exact-commit Windows
+packaging and independent security re-verification still require separate evidence.
+
+The independent audit task remains active but is waiting for a local tool approval;
+no final baseline verdict is claimed. The owner has been notified of that approval
+blocker. Findings/remediations above are owned reproduction and verification,
+not an independent final-head PASS. Production holds remain intact.
+
 Public provider documentation is research, not proof of a particular registration:
 [terms](https://enablebanking.com/terms/) describe limited personal/evaluation use;
 [API reference](https://enablebanking.com/docs/api/reference/) documents separate

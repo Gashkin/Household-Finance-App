@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { unlockFixture } from './workspace-helper';
+import { unlockFixture, BACKEND_URL } from './workspace-helper';
 test.use({ extraHTTPHeaders: { 'X-Workspace-Request': '1' } });
 test.beforeEach(unlockFixture);
 
@@ -31,7 +31,7 @@ test('unlock, inspect and correct source facts, approve once, and use them in a 
   const snapshot = await response.json();
   expect(snapshot.availableAfterCommitmentsMinor).toBe(90000);
   expect(JSON.stringify(snapshot)).not.toContain('PRIVATE SYNTHETIC SOURCE MARKER');
-  const retry = await request.post('http://127.0.0.1:8080/api/evidence-intake/drafts/'+draft.id+'/approve', {
+  const retry = await request.post(BACKEND_URL+'/api/evidence-intake/drafts/'+draft.id+'/approve', {
     headers:{'X-Intake-Key':'synthetic-browser-intake-key'},data:response.request().postDataJSON(),
   });
   expect(retry.ok()).toBeTruthy(); expect((await retry.json()).id).toBe(snapshot.id);

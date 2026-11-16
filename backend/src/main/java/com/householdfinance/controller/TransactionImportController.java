@@ -12,6 +12,10 @@ import java.util.List;
 
 @RestController
 public class TransactionImportController {
+    @org.springframework.web.bind.annotation.ExceptionHandler(IllegalArgumentException.class)
+    public org.springframework.http.ResponseEntity<java.util.Map<String,String>> invalid(IllegalArgumentException error) {
+        return org.springframework.http.ResponseEntity.badRequest().body(java.util.Map.of("error",error.getMessage()));
+    }
 
     private final TransactionImportService transactionImportService;
 

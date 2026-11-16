@@ -24,6 +24,8 @@ public class WorkspaceBackupService {
     public record Archive(int version, String createdAt, Map<String, TableData> tables) {}
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
     public WorkspaceBackupService(JdbcTemplate jdbc, ObjectMapper mapper) {
         this.jdbc = jdbc; this.json = mapper.copy().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
@@ -104,6 +106,14 @@ public class WorkspaceBackupService {
         // Caller has flushed its pending mutation; a rejection rolls back that whole transaction.
         byte[] plain = encodeSnapshot();
         Arrays.fill(plain, (byte)0);
+    }
+    @Transactional(propagation=Propagation.MANDATORY)
+    public void assertMutationRecoverable() {
+        // Flush *all* pending JPA writes into this same transaction before the
+        // authoritative snapshot. A rejection rolls back every affected table.
+        entityManager.flush();
+        byte[] plain=encodeSnapshot();
+        Arrays.fill(plain,(byte)0);
     }
     @Transactional(readOnly=true, isolation=Isolation.SERIALIZABLE)
     public byte[] exportBackup(String password) {

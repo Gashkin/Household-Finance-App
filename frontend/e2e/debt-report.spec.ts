@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { unlockFixture } from './workspace-helper';
+import { unlockFixture, BACKEND_URL } from './workspace-helper';
 test.use({ extraHTTPHeaders: { 'X-Workspace-Request': '1' } });
 test.beforeEach(unlockFixture);
 
@@ -40,7 +40,7 @@ test('capture cash evidence, inspect and download a reproducible debt decision',
   expect(report.cashEvidence.sourceNote).toBe('Synthetic bank statement');
   expect(report.cashEvidence.committedMinor).toBe(10000);
   expect(report.input.cashPositionSnapshotId).toBe(report.cashEvidence.id);
-  const replay = await request.post('http://127.0.0.1:8080/api/debt-scenarios/report', { data: report.input });
+  const replay = await request.post(`${BACKEND_URL}/api/debt-scenarios/report`, { data: report.input });
   expect(replay.ok()).toBeTruthy();
   expect((await replay.json()).result).toEqual(report.result);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
