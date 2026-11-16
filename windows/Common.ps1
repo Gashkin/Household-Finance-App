@@ -1,5 +1,40 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+# Set only owner and protected DACL. Set-Acl can request SACL/audit privileges
+# when tightening an existing path under a standard Windows account.
+if (-not ('HouseholdFinance.WindowsDacl' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+namespace HouseholdFinance {
+    public static class WindowsDacl {
+        [DllImport("advapi32.dll", SetLastError=true)]
+        static extern bool GetSecurityDescriptorDacl(IntPtr descriptor, out bool present, out IntPtr dacl, out bool defaulted);
+        [DllImport("advapi32.dll", SetLastError=true)]
+        static extern bool GetSecurityDescriptorOwner(IntPtr descriptor, out IntPtr owner, out bool defaulted);
+        [DllImport("advapi32.dll", CharSet=CharSet.Unicode)]
+        static extern uint SetNamedSecurityInfoW(string path, uint objectType, uint info,
+            IntPtr owner, IntPtr group, IntPtr dacl, IntPtr sacl);
+        public static void Apply(string path, byte[] descriptor) {
+            var pinned=GCHandle.Alloc(descriptor,GCHandleType.Pinned);
+            try {
+                IntPtr pointer=pinned.AddrOfPinnedObject(), dacl, owner;
+                bool present, ignored;
+                if (!GetSecurityDescriptorDacl(pointer,out present,out dacl,out ignored) ||
+                    !GetSecurityDescriptorOwner(pointer,out owner,out ignored))
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                if (!present || dacl==IntPtr.Zero || owner==IntPtr.Zero)
+                    throw new InvalidOperationException("A non-null private DACL and owner are required.");
+                // SE_FILE_OBJECT; OWNER | DACL | PROTECTED_DACL. No SACL flags.
+                uint result=SetNamedSecurityInfoW(path,1,0x80000005,owner,IntPtr.Zero,dacl,IntPtr.Zero);
+                if (result!=0) throw new Win32Exception((int)result);
+            } finally { pinned.Free(); }
+        }
+    }
+}
+'@
+}
 function Get-InstanceRoot {
     if ($env:OS -ne 'Windows_NT') { throw 'This installer requires Windows.' }
     Join-Path $env:LOCALAPPDATA 'HouseholdFinance'
@@ -19,7 +54,8 @@ function Set-PrivatePath([string]$Path, [bool]$Directory) {
         $acl.SetAccessRuleProtection($true, $false)
         $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($identity, 'FullControl', 'Allow')))
     }
-    Set-Acl -LiteralPath $Path -AclObject $acl
+    [HouseholdFinance.WindowsDacl]::Apply($item.FullName,$acl.GetSecurityDescriptorBinaryForm())
+    Assert-PrivatePath $item.FullName
 }
 function Assert-PrivatePath([string]$Path) {
     $item = Get-Item -LiteralPath $Path -Force

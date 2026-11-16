@@ -224,3 +224,24 @@ Background helpers are hidden; move/delete targets are checked within the synthe
 temporary instance. Testing a standard identity predicate does not certify actual
 production isolation. Updated package assembly and installed tests are still pending
 at this source checkpoint. Both production holds remain intact; F6/B1–B4 remain open.
+
+### Standard-user Windows DACL correction
+
+The clean `ccad3f5` candidate assembled successfully with the pinned toolchain,
+all 148 backend tests discovered (132 passed /16 skips), and stale resource/Vite
+configuration probes excluded. Installed verification stopped while preparing
+and re-tightening a deliberately weak synthetic DACL: `Set-Acl` requested the
+unavailable `SeSecurityPrivilege`. A native DACL-only weak grant isolated the
+same failure in the packaged `Set-PrivatePath`, so this was not treated as a
+passing installed test or worked around by elevating the runtime identity.
+
+`Set-PrivatePath` now applies the same owner-only protected access descriptor via
+Windows `SetNamedSecurityInfoW`, explicitly selecting owner and DACL flags only,
+never SACL/audit flags. The helper pins/frees descriptor memory, rejects null DACLs
+and owners, checks native error codes and verifies the private path afterward.
+A standard-user disposable-directory probe passed weak-DACL rejection and
+re-tightening. Full installed/package re-verification remains required, including
+Windows PowerShell 5.1; this security-sensitive native boundary requires the
+separate independent review. No real-user path or production permissions were changed.
+
+API reference: [Microsoft SetNamedSecurityInfoW](https://learn.microsoft.com/en-us/windows/win32/api/aclapi/nf-aclapi-setnamedsecurityinfow).

@@ -33,6 +33,12 @@ function Assert-Rejected([scriptblock]$Operation) {
     try { & $Operation } catch { $rejected=$true }
     if(-not $rejected){throw 'An unsafe path was accepted.'}
 }
+function Set-SyntheticWeakDirectoryAcl([string]$Path) {
+    Assert-FixturePath $Path
+    # Native DACL-only grant avoids attempting privileged audit/SACL writes.
+    & icacls.exe $Path /grant '*S-1-1-0:(R)' | Out-Null
+    if($LASTEXITCODE -ne 0) { throw 'Could not prepare the synthetic weak DACL.' }
+}
 # Amended acceptance is not satisfied by the earlier READINESS PASSED prompt.
 # Missing, false and string-valued eligibility all fail closed.
 foreach ($candidate in @([PSCustomObject]@{},[PSCustomObject]@{productionEligible=$false},[PSCustomObject]@{productionEligible='true'})) {
@@ -67,10 +73,7 @@ $junction=Join-Path $instance 'junction'
 New-Item -ItemType Junction -Path $junction -Target $nested | Out-Null
 Assert-Rejected { Assert-PrivatePath $junction }
 [IO.Directory]::Delete($junction)
-$acl=Get-Acl -LiteralPath $nested
-$everyone=New-Object Security.Principal.SecurityIdentifier('S-1-1-0')
-$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($everyone,'Read','Allow')))
-Set-Acl -LiteralPath $nested -AclObject $acl
+Set-SyntheticWeakDirectoryAcl $nested
 Assert-Rejected { Assert-PrivatePath $nested }
 Set-PrivatePath $nested $true
 # Round-trip Windows DPAPI without disclosing any plaintext in logs.
@@ -95,10 +98,7 @@ try {
     $versionsPath=Join-Path $installed 'versions'
     Assert-PrivatePath $versionsPath
     # A weak versions ACL must prevent reinstalling even if the root stays private.
-    $versionsAcl=Get-Acl -LiteralPath $versionsPath
-    $everyone=New-Object Security.Principal.SecurityIdentifier('S-1-1-0')
-    $versionsAcl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($everyone,'Read','Allow')))
-    Set-Acl -LiteralPath $versionsPath -AclObject $versionsAcl
+    Set-SyntheticWeakDirectoryAcl $versionsPath
     try { Assert-Rejected { & (Join-Path $Package 'Install.ps1') -ShortcutDirectory $shortcutDirectory } }
     finally { Set-PrivatePath $versionsPath $true }
     Assert-PrivatePath $versionsPath
