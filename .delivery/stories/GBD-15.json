@@ -1,0 +1,53 @@
+{
+  "work_id": "GBD-15",
+  "page_id": "419d3419-fef0-8126-ba7c-e9278f572384",
+  "branch": "story/15-delivery",
+  "artifacts": [
+    {
+      "path": "backend/src/main/java/com/householdfinance/service/LegacyMoney.java",
+      "contains": [
+        "BigDecimal",
+        "losing cent precision"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/householdfinance/service/WorkbookIngestionService.java",
+      "contains": [
+        "getRawValue()"
+      ]
+    },
+    {
+      "path": "backend/src/test/java/com/householdfinance/WorkbookRawNumericSecurityTest.java",
+      "contains": [
+        "rawInvalidNumbersCannotBecomeDifferentAdmissibleAmounts",
+        "exactRawCentsRemainReviewableAndPersistWithoutRounding"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/householdfinance/workspace/WorkspaceMutationGuard.java",
+      "contains": [
+        "assertMutationRecoverable",
+        "beforeBegin"
+      ]
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/V1__workspace.sql",
+      "contains": [
+        "create table accounts"
+      ]
+    },
+    {
+      "path": "windows/Build-Release.ps1",
+      "contains": [
+        "productionEligible=$false"
+      ]
+    },
+    {
+      "path": "product/stories/security-audit-disposition.md",
+      "contains": [
+        "N1 raw OOXML precision remediation",
+        "B1\u2013B4"
+      ]
+    }
+  ]
+}
