@@ -672,6 +672,8 @@ body {
 .account-edit-controls { border:0; padding:0; min-width:0; }
 .account-edit-controls:disabled { opacity:.65; }
 .ledger-controls input[type=checkbox] { padding:0; width:1.25rem; height:1.25rem; flex:0 0 1.25rem; }
+.ledger-controls label { min-width:0; grid-template-columns:minmax(0,1fr); }
+.ledger-controls select, .ledger-controls input[type=file] { width:100%; min-width:0; }
 .workspace-gate nav { display:flex; flex-wrap:wrap; gap:.5rem; }
 @media(max-width:600px) { .workspace-toolbar { flex-wrap:wrap; overflow-wrap:anywhere; } }
 .recovery-panel button { justify-self: start; }
