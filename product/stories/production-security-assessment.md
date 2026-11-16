@@ -65,7 +65,13 @@ OS-conditional skips, and none failed or errored. Both Windows ACL/store tests
 passed. Linux-only protocol/recovery coverage still needs hosted Linux CI.
 All 31 delivery-coordination tests passed with loopback access. Sandbox HTTP
 restrictions initially made the simulator fail; the unrestricted synthetic
-rerun passed without changing the coordinator. Browser verification is ongoing.
+rerun passed without changing the coordinator.
+
+The corrected synthetic production fixture subsequently started on Windows.
+The complete browser suite then stopped during startup because local port 8080
+was already occupied; no browser cases completed. No existing application was
+terminated to clear the port. Browser verification remains outstanding; do not
+represent the successful bundle/unit tests as a browser pass.
 
 Generated `node_modules`, TypeScript build caches and emitted Vite configuration
 were tracked at baseline. They are removed from tracking and ignored; local files
