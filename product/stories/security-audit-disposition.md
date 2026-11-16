@@ -265,3 +265,9 @@ A Windows PowerShell 5.1 probe with an intentionally unusable `PSModulePath`
 passed security-command loading and SHA256 checks. No machine/user environment,
 execution policy or real-instance data was changed. Final assembled testing is
 required again; earlier installed startup failures remain recorded above.
+
+The `49228ae` installed launcher reached Java, which rejected an inherited empty
+`bank.production.readiness` Boolean. Non-production launch now explicitly sets
+readiness false alongside both disabled banking environments instead of relying
+on an absent environment variable. The unconditional production holds are unchanged.
+This startup failure was fail-closed and did not enable banking or change records.

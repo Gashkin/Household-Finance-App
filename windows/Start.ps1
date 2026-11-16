@@ -17,7 +17,7 @@ try {
     if (-not (Test-Path -LiteralPath $data)) { New-Item -ItemType Directory -Path $data | Out-Null; Set-PrivatePath $data $true }
     Assert-PrivatePath $data
     # Override inherited development settings; no sandbox or model/network exposure in the release.
-    $env:BANK_SANDBOX_ENABLED='false'; $env:BANK_PRODUCTION_ENABLED='false'; $env:EVIDENCE_AI_ENABLED='false'
+    $env:BANK_SANDBOX_ENABLED='false'; $env:BANK_PRODUCTION_ENABLED='false'; $env:BANK_PRODUCTION_READINESS='false'; $env:EVIDENCE_AI_ENABLED='false'
     $env:SERVER_ADDRESS='127.0.0.1'; $env:SERVER_PORT=[string]$Port; $env:WORKSPACE_ORIGINS="http://127.0.0.1:$Port"
     $env:WORKSPACE_PASSWORD=Get-PlainSecret $config.Password
     $env:SPRING_DATASOURCE_URL='jdbc:h2:file:' + (Join-Path $data 'household-finance').Replace('\','/') + ';WRITE_DELAY=0'
