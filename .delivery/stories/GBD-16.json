@@ -1,0 +1,11 @@
+{
+  "work_id":"GBD-16",
+  "page_id":"41ad3419-fef0-8114-965b-c4b381442f0b",
+  "branch":"story/16-delivery",
+  "artifacts":[
+    {"path":"backend/src/main/java/com/householdfinance/access/AccessService.java","contains":["class AccessService"]},
+    {"path":"frontend/src/components/HouseholdAccess.tsx","contains":["HouseholdAccess"]},
+    {"path":"backend/src/test/java/com/householdfinance/access/HouseholdAccessTest.java","contains":["class HouseholdAccessTest"]},
+    {"path":"product/stories/household-access.md","contains":["GBD-16"]}
+  ]
+}

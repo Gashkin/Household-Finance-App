@@ -1,0 +1,9 @@
+{
+  "work_id": "GBD-16",
+  "page_id": "41ad3419-fef0-8114-965b-c4b381442f0b",
+  "branch": "story/16-delivery",
+  "token": "claim-token:codex-01a1e438-gbd16",
+  "claimed_at": "2026-11-16T13:30:00Z",
+  "base_sha": "9f607c4d2fbea6224ae47671c52cbf3a3e3e0845",
+  "history": [{"event":"claim","method":"Git push with an empty expected remote ref; Notion ownership is written only after create-only push succeeds."}]
+}
