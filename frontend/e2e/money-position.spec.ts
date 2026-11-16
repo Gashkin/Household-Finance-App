@@ -140,12 +140,12 @@ test("review activity, correct facts, reconcile an explicit difference and reuse
     .getByLabel("Unpaid commitment 1", { exact: true })
     .fill("Unpaid utility");
   await page.getByLabel("Commitment 1 amount (€)", { exact: true }).fill("50");
-  await page
-    .getByLabel(
+  const publicationConsent = page.getByLabel(
       "I checked reconciled cash and unpaid commitments against pending debits to avoid counting payments twice",
       { exact: true },
-    )
-    .check();
+    );
+  await publicationConsent.locator('..').click();
+  await expect(publicationConsent).toBeChecked();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
