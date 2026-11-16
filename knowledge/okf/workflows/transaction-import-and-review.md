@@ -1,10 +1,10 @@
 ---
 type: Workflow
 title: Transaction Import and Review Workflow
-description: CSV import preview, dedupe review, acceptance, suggested matching, and optional mapping to future commitments.
+description: Legacy CSV session preview and acceptance; financial review belongs to the durable ledger.
 resource: backend/src/main/java/com/householdfinance/service/TransactionImportService.java
 tags: [okf, workflow, import, reconciliation]
-timestamp: 2026-07-27T00:00:00Z
+timestamp: 2026-11-16T00:00:00Z
 ---
 
 # Transaction Import and Review Workflow
@@ -14,19 +14,25 @@ timestamp: 2026-07-27T00:00:00Z
 2. Normalize and parse date, description, amount, account.
 3. Mark row-level duplicates using dedupe key.
 4. Accept selected rows into transaction history.
-5. Surface suggested ONE_OFF_FUTURE commitment matches for unmapped rows.
-6. Optionally map accepted history rows to ONE_OFF_FUTURE commitments (manual select or one-click apply suggestion).
+5. Use Money position for durable reviewed manual/CSV activity.
 
 ## Inputs
 - CSV content
 - accepted row id list
-- history id to future commitment id mapping
+
+## Integrity and bounds
+- Use the shared quoted CSV parser with the exact `date,description,amount,account` header, at most 100,000 characters and 500 complete rows.
+- Reject invalid ISO dates, missing account/description, malformed or non-finite amounts and fractional cents; do not silently replace bad amounts with zero.
+- Duplicate preview keys include account identity. Repeated selection, repeated acceptance and concurrent acceptance of the same import row create at most one history item.
+- Save the acceptance receipt before publishing in-memory history.
+- Legacy `/imports/map-to-future` and `/imports/resolve-history` return HTTP 410 without invoking financial mutations. In-process dedupe cannot provide durable cross-import/restart identities, so the HTTP surface no longer changes balances or commitments. The UI removes matching/resolution actions.
+- This legacy history cache remains process-local; it is not the durable reviewed ledger. Restarting does not restore the cache from backup. The durable manual/CSV/bank activity journey is documented in [Reviewed money position](../../../product/stories/reviewed-money-position.md).
+- Database writes are also subject to [Workspace recoverability](../services/workspace-recoverability.md).
 
 ## Outputs
 - ImportPreview
 - ImportAcceptResult
 - Transaction history entries
-- Suggested match candidate per unmapped history row (UI-computed)
 
 ## Linked Concepts
 - [Transactions](../domain/transactions.md)

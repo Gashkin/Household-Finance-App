@@ -236,6 +236,8 @@ class WorkbookIngestionServiceTest {
         .thenReturn(summary);
     when(migrationArtifactService.getLatestPayload(eq("exec-123"), eq("WORKBOOK_LOAD_SNAPSHOT"), eq(WorkbookIngestionService.PlannerSnapshotPayload.class)))
         .thenReturn(snapshot);
+    when(migrationArtifactService.getLatestPayload(eq("exec-123"), eq("WORKBOOK_LOAD_AFTER_SNAPSHOT"), eq(WorkbookIngestionService.PlannerSnapshotPayload.class)))
+        .thenReturn(new WorkbookIngestionService.PlannerSnapshotPayload(List.of(),List.of(),List.of(),List.of()));
 
     var rollback = service.rollbackLoad("exec-123");
     assertEquals("ROLLED_BACK", rollback.status());

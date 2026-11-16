@@ -6,7 +6,7 @@ import java.util.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.*;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -61,6 +61,25 @@ class WorkspaceSecurityTest {
         jdbc.update("INSERT INTO MIGRATION_ARTIFACTS(IMPORT_ID,ARTIFACT_TYPE,CREATED_AT,PAYLOAD) VALUES('next','report',CURRENT_TIMESTAMP,'new')");
         assertEquals(2L,backups.counts().get("MIGRATION_ARTIFACTS"));
     }
+    @Test void legacyColumnOrderRecoversByIdentityAndUnknownColumnsAreRejected() throws Exception {
+        seed();
+        String password="separate-synthetic-backup-passphrase";
+        var archive=json.readValue(BackupCrypto.decrypt(backups.exportBackup(password),password),WorkspaceBackupService.Archive.class);
+        var tables=new LinkedHashMap<>(archive.tables());
+        var accounts=tables.get("ACCOUNTS");
+        var cols=new ArrayList<>(accounts.columns());Collections.reverse(cols);
+        var rows=accounts.rows().stream().map(row->{var reversed=new ArrayList<>(row);Collections.reverse(reversed);return (List<String>)reversed;}).toList();
+        tables.put("ACCOUNTS",new WorkspaceBackupService.TableData(cols,rows));
+        byte[] reordered=BackupCrypto.encrypt(json.writeValueAsBytes(new WorkspaceBackupService.Archive(archive.version(),archive.createdAt(),tables)),password);
+        clear();backups.restore(reordered,password,"RESTORE INTO EMPTY WORKSPACE");
+        assertEquals(123.45,jdbc.queryForObject("SELECT BALANCE FROM ACCOUNTS",Double.class));
+        clear();cols.set(0,"UNKNOWN_COLUMN");
+        tables.put("ACCOUNTS",new WorkspaceBackupService.TableData(cols,rows));
+        byte[] invalid=BackupCrypto.encrypt(json.writeValueAsBytes(new WorkspaceBackupService.Archive(archive.version(),archive.createdAt(),tables)),password);
+        assertThrows(IllegalArgumentException.class,()->backups.restore(invalid,password,"RESTORE INTO EMPTY WORKSPACE"));
+        assertTrue(backups.counts().values().stream().allMatch(n->n==0));
+    }
+
     @Test void damagedWrongPasswordIncompleteAndConstraintFailingRestoresLeaveNoPartialData() throws Exception {
         seed();byte[] encrypted=backups.exportBackup("separate-synthetic-backup-passphrase");clear();
         assertThrows(IllegalArgumentException.class,()->backups.restore(encrypted,"wrong-password-123456","RESTORE INTO EMPTY WORKSPACE"));

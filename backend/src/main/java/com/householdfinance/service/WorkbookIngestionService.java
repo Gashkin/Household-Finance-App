@@ -12,19 +12,21 @@ import com.householdfinance.repository.TransactionRepository;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -56,6 +58,8 @@ public class WorkbookIngestionService {
     }
 
     private static final String CURRENT_MONTH_SHEET = "Jun26";
+    private static final Duration VALIDATION_LIFETIME = Duration.ofMinutes(5);
+    private static final int MAX_PENDING_VALIDATIONS = 4;
     private static final Pattern MONTH_SUFFIX_TAB_PATTERN = Pattern.compile(".*26$");
         private static final DateTimeFormatter DUE_MONTH_LABEL = new DateTimeFormatterBuilder()
             .parseCaseInsensitive()
@@ -168,23 +172,35 @@ public class WorkbookIngestionService {
                 String validationId,
                 LoadMode mode,
                 WorkbookMappingResult mapping,
-                Instant createdAt
+                Instant createdAt,
+                PlannerSnapshotPayload validatedState
             ) {}
 
     private final MigrationArtifactService migrationArtifactService;
+    private final Clock clock;
             private final AccountRepository accountRepository;
             private final CategoryRepository categoryRepository;
             private final MonthlyCommitmentRepository monthlyCommitmentRepository;
             private final TransactionRepository transactionRepository;
             private final Map<String, PendingValidation> pendingValidations = new ConcurrentHashMap<>();
 
-            public WorkbookIngestionService(
+              @org.springframework.beans.factory.annotation.Autowired
+              public WorkbookIngestionService(
                 MigrationArtifactService migrationArtifactService,
                 AccountRepository accountRepository,
                 CategoryRepository categoryRepository,
                 MonthlyCommitmentRepository monthlyCommitmentRepository,
                 TransactionRepository transactionRepository
             ) {
+        this(migrationArtifactService, accountRepository, categoryRepository,
+            monthlyCommitmentRepository, transactionRepository, Clock.systemUTC());
+    }
+
+    WorkbookIngestionService(MigrationArtifactService migrationArtifactService,
+        AccountRepository accountRepository, CategoryRepository categoryRepository,
+        MonthlyCommitmentRepository monthlyCommitmentRepository,
+        TransactionRepository transactionRepository, Clock clock) {
+        this.clock = clock;
         this.migrationArtifactService = migrationArtifactService;
             this.accountRepository = accountRepository;
             this.categoryRepository = categoryRepository;
@@ -197,7 +213,7 @@ public class WorkbookIngestionService {
             throw new IllegalArgumentException("Workbook file is required.");
         }
 
-        try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
+        try (Workbook workbook = WorkbookSafety.open(file)) {
             var formatter = new DataFormatter();
             var sheetPreviews = new ArrayList<WorkbookSheetPreview>();
             var totalRows = 0;
@@ -231,6 +247,7 @@ public class WorkbookIngestionService {
         return mappingResult;
     }
 
+    @Transactional
     public WorkbookLoadValidationResult validateWorkbookLoad(MultipartFile file, String mode) {
         var loadMode = parseLoadMode(mode);
         var mappingResult = mapWorkbookInternal(file);
@@ -285,7 +302,13 @@ public class WorkbookIngestionService {
         );
 
         if (!token.isBlank()) {
-            pendingValidations.put(token, new PendingValidation(validationId, loadMode, mappingResult, Instant.now()));
+            synchronized (pendingValidations) {
+                var now = clock.instant();
+                pendingValidations.values().removeIf(p -> expired(p, now));
+                if (pendingValidations.size() >= MAX_PENDING_VALIDATIONS)
+                    throw new IllegalArgumentException("Too many pending workbook reviews. Complete a review or wait five minutes.");
+                pendingValidations.put(token, new PendingValidation(validationId, loadMode, mappingResult, now, snapshotPlannerState()));
+            }
         }
 
         migrationArtifactService.recordArtifact(validationId, "WORKBOOK_LOAD_VALIDATE", result);
@@ -299,7 +322,7 @@ public class WorkbookIngestionService {
         }
 
         var pending = pendingValidations.remove(request.confirmationToken());
-        if (pending == null) {
+        if (pending == null || expired(pending, clock.instant())) {
             throw new IllegalArgumentException("Invalid or expired confirmation token. Re-run validation.");
         }
 
@@ -313,6 +336,8 @@ public class WorkbookIngestionService {
         }
 
         var beforeSnapshot = snapshotPlannerState();
+        if (!beforeSnapshot.equals(pending.validatedState()))
+            throw new IllegalArgumentException("Planner changed after validation. Review and validate the workbook again.");
 
         if (pending.mode() == LoadMode.REPLACE) {
             transactionRepository.deleteAll();
@@ -364,6 +389,7 @@ public class WorkbookIngestionService {
         migrationArtifactService.recordArtifact(result.executionId(), "WORKBOOK_LOAD_SUMMARY", summary);
         migrationArtifactService.recordArtifact(result.executionId(), "WORKBOOK_LOAD_REJECTIONS", new LoadRejectedRowsPayload(rejectedRows));
         migrationArtifactService.recordArtifact(result.executionId(), "WORKBOOK_LOAD_SNAPSHOT", beforeSnapshot);
+        migrationArtifactService.recordArtifact(result.executionId(), "WORKBOOK_LOAD_AFTER_SNAPSHOT", snapshotPlannerState());
         return result;
     }
 
@@ -418,6 +444,11 @@ public class WorkbookIngestionService {
             throw new IllegalArgumentException("No rollback snapshot found for load execution: " + executionId);
         }
 
+        var appliedState = migrationArtifactService.getLatestPayload(
+                executionId, "WORKBOOK_LOAD_AFTER_SNAPSHOT", PlannerSnapshotPayload.class);
+        // Old receipts have no trustworthy post-load boundary; fail closed.
+        if (appliedState == null || !appliedState.equals(snapshotPlannerState()))
+            throw new IllegalArgumentException("Planner changed after this load, or its revision evidence is unavailable. Rollback would overwrite later work.");
         restorePlannerState(snapshot);
 
         var updatedSummary = new WorkbookLoadPostSummary(
@@ -441,12 +472,15 @@ public class WorkbookIngestionService {
 
     private PlannerSnapshotPayload snapshotPlannerState() {
         var accounts = accountRepository.findAll().stream()
+                .sorted(Comparator.comparing(AccountEntity::getId))
                 .map(entity -> new SnapshotAccount(entity.getId(), entity.getName(), entity.getType(), entity.getBalance()))
                 .toList();
         var categories = categoryRepository.findAll().stream()
+                .sorted(Comparator.comparing(CategoryEntity::getId))
                 .map(entity -> new SnapshotCategory(entity.getId(), entity.getName(), entity.getBudget()))
                 .toList();
         var monthlyCommitments = monthlyCommitmentRepository.findAll().stream()
+            .sorted(Comparator.comparing(MonthlyCommitmentEntity::getId))
             .map(entity -> new SnapshotMonthlyCommitment(
                 entity.getId(),
                 entity.getTitle(),
@@ -456,6 +490,7 @@ public class WorkbookIngestionService {
             ))
             .toList();
         var transactions = transactionRepository.findAll().stream()
+            .sorted(Comparator.comparing(TransactionEntity::getId))
             .map(entity -> new SnapshotTransaction(
                 entity.getId(),
                 entity.getTxnDate().toString(),
@@ -468,6 +503,10 @@ public class WorkbookIngestionService {
                 .toList();
 
         return new PlannerSnapshotPayload(accounts, categories, monthlyCommitments, transactions);
+    }
+
+    private boolean expired(PendingValidation pending, Instant now) {
+        return pending.createdAt().isAfter(now) || !pending.createdAt().plus(VALIDATION_LIFETIME).isAfter(now);
     }
 
     private void restorePlannerState(PlannerSnapshotPayload snapshot) {
@@ -509,7 +548,7 @@ public class WorkbookIngestionService {
             throw new IllegalArgumentException("Workbook file is required.");
         }
 
-        try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
+        try (Workbook workbook = WorkbookSafety.open(file)) {
             var formatter = new DataFormatter();
             var accounts = new ArrayList<MappedAccount>();
             var categories = new ArrayList<MappedCategory>();
@@ -609,6 +648,7 @@ public class WorkbookIngestionService {
 
     private void validateMappedCommitments(List<MappedCommitment> commitments, List<ValidationIssue> issues) {
         for (var commitment : commitments) {
+            LegacyMoney.require(java.math.BigDecimal.valueOf(commitment.amount()), false);
             if (commitment.title() == null || commitment.title().isBlank()) {
                 issues.add(new ValidationIssue("COMMITMENTS", rowRef(commitment.sourceSheet(), commitment.sourceRow()), ValidationSeverity.ERROR.name(), "Commitment title is required."));
             }
@@ -634,7 +674,7 @@ public class WorkbookIngestionService {
             }
 
             var title = cellValue(row, formatter, headerIndex, "metric", "commitment", "title", "name", "category");
-            var amount = parseAmount(cellValue(row, formatter, headerIndex, "amount", "value", "budget"));
+            var amount = parseAmount(amountValue(row, formatter, headerIndex, "amount", "value", "budget"));
 
             if (title.isBlank()) {
                 warnings.add(new MappingWarning(sheetName, rowIndex + 1, "Monthly Budget row skipped: commitment title is missing."));
@@ -662,7 +702,7 @@ public class WorkbookIngestionService {
             }
 
             var name = cellValue(row, formatter, headerIndex, "metric", "name", "account", "title", "category");
-            var amount = parseAmount(cellValue(row, formatter, headerIndex, "amount", "value", "balance", "budget"));
+            var amount = parseAmount(amountValue(row, formatter, headerIndex, "amount", "value", "balance", "budget"));
 
             if (name.isBlank()) {
                 warnings.add(new MappingWarning(sheetName, rowIndex + 1, "Month-suffix row skipped: name/metric is missing."));
@@ -929,7 +969,7 @@ public class WorkbookIngestionService {
         }
 
         var type = cellValue(row, formatter, headerIndex, "type", "kind");
-        var balance = parseAmount(cellValue(row, formatter, headerIndex, "balance", "amount", "value"));
+        var balance = parseAmount(amountValue(row, formatter, headerIndex, "balance", "amount", "value"));
         accounts.add(new MappedAccount(name, type.isBlank() ? "Unspecified" : type, round(balance), sheetName, rowIndex + 1));
     }
 
@@ -948,7 +988,7 @@ public class WorkbookIngestionService {
             return;
         }
 
-        var budgetAmount = parseAmount(cellValue(row, formatter, headerIndex, "budget", "amount", "value"));
+        var budgetAmount = parseAmount(amountValue(row, formatter, headerIndex, "budget", "amount", "value"));
         var budget = "$" + String.format(Locale.US, "%,.2f", budgetAmount);
         categories.add(new MappedCategory(name, budget, sheetName, rowIndex + 1));
     }
@@ -968,7 +1008,7 @@ public class WorkbookIngestionService {
             return;
         }
 
-        var amount = parseAmount(cellValue(row, formatter, headerIndex, "amount", "value", "budget"));
+        var amount = parseAmount(amountValue(row, formatter, headerIndex, "amount", "value", "budget"));
         var dueDate = cellValue(row, formatter, headerIndex, "due", "duedate", "date");
         commitments.add(new MappedCommitment(title, round(amount), dueDate, sheetName, rowIndex + 1));
     }
@@ -990,7 +1030,7 @@ public class WorkbookIngestionService {
 
         var date = cellValue(row, formatter, headerIndex, "date", "posted", "transactiondate");
         var account = cellValue(row, formatter, headerIndex, "account", "source", "from");
-        var amount = parseAmount(cellValue(row, formatter, headerIndex, "amount", "value", "debit", "credit"));
+        var amount = parseAmount(amountValue(row, formatter, headerIndex, "amount", "value", "debit", "credit"));
         transactions.add(new MappedTransaction(date, description, round(amount), account, sheetName, rowIndex + 1));
     }
 
@@ -1030,20 +1070,49 @@ public class WorkbookIngestionService {
         return value == null ? "" : value.toLowerCase(Locale.ROOT).replace("_", "").replace(" ", "");
     }
 
-    private double parseAmount(String rawAmount) {
-        if (rawAmount == null || rawAmount.isBlank()) {
-            return 0.0;
+    private String amountValue(Row row, DataFormatter formatter, Map<String, Integer> headers, String... candidates) {
+        for (var candidate : candidates) {
+            var index=findHeaderIndex(headers,candidate);
+            if (index==null || row.getCell(index)==null) continue;
+            var cell=row.getCell(index);
+            String location="Sheet "+(row.getSheet().getWorkbook().getSheetIndex(row.getSheet())+1)
+                +" cell "+cell.getAddress().formatAsString();
+            try {
+                if (cell.getCellType()==org.apache.poi.ss.usermodel.CellType.FORMULA)
+                    throw new IllegalArgumentException("Financial formula cells require explicit manual review; cached results are not accepted.");
+                if (cell.getCellType()==org.apache.poi.ss.usermodel.CellType.NUMERIC) {
+                    if (!(cell instanceof org.apache.poi.xssf.usermodel.XSSFCell numeric))
+                        throw new IllegalArgumentException("Only raw XLSX numeric values are supported.");
+                    String raw=numeric.getRawValue();
+                    if (raw==null || raw.isEmpty() || raw.length()>64)
+                        throw new IllegalArgumentException("An explicit bounded monetary value is required.");
+                    // Validate the original OOXML lexeme BEFORE any double conversion.
+                    var exact=new java.math.BigDecimal(raw);
+                    LegacyMoney.require(exact,true);
+                    // Normalize only after admission, so tiny/overflow exponents cannot
+                    // allocate huge decimal strings and exact exponent cents still work.
+                    return exact.stripTrailingZeros().toPlainString();
+                }
+                var text=formatter.formatCellValue(cell).trim();
+                if (!text.isEmpty()) {
+                    LegacyMoney.parse(text,true);
+                    return text;
+                }
+            } catch (IllegalArgumentException invalid) {
+                throw new IllegalArgumentException(location+": invalid or unsupported monetary value.",invalid);
+            }
         }
+        throw new IllegalArgumentException("Missing workbook amount in sheet "
+            +(row.getSheet().getWorkbook().getSheetIndex(row.getSheet())+1)+", row "+(row.getRowNum()+1)+".");
+    }
 
-        try {
-            return Double.parseDouble(rawAmount.replace("$", "").replace(",", ""));
-        } catch (NumberFormatException ignored) {
-            return 0.0;
-        }
+    private double parseAmount(String rawAmount) {
+        return LegacyMoney.parse(rawAmount, true);
     }
 
     private double round(double value) {
-        return Math.round(value * 100.0) / 100.0;
+        // Admission already proved exact cent precision; never round a financial input.
+        return value;
     }
 
     private List<List<String>> extractSampleRows(org.apache.poi.ss.usermodel.Sheet sheet, DataFormatter formatter, int limit) {
