@@ -15,6 +15,7 @@ public class MonthlySummaryService {
             List<MonthlyTransaction> recentTransactions, String status, String explanation) {}
 
     public MonthlyOverview getMonthlyOverview() {
+        com.householdfinance.access.AccessContext.requireLegacy();
         // Unknown is not zero. Current balances, legacy plans and synthetic fixtures
         // cannot establish an opening balance or reviewed actual monthly activity.
         return new MonthlyOverview(

@@ -19,6 +19,7 @@ import org.springframework.context.ConfigurableApplicationContext;
 import static org.junit.jupiter.api.Assertions.*;
 
 @EnabledOnOs(OS.LINUX)
+@org.junit.jupiter.api.extension.ExtendWith(com.householdfinance.access.OwnerFixture.class)
 class ProductionRecoveryTest {
   @TempDir Path folder;
   ConfigurableApplicationContext start(String name) {

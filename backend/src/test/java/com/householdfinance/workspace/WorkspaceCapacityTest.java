@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @SpringBootTest(properties={"spring.datasource.url=jdbc:h2:mem:workspace-capacity;DB_CLOSE_DELAY=-1"})
+@org.junit.jupiter.api.extension.ExtendWith(com.householdfinance.access.OwnerFixture.class)
 class WorkspaceCapacityTest {
   @Autowired MigrationArtifactService artifacts;
   @Autowired WorkspaceBackupService backups;
@@ -61,17 +62,17 @@ class WorkspaceCapacityTest {
     var barrier=new CyclicBarrier(2);
     var pool=Executors.newFixedThreadPool(2);
     try {
-      Callable<String> write=()->{
+      Callable<String> write=()->com.householdfinance.access.OwnerFixture.call(()->{
         barrier.await();
         try { artifacts.recordArtifact(UUID.randomUUID().toString(),"SYNTHETIC","y".repeat(400_000)); return "accepted"; }
         catch (IllegalArgumentException e) { return "rejected"; }
-      };
+      });
       var a=pool.submit(write);var b=pool.submit(write);
       var results=List.of(a.get(30,TimeUnit.SECONDS),b.get(30,TimeUnit.SECONDS));
       assertEquals(1,Collections.frequency(results,"accepted"));
       assertEquals(1,Collections.frequency(results,"rejected"));
       // A later write on another thread proves rejected commits release admission.
-      pool.submit(()->artifacts.recordArtifact("after-rollback","SYNTHETIC","small"))
+      pool.submit(()->com.householdfinance.access.OwnerFixture.call(()->{artifacts.recordArtifact("after-rollback","SYNTHETIC","small");return null;}))
           .get(10,TimeUnit.SECONDS);
       assertEquals(3L,backups.counts().get("MIGRATION_ARTIFACTS"));
       assertNotNull(backups.exportBackup("synthetic-separate-backup-password"));

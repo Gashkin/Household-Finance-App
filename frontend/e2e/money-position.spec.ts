@@ -8,11 +8,18 @@ test("review activity, correct facts, reconcile an explicit difference and reuse
   page,
 }, testInfo) => {
   test.setTimeout(90000);
+  // A long permitted name must not widen the mobile layout viewport or displace touch targets.
+  const today=(await (await page.request.get('/api/forecast')).json()).today;
+  const seed=await page.request.post('/api/ledger/accounts',{data:{name:'Synthetic household account with a deliberately long source name '+testInfo.project.name,kind:'CASH',openingDate:today,openingEuro:'1.00',source:'Synthetic responsive-layout source'}});
+  expect(seed.ok()).toBeTruthy();const longAccount=await seed.json();
+  expect((await page.request.post('/api/ledger/accounts/'+longAccount.id+'/reconcile?asOf='+today,{data:{revision:longAccount.revision,statementEuro:'1.00',source:'Synthetic closing evidence',commit:true,acceptAdjustment:false}})).ok()).toBeTruthy();
   await page.goto("/");
   await page
     .getByRole("button", { name: "Money position", exact: true })
     .click();
   await expect(page.getByText("Loading reviewed position…")).toBeHidden();
+  await expect(page.getByLabel('Review account',{exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
   const date = await page
     .getByLabel("Position as at", { exact: true })
     .inputValue();
@@ -140,12 +147,12 @@ test("review activity, correct facts, reconcile an explicit difference and reuse
     .getByLabel("Unpaid commitment 1", { exact: true })
     .fill("Unpaid utility");
   await page.getByLabel("Commitment 1 amount (€)", { exact: true }).fill("50");
-  await page
-    .getByLabel(
+  const publicationConsent = page.getByLabel(
       "I checked reconciled cash and unpaid commitments against pending debits to avoid counting payments twice",
       { exact: true },
-    )
-    .check();
+    );
+  await publicationConsent.locator('..').click();
+  await expect(publicationConsent).toBeChecked();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

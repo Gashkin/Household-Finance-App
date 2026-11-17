@@ -1,5 +1,7 @@
 # GBD-13 — private local records and recovery
 
+This records the original GBD-13 foundation. [GBD-16 named access](household-access.md) now supersedes its single-operator, environment-password-reset, credential-retention and backup-version behavior. Use that guide for current enrolment, permissions and recovery.
+
 One operator, one local workspace. Every backend route except the nonfinancial `/health` and workspace status/unlock endpoints requires an opaque server-side session. Missing or short instance passwords fail closed. Legacy planner/import/report/auth routes are included; the development role response is available only after unlocking and represents this single operator, not household roles. H2's browser console is disabled and blocked by the access filter. H2 automatic TCP sharing is removed.
 
 ## Set up and use (Java 21, Maven, Node 22)
@@ -13,7 +15,7 @@ $env:WORKSPACE_PASSWORD = [System.Net.NetworkCredential]::new('', (Read-Host 'Wo
 mvn spring-boot:run
 ```
 
-On Unix set `WORKSPACE_PASSWORD` using your preferred secret/environment manager before `mvn spring-boot:run`. Use a unique long password stored in your password manager. No hardcoded/default password is accepted. Reset the instance password by stopping the backend, setting a new environment value and restarting; all previous sessions are revoked. This changes access to existing records, not the passphrase of an existing backup.
+On Unix set `WORKSPACE_PASSWORD` using your preferred secret/environment manager before `mvn spring-boot:run`. Use a unique long password stored in your password manager. No hardcoded/default password is accepted. The bootstrap value seeds `owner` at first sign-in; it does not replace an existing verifier. Use the named account's separately stored recovery code to reset its password. This does not change the passphrase of an existing backup.
 
 From `frontend`, run `npm ci` and `npm run dev`. Open **http://127.0.0.1:5173**, unlock, and use Debt decision, Planner or the other views. Legacy views now use the same-origin proxy. Lock when finished: the server revokes the cookie and React unmounts financial screens and temporary forms. A tab returning from the background rechecks the session; an API 401 locks the screen. Explicit lock broadcasts to other open tabs in modern browsers. Server expiry is detected when a tab becomes active or requests data; an idle visible tab can retain rendered data until that check. Close the browser when leaving a shared device.
 

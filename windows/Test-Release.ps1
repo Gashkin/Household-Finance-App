@@ -232,6 +232,8 @@ try {
     $session=Unlock-SyntheticInstance
     $restore=@{password='synthetic-recovery-passphrase';backup=[Convert]::ToBase64String($bytes);confirmation='RESTORE INTO EMPTY WORKSPACE'}
     Invoke-RestMethod "${baseUrl}/api/workspace/restore" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($restore | ConvertTo-Json) -WebSession $session | Out-Null
+    Assert-Rejected { Invoke-RestMethod ("${baseUrl}/api/ledger?asOf="+$today) -WebSession $session | Out-Null }
+    $session=Unlock-SyntheticInstance
     $position=Invoke-RestMethod ("${baseUrl}/api/ledger?asOf="+$today) -WebSession $session
     if($position.cashMinor -ne 12345){throw 'Packaged Windows encrypted restore changed synthetic records.'}
     [Array]::Clear($bytes,0,$bytes.Length)

@@ -22,6 +22,7 @@ import static org.hamcrest.Matchers.*;
 
 @SpringBootTest(properties="spring.datasource.url=jdbc:h2:mem:workbook-raw-numbers;DB_CLOSE_DELAY=-1")
 @AutoConfigureMockMvc(addFilters=false)
+@org.junit.jupiter.api.extension.ExtendWith(com.householdfinance.access.OwnerFixture.class)
 class WorkbookRawNumericSecurityTest {
     @Autowired MockMvc http;
     @Autowired ObjectMapper json;

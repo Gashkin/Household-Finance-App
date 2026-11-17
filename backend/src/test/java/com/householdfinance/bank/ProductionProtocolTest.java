@@ -16,6 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 /** Production protocol with generated keys and a loopback-only test provider. No bank access. */
 @SpringBootTest(properties={"workspace.password=synthetic-production-password", "spring.datasource.url=jdbc:h2:mem:production-protocol;DB_CLOSE_DELAY=-1"})
 @EnabledOnOs(OS.LINUX)
+@org.junit.jupiter.api.extension.ExtendWith(com.householdfinance.access.OwnerFixture.class)
 class ProductionProtocolTest {
   @Autowired LedgerService ledger;
   @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;

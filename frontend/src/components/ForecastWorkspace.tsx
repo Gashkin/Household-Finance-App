@@ -105,6 +105,7 @@ export default function ForecastWorkspace() {
       setReplace(false);
       setExpenseDate(dateAfter(p.baseline.date, 1));
     } else {
+      setName("Personal plan");setCash("");setPending("0");setSource("");setReserve("0");setEvents([]);
       setMode(value.suggestedLedgerDate ? "LEDGER" : "MANUAL");
       setDate(value.suggestedLedgerDate || value.today);
       setEnd(dateAfter(value.suggestedLedgerDate || value.today, 28));
@@ -167,7 +168,7 @@ export default function ForecastWorkspace() {
     setComparison(null);
     try {
       const value = await forecast<Workspace>("", {
-        revision: plan?.revision || 0,
+        revision: plan?.revision || workspace?.hiddenPlanRevision || 0,
         name,
         baseline: replace
           ? {
@@ -233,6 +234,8 @@ export default function ForecastWorkspace() {
   return (
     <section className="forecast-workspace">
       <h2>Plan ahead</h2>
+      <p>This private plan uses your permitted sources, including your private accounts. It is not a shared-only household forecast.</p>
+      {workspace.hiddenPlanRevision&&<p role="status">Access to earlier starting evidence changed. Its figures are hidden; choose new starting evidence to replace this plan.</p>}
       <p>
         See when bills could outrun cash, then test a purchase or a delayed
         payday. Expectations remain separate from received money and reviewed

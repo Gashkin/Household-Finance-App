@@ -25,6 +25,8 @@ export type LedgerAccount = {
   reconciled: boolean;
   entries: number;
   warnings: string[];
+  shared:boolean;
+  owned:boolean;
 };
 export type Position = {
   asOf: string;
