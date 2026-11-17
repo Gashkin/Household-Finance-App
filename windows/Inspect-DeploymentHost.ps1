@@ -23,9 +23,12 @@ try {
     $result.VolumeEncryptionInventory='Read; actual instance-volume mapping still required'
 } catch { $result.VolumeEncryptionInventory='Unavailable; device encryption not verified' }
 $admins=@()
+$result.CurrentIdentityDirectLocalAdministrator=$null
 try {
     $admins=@(Get-LocalGroupMember -SID 'S-1-5-32-544' -ErrorAction Stop | ForEach-Object {$_.SID.Value})
     $result.LocalAdministratorsInventoryAvailable=$true
+    # Restricted token groups do not establish the underlying account is standard.
+    $result.CurrentIdentityDirectLocalAdministrator=($identity.User.Value -in $admins)
 } catch { $result.LocalAdministratorsInventoryAvailable=$false }
 $counts=[ordered]@{Found=0;OwnerResolved=0;LocalAdministratorOwners=0;BuiltInServiceOwners=0;OwnerUnknown=0}
 try {
@@ -41,6 +44,7 @@ try {
     }
     $result.RunnerEnumerationAvailable=$true
 } catch { $result.RunnerEnumerationAvailable=$false }
+$result.AdministratorIdentityBoundaryBlocked=($result.AdministratorGroupPresent -or $result.CurrentIdentityDirectLocalAdministrator -eq $true)
 $result.RunnerProcesses=$counts
 $result.PrivilegedRunnerBoundaryBlocked=($counts.LocalAdministratorOwners -gt 0 -or $counts.BuiltInServiceOwners -gt 0)
 $result.ProductionIsolationVerified=$false

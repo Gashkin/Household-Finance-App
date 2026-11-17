@@ -11,6 +11,9 @@ Failure to obtain encryption or runner-owner metadata means UNKNOWN, not PASS.
 No running runner is not proof that another configured or scheduled privileged runner
 cannot start. Group enumeration is local-only and does not establish all effective
 nested/domain/elevation rights. Inventory those and host/VM management separately.
+A restricted or filtered current token can omit the Administrators group even when
+the underlying account is a direct local administrator. Check account membership
+as well; absence of token groups is not proof of a standard development identity.
 
 A runner or excluded development identity with administrative control can cross ordinary
 account ACLs. A new standard user or VM on an administrator-controlled host is insufficient
