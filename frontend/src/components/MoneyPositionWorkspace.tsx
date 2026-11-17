@@ -25,10 +25,13 @@ function newRow(date: string): ActivityRow {
     kind: "ACTIVITY",
   };
 }
-function explain(value: string) {
+function explain(value: string): string {
   try {
     const v = JSON.parse(value);
     if (v === null) return "—";
+    if (v.row) return explain(JSON.stringify(v.row)) + (v.review?.reviewState ? ` · ${v.review.reviewState}` : "");
+    if (v.result) return `${v.throughDate} · ${explain(JSON.stringify(v.result))}`;
+    if (v.expectedMinor !== undefined) return `Booked balance before reconciliation: ${money(v.expectedMinor)}`;
     if (typeof v === "number") return money(v);
     if (Array.isArray(v))
       return v

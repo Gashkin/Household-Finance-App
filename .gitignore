@@ -33,7 +33,8 @@ backend/target/
 
 # Generated frontend build output
 frontend/dist/
-frontend/node_modules/
+**/node_modules/
+/.worktrees/
 *.tsbuildinfo
 frontend/vite.config.js
 frontend/vite.config.d.ts
@@ -58,6 +59,7 @@ frontend/vite.config.d.ts
 # Synthetic browser verification outputs
 frontend/test-results/
 frontend/playwright-report/
+frontend/playwright.*-local.config.ts
 
 # Operator verification receipts (CI retains these separately)
 delivery-receipt.json

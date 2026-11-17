@@ -60,6 +60,7 @@ export type Preview = {
   }[];
 };
 export type Audit = {
+  actorId: string;
   id: string;
   action: string;
   recordedAt: string;

@@ -1,4 +1,5 @@
 import DecisionPlansWorkspace from './components/DecisionPlansWorkspace';
+import ActivityReviewWorkspace from './components/ActivityReviewWorkspace';
 import ForecastWorkspace from "./components/ForecastWorkspace";
 import MoneyPositionWorkspace from './components/MoneyPositionWorkspace';
 import WorkspaceRecovery from './components/WorkspaceRecovery';
@@ -15,7 +16,7 @@ import { useIdentity } from './api/access';
 function App() {
   const identity=useIdentity();
   const read=identity?.canRead??false,edit=identity?.canEdit??false,custodian=identity?.custodian??false;
-  const [role, setRole] = useState<'member'|'access'|'decision' | 'planner' | 'migrater' | 'consumer' | 'recovery' | 'money' | 'forecast' | 'plans'>(!edit?(read?'money':'access'):location.pathname === '/bank/callback' ? 'money' : 'decision');
+  const [role, setRole] = useState<'review'|'member'|'access'|'decision' | 'planner' | 'migrater' | 'consumer' | 'recovery' | 'money' | 'forecast' | 'plans'>(!edit?(read?'money':'access'):location.pathname === '/bank/callback' ? 'money' : 'decision');
 
   const [planId, setPlanId] = useState<string | null>(null);
 
@@ -27,6 +28,7 @@ function App() {
           <button onClick={()=>setRole('access')} className={role==='access'?'active':''}>Household access</button>
           {read&&<button onClick={()=>setRole('member')} className={role==='member'?'active':''}>Spending &amp; purchases</button>}
           {edit&&<>
+          <button onClick={()=>setRole('review')} className={role==='review'?'active':''}>Review &amp; reconcile</button>
           <button onClick={() => setRole('plans')} className={role === 'plans' ? 'active' : ''}>Financial plans</button>
           <button onClick={() => setRole('forecast')} className={role === 'forecast' ? 'active' : ''}>Plan ahead</button>
           <button onClick={() => setRole('money')} className={role === 'money' ? 'active' : ''}>Money position</button>
@@ -47,6 +49,7 @@ function App() {
       </header>
 
       <main className="app-main">
+        {role==='review'&&edit?<ActivityReviewWorkspace/>:null}
         {role==='access'?<HouseholdAccess/>:null}
         {role==='member'?<MemberWorkspace/>:null}
         {role === 'plans' ? <DecisionPlansWorkspace initialId={planId} /> : null}

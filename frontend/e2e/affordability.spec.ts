@@ -241,6 +241,9 @@ test("a second-tab ledger change withdraws current evidence after comparing", as
     "Starting evidence is current and reconciled. Future income is still only projected.";
   await expect(page.getByText(claim, { exact: true })).toBeVisible();
   const other = await context.newPage();
+  expect((await other.request.post(`/api/ledger/accounts/${account.id}/reopen`, {
+    data: { revision: account.revision, reason: "Synthetic late receipt requires reopening" },
+  })).ok()).toBeTruthy();
   await other.goto("/");
   await other
     .getByRole("button", { name: "Money position", exact: true })

@@ -157,7 +157,7 @@ public class WorkspaceFilter extends OncePerRequestFilter {
             if(!publicRoute && users!=null){
                 var actor=actor(request);
                 if(actor==null||!users.permits(path,request.getMethod(),actor)){deny(response,403,"Capability not granted");return;}
-                boolean sensitive=!safe&&(path.startsWith("/api/access/")&&!path.equals("/api/access/reauth")||path.equals("/api/workspace/backup")||path.equals("/api/workspace/restore")||path.endsWith("/sharing"));
+                boolean sensitive=!safe&&(path.startsWith("/api/access/")&&!path.equals("/api/access/reauth")||path.equals("/api/workspace/backup")||path.equals("/api/workspace/restore")||path.endsWith("/sharing")||path.endsWith("/reopen"));
                 if(sensitive&&!recent(request)){deny(response,403,"Confirm your password in Household access before this sensitive change");return;}
                 AccessContext.enter(actor);
             }

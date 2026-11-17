@@ -43,7 +43,7 @@ class MemberRecoveryTest {
     try(var app=start("v5-source")){
       app.getBean(AccessService.class).ensureOwner();var json=app.getBean(ObjectMapper.class);var backup=app.getBean(WorkspaceBackupService.class).exportBackup(ARCHIVE);
       var current=json.readValue(BackupCrypto.decrypt(backup,ARCHIVE),WorkspaceBackupService.Archive.class);
-      Map<String,WorkspaceBackupService.TableData> tables=new LinkedHashMap<>();for(var t:WorkspaceBackupService.V5_TABLES)tables.put(t,current.tables().get(t));
+      Map<String,WorkspaceBackupService.TableData> tables=LegacyArchiveFixture.tables(current,5);
       v5=BackupCrypto.encrypt(json.writeValueAsBytes(new WorkspaceBackupService.Archive(5,current.createdAt(),tables)),ARCHIVE);
     }
     try(var app=start("v5-restored")){
