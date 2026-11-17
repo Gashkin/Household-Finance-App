@@ -237,7 +237,7 @@ public class LedgerService {
   public AccountView create(AccountInput input) {
     AccessContext.requireEdit();
     check(input != null, "Account required");
-    check(accounts.findAll().stream().filter(a -> AccessContext.owns(a.ownerId)).count() < 30, "Use at most 30 owned ledger accounts");
+    check(accounts.findAll().stream().filter(a -> AccessContext.owns(a.ownerId)).count() < com.householdfinance.access.HouseholdLimits.ACCOUNTS_PER_USER, "Use at most 30 owned ledger accounts");
     var a = new LedgerAccount();
     a.id = UUID.randomUUID().toString();
     a.name = text(input.name(), 80, "Account name");

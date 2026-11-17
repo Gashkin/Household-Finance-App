@@ -95,7 +95,7 @@ public class AccessService {
   @Transactional
   public Invitation invite(String name){
     admin();ownerLock();String login=username(name);
-    if(jdbc.queryForObject("SELECT COUNT(*) FROM HOUSEHOLD_USERS",Long.class)>=30)throw new IllegalArgumentException("Household user limit reached");
+    if(jdbc.queryForObject("SELECT COUNT(*) FROM HOUSEHOLD_USERS",Long.class)>=HouseholdLimits.MAX_USERS)throw new IllegalArgumentException("Household user limit reached");
     if(jdbc.queryForObject("SELECT COUNT(*) FROM HOUSEHOLD_USERS WHERE USERNAME=?",Long.class,login)!=0)throw new IllegalArgumentException("Choose another username");
     String id=UUID.randomUUID().toString(),code=secret();Instant expiry=Instant.now(clock).plus(Duration.ofDays(7));
     jdbc.update("INSERT INTO HOUSEHOLD_USERS(ID,USERNAME,ROLES,STATE,REVISION,INVITATION_HASH,INVITATION_EXPIRY) VALUES(?,?,'','INVITED',0,?,?)",id,login,hash(code),java.sql.Timestamp.from(expiry));

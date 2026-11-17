@@ -67,10 +67,13 @@ public class CashPositionService {
         if (!"REVIEWED".equals(input.verification()) && !"ESTIMATED".equals(input.verification()))
             throw new IllegalArgumentException("verification must be REVIEWED or ESTIMATED");
         requireAmount(input.minimumReserveMinor(), "minimumReserveMinor");
-        if (input.cashBalances() == null || input.cashBalances().isEmpty() || input.cashBalances().size() > MAX_LINES)
-            throw new IllegalArgumentException("Provide 1–30 cash balances");
-        if (input.upcomingCommitments() == null || input.upcomingCommitments().size() > MAX_LINES)
-            throw new IllegalArgumentException("Provide 0–30 upcoming commitments");
+        int cashLimit = signedCash ? com.householdfinance.access.HouseholdLimits.MAX_VISIBLE_ACCOUNTS : MAX_LINES;
+        // Ledger publication may add one pending-debit line per source, plus the reviewed manual commitments.
+        int commitmentLimit = signedCash ? cashLimit + MAX_LINES : MAX_LINES;
+        if (input.cashBalances() == null || input.cashBalances().isEmpty() || input.cashBalances().size() > cashLimit)
+            throw new IllegalArgumentException("Provide 1–"+cashLimit+" cash balances");
+        if (input.upcomingCommitments() == null || input.upcomingCommitments().size() > commitmentLimit)
+            throw new IllegalArgumentException("Provide 0–"+commitmentLimit+" upcoming commitments");
 
         List<CashPositionLine> lines = new ArrayList<>();
         long cash = 0, committed = 0;

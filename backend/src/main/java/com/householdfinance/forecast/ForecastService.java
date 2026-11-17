@@ -195,7 +195,7 @@ public class ForecastService {
               && value.reserveMinor() >= 0
               && value.reserveMinor() <= MAX_AMOUNT
               && b.revisions() != null
-              && b.revisions().size() <= 30,
+              && b.revisions().size() <= com.householdfinance.access.HouseholdLimits.MAX_VISIBLE_ACCOUNTS,
           "Invalid saved starting evidence");
       check(
           !b.date().isAfter(today())

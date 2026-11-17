@@ -22,6 +22,55 @@ class AccessRecoveryRestartTest {
         "--spring.datasource.url=jdbc:h2:file:"+directory.resolve(name)+";DB_CLOSE_ON_EXIT=FALSE",
         "--workspace.password="+password,"--spring.main.banner-mode=off");
   }
+  @Test void sharedScopeBeyondThirtySourcesSurvivesForecastPublicationRestartAndWithdrawal() {
+    var today=LocalDate.now(java.time.ZoneId.of("Europe/Dublin"));
+    String memberId,sharedId,snapshotId;
+    try(var app=start("shared-scope",OLD)) {
+      var access=app.getBean(AccessService.class);access.ensureOwner();
+      var ledger=app.getBean(LedgerService.class);
+      for(int i=0;i<30;i++) {
+        var account=ledger.create(new LedgerService.AccountInput("Synthetic own source "+i,"CASH",today,"1.00","Synthetic opening evidence"));
+        account=ledger.manual(account.id(),new LedgerService.Manual(account.revision(),new LedgerService.Row("synthetic-pending-"+i,today,"Synthetic pending debit","-0.01","PENDING","ACTIVITY"),"Synthetic pending evidence",true));
+        ledger.reconcile(account.id(),today,new LedgerService.Reconcile(account.revision(),"1.00","Synthetic closing evidence",true,false));
+      }
+      var invite=access.invite("scopeeditor");access.accept(invite.code(),MEMBER,true);
+      var u=access.users().stream().filter(x->x.username().equals("scopeeditor")).findFirst().orElseThrow();memberId=u.id();
+      access.change(memberId,new AccessService.Change(u.revision(),Set.of("EDITOR"),"ACTIVE"));
+      AccessContext.enter(access.authenticate("scopeeditor",MEMBER));
+      var shared=ledger.create(new LedgerService.AccountInput("Synthetic shared source","CASH",today,"2.34","Synthetic shared opening"));sharedId=shared.id();
+      shared=ledger.share(sharedId,new LedgerService.Sharing(shared.revision(),true));
+      shared=ledger.manual(sharedId,new LedgerService.Manual(shared.revision(),new LedgerService.Row("synthetic-shared-pending",today,"Synthetic shared pending debit","-0.01","PENDING","ACTIVITY"),"Synthetic shared pending evidence",true));
+      ledger.reconcile(sharedId,today,new LedgerService.Reconcile(shared.revision(),"2.34","Synthetic shared closing",true,false));
+      var hidden=ledger.create(new LedgerService.AccountInput("Synthetic excluded private source","CASH",today,"99.00","Synthetic private opening"));
+      ledger.reconcile(hidden.id(),today,new LedgerService.Reconcile(hidden.revision(),"99.00","Synthetic private closing",true,false));
+      AccessContext.enter(access.authenticate("owner",OLD));
+      var forecast=app.getBean(com.householdfinance.forecast.ForecastService.class);
+      var saved=forecast.save(new com.householdfinance.forecast.ForecastService.Input(0L,"Synthetic shared-source plan",new com.householdfinance.forecast.ForecastService.BaselineInput("LEDGER",today,null,null,null),today.plusDays(7),"0",List.of(),true));
+      assertEquals(31,saved.plan().inputs().baseline().revisions().size());
+      assertEquals(3203,saved.plan().projection().startingMinor());
+      var position=ledger.position(today);assertEquals(31,position.accounts().size());
+      assertTrue(position.accounts().stream().noneMatch(a->a.name().contains("excluded")));
+      var revisions=position.accounts().stream().collect(java.util.stream.Collectors.toMap(LedgerService.AccountView::id,LedgerService.AccountView::revision));
+      var snapshot=ledger.publish(new LedgerService.Publish(UUID.randomUUID().toString(),today,revisions,"0",List.of(),true));snapshotId=snapshot.id();
+      assertEquals(31,snapshot.cashBalances().size());assertEquals(3234,snapshot.liquidCashMinor());
+      assertEquals(31,snapshot.upcomingCommitments().size());assertEquals(31,snapshot.committedMinor());assertEquals(3203,snapshot.availableAfterCommitmentsMinor());
+    }
+    try(var app=start("shared-scope","")) {
+      var access=app.getBean(AccessService.class);AccessContext.enter(access.authenticate("owner",OLD));
+      var forecast=app.getBean(com.householdfinance.forecast.ForecastService.class);
+      var cash=app.getBean(com.householdfinance.service.CashPositionService.class);
+      assertEquals(31,forecast.get().plan().inputs().baseline().revisions().size());
+      assertEquals(3203,forecast.get().plan().projection().startingMinor());
+      assertEquals(3234,cash.byId(snapshotId).orElseThrow().liquidCashMinor());
+      var ledger=app.getBean(LedgerService.class);AccessContext.enter(access.authenticate("scopeeditor",MEMBER));
+      var shared=ledger.position(today).accounts().stream().filter(a->a.id().equals(sharedId)).findFirst().orElseThrow();
+      ledger.share(sharedId,new LedgerService.Sharing(shared.revision(),false));
+      AccessContext.enter(access.authenticate("owner",OLD));
+      assertNull(forecast.get().plan());assertNotNull(forecast.get().hiddenPlanRevision());
+      assertTrue(cash.byId(snapshotId).isEmpty());
+      assertEquals(3000,ledger.position(today).cashMinor());assertEquals(30,ledger.position(today).accounts().size());
+    }
+  }
   @Test void existingSingleOwnerDatabaseMigratesAccountsToPrivateWithoutLosingBalances() throws Exception {
     try(var app=start("legacy",OLD)) {
       app.getBean(LedgerService.class).create(new LedgerService.AccountInput("Synthetic legacy private","CASH",LocalDate.now(),"23.45","Synthetic legacy evidence"));
