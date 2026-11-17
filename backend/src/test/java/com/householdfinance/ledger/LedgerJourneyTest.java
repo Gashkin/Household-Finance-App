@@ -23,6 +23,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
       "spring.datasource.url=jdbc:h2:mem:ledger-journey;DB_CLOSE_DELAY=-1"
     })
 @AutoConfigureMockMvc
+@org.junit.jupiter.api.extension.ExtendWith(com.householdfinance.access.OwnerFixture.class)
 class LedgerJourneyTest {
   @Autowired MockMvc mvc;
   @Autowired ObjectMapper json;
@@ -476,7 +477,7 @@ class LedgerJourneyTest {
         json.readValue(
             BackupCrypto.decrypt(encrypted, "synthetic-backup-passphrase-1234"),
             WorkspaceBackupService.Archive.class);
-    assertEquals(4, archive.version());
+    assertEquals(5, archive.version());
     var tables = new ArrayList<>(before.keySet());
     Collections.reverse(tables);
     for (String table : tables) jdbc.update("DELETE FROM " + table);
@@ -489,7 +490,7 @@ class LedgerJourneyTest {
     assertTrue(
         service.history("HOUSEHOLD").stream()
             .anyMatch(e -> e.source.equals("Snapshot " + snapshot.id())));
-    var old = new LinkedHashMap<>(archive.tables());
+    var old = new LinkedHashMap<>(com.householdfinance.workspace.LegacyArchiveFixture.tables(archive,1));
     old.keySet().removeIf(k -> k.startsWith("LEDGER_") || k.equals("FORECAST_PLANS") || k.equals("DECISION_PLANS"));
     byte[] v1 =
         BackupCrypto.encrypt(

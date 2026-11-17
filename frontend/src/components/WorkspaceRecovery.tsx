@@ -22,11 +22,11 @@ export default function WorkspaceRecovery(){
       const bytes=new Uint8Array(await file.arrayBuffer());let binary='';for(const b of bytes)binary+=String.fromCharCode(b);
       const response=await workspacePost('restore',{password,backup:btoa(binary),confirmation:confirmed?'RESTORE INTO EMPTY WORKSPACE':''});
       setCounts(await response.json());setFile(null);setConfirmed(false);
-      setMessage('Recovery complete. All saved records are available. Open Debt decision or Planner to review them.');
+      window.dispatchEvent(new Event('workspace-restored'));
     }catch(e){setError((e as Error).message);}finally{setPassword('');setRepeat('');setBusy(false);}
   }
   return <section className="recovery-panel"><h2>Backup & recovery</h2><p>Return to your saved records after restarting the app, or recover them on a fresh local workspace.</p>
-    <p>Backups contain all saved financial records, reviewed ledger activity, correction history and migration history. Unsaved comparisons and temporary intake drafts are excluded. Downloaded decision JSON reports are separate, unencrypted files.</p>
+    <p>Custodian-only recovery: backups contain all people's saved financial records, identities, password verifiers, permissions, reviewed ledger activity and audit history. Keep the archive and passphrase private. Recovery retains the fresh installation's owner password, revokes current sessions and disables all other users pending an administrator's review. Old invitations and recovery codes are invalidated. Unsaved comparisons and temporary intake drafts are excluded.</p>
     {counts&&<p>Saved records: {Object.values(counts).reduce((a,b)=>a+b,0)}. {empty?'This workspace is empty and can receive a backup.':'Recovery is blocked here to protect existing records.'}</p>}
     <label>Backup passphrase<input type="password" autoComplete="new-password" minLength={16} maxLength={256} value={password} onChange={e=>setPassword(e.target.value)} disabled={busy}/></label>
     <label>Repeat backup passphrase<input type="password" autoComplete="new-password" maxLength={256} value={repeat} onChange={e=>setRepeat(e.target.value)} disabled={busy}/></label>
@@ -36,6 +36,6 @@ export default function WorkspaceRecovery(){
     <label className="restore-confirm"><input type="checkbox" checked={confirmed} disabled={busy||!empty} onChange={e=>setConfirmed(e.target.checked)}/>I want to restore all saved records into this empty workspace</label>
     <button disabled={busy||!empty||!file||!confirmed||password.length<16} onClick={restore}>Restore backup</button>
     {busy&&<p role="status">Protecting your records…</p>}{message&&<p role="status">{message}</p>}{error&&<p role="alert">{error}</p>}
-    <p>There is no passphrase reset for backups. Keep a copy away from this device. Local database files rely on your operating system account and full-disk encryption; this app is for one operator on loopback only.</p>
+    <p>There is no passphrase reset for backups. Account recovery codes cannot decrypt an archive. Keep a copy away from this device. Local database files rely on your operating system account and full-disk encryption; network access remains disabled.</p>
   </section>;
 }

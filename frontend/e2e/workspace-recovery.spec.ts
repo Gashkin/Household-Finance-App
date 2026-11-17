@@ -7,7 +7,7 @@ test('locked workspace, encrypted download and safe recovery controls',async({pa
   await page.goto('/');
   await expect(page.getByRole('heading',{name:'Private local workspace'})).toBeVisible();
   await expect(page.getByRole('button',{name:'Compare scenarios'})).toHaveCount(0);
-  await page.getByLabel('Workspace password',{exact:true}).fill('wrong');
+  await page.getByLabel('Workspace password',{exact:true}).fill('synthetic-wrong-password');
   await page.getByRole('button',{name:'Unlock workspace',exact:true}).click();
   await expect(page.getByRole('alert')).toContainText('Incorrect workspace password');
   await page.getByLabel('Workspace password',{exact:true}).fill(PASSWORD);
@@ -50,7 +50,8 @@ test('recover an encrypted backup in a fresh workspace without partial writes',a
   await page.getByLabel('Backup passphrase',{exact:true}).fill('separate-synthetic-backup-passphrase');
   await page.getByRole('button',{name:'Restore backup',exact:true}).click();
   await expect(page.getByRole('status')).toContainText('Recovery complete');
-  await expect(page.getByRole('button',{name:'Restore backup',exact:true})).toBeDisabled();
+  await expect(page.getByRole('button',{name:'Unlock workspace',exact:true})).toBeVisible();
+  await page.getByLabel('Workspace password',{exact:true}).fill(PASSWORD);await page.getByRole('button',{name:'Unlock workspace',exact:true}).click();
   await page.getByRole('button',{name:'Debt decision',exact:true}).click();
   await expect(page.getByText('Loading saved cash position…')).toBeHidden();
   await expect(page.getByRole('button',{name:'Use this cash position in debt comparison',exact:true})).toBeVisible();

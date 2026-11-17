@@ -1,4 +1,5 @@
 import BankSandboxPanel from "./BankSandboxPanel";
+import { useIdentity } from '../api/access';
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ledger,
@@ -55,6 +56,7 @@ export default function MoneyPositionWorkspace({
 }: {
   openDecision: () => void;
 }) {
+  const identity=useIdentity();
   const [asOf, setAsOf] = useState(todayInDublin());
   const [position, setPosition] = useState<Position | null>(null);
   const [selected, setSelected] = useState("");
@@ -308,6 +310,7 @@ export default function MoneyPositionWorkspace({
   return (
     <section className="money-workspace">
       <h2>Household money position</h2>
+      <p>This limited view includes your own accounts and explicitly shared accounts. Other private accounts are excluded; these figures may be incomplete.</p>
       <p>
         Start with dated account evidence, review what moved, and check the
         result against a statement. All accounts here are in EUR.
@@ -316,7 +319,7 @@ export default function MoneyPositionWorkspace({
       {message && <p role="status">{message}</p>}
       {busy && <p role="status">Saving or checking reviewed facts…</p>}
       <fieldset disabled={busy} className="ledger-controls">
-        <BankSandboxPanel
+        {(identity?.custodian??false)&&<BankSandboxPanel
           ledgerAccountId={selected}
           openingDate={account?.openingDate}
           onBusy={setBusy}
@@ -341,7 +344,7 @@ export default function MoneyPositionWorkspace({
               0,
             );
           }}
-        />
+        />}
         <button type="button" onClick={() => run(refresh)}>
           Reload reviewed position
         </button>
@@ -492,6 +495,8 @@ export default function MoneyPositionWorkspace({
                           `Last statement ${account.reconciledDate}: ${account.reconciledSource}`}
                       </p>
                     </section>
+                    {!account.owned&&<p>This shared account is read-only. Its owner reviews activity and reconciliation.</p>}
+                    <fieldset disabled={!account.owned} className="account-edit-controls"><legend>Owner activity tools</legend>
                     <details id="ledger-import-review" className="ledger-card">
                       <summary>Preview and review CSV activity</summary>
                       <p>
@@ -776,6 +781,7 @@ export default function MoneyPositionWorkspace({
                         )}
                       </form>
                     </section>
+                    </fieldset>
                     <section
                       className="ledger-card"
                       aria-label="Reviewed account activity"
@@ -813,7 +819,7 @@ export default function MoneyPositionWorkspace({
                                 </td>
                                 <td>{e.source}</td>
                                 <td>
-                                  {e.kind !== "ADJUSTMENT" && (
+                                  {account.owned && e.kind !== "ADJUSTMENT" && (
                                     <button
                                       type="button"
                                       aria-label={"Correct " + e.reference}
@@ -829,6 +835,7 @@ export default function MoneyPositionWorkspace({
                         </table>
                       </div>
                     </section>
+                    <fieldset disabled={!account.owned} className="account-edit-controls"><legend>Owner reconciliation tools</legend>
                     <section className="ledger-card">
                       <h3>Check against a statement</h3>
                       <p>
@@ -897,6 +904,7 @@ export default function MoneyPositionWorkspace({
                         </section>
                       )}
                     </section>
+                    </fieldset>
                     <details className="ledger-card">
                       <summary>Account correction and evidence history</summary>
                       {history.map((e) => (

@@ -11,6 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(properties="spring.datasource.url=jdbc:h2:mem:workbook-revision;DB_CLOSE_DELAY=-1")
+@org.junit.jupiter.api.extension.ExtendWith(com.householdfinance.access.OwnerFixture.class)
 class WorkbookRevisionTest {
     @Autowired WorkbookIngestionService service;
     @Autowired AccountRepository accounts;

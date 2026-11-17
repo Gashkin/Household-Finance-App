@@ -34,6 +34,7 @@ public class EvidenceIntakeService {
     @Scheduled(fixedDelay = 60000) public synchronized void purge() { drafts.values().removeIf(d -> !d.expires.isAfter(clock.instant())); }
 
     public View create(String source, String reference, boolean allowModel) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         if (source == null || source.isBlank() || source.length() > 4000 || source.split("\\R", -1).length > 80)
             throw new IllegalArgumentException("Provide 1–4000 characters in at most 80 source lines");
         if (reference == null || reference.isBlank() || reference.strip().length() > 100)
@@ -108,6 +109,7 @@ public class EvidenceIntakeService {
             "Model suggestion; exact amount checked against source, meaning and account type still require your review.");
     }
     public synchronized CashPositionService.Snapshot approve(String id, Approval approval) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         purge(); Draft draft = drafts.get(id);
         if (draft == null) throw new ResponseStatusException(NOT_FOUND, "Draft expired or was discarded; extract again");
         if (draft.saved != null) {
@@ -131,7 +133,8 @@ public class EvidenceIntakeService {
         draft.approval = approval; draft.saved = saved; draft.lines = List.of(); // Drop source references immediately on approval.
         return saved;
     }
-    public synchronized void discard(String id) { drafts.remove(id); }
+    public synchronized void discard(String id) {
+        com.householdfinance.access.AccessContext.requireLegacy(); drafts.remove(id); }
     public static long minor(String euro) {
         if (euro == null || euro.length() > 18 || !euro.matches("[0-9]+(?:\\.[0-9]{1,2})?")) throw new IllegalArgumentException("Amounts must be nonnegative euro text with at most two decimals");
         try { long cents = new BigDecimal(euro).movePointRight(2).longValueExact();

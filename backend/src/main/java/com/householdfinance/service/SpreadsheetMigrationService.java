@@ -60,6 +60,7 @@ public class SpreadsheetMigrationService {
     }
 
     public MigrationPreview previewBaselineCsv(String csvContent) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         var importId = UUID.randomUUID().toString();
         var appValueByMetric = createAppValueByMetric();
         var rows = new ArrayList<MigrationRow>();
@@ -124,6 +125,7 @@ public class SpreadsheetMigrationService {
     }
 
     public ReconcileResult reconcile(ReconcileRequest request) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         var importId = request == null || request.importId() == null ? "unknown" : request.importId();
         var preview = previews.get(importId);
         if (preview == null && request != null && request.importId() != null) {
@@ -153,6 +155,7 @@ public class SpreadsheetMigrationService {
     }
 
     public MigrationExecutionReport executionReport(String importId) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         var preview = previews.get(importId);
         if (preview == null) {
             preview = migrationArtifactService.getLatestPayload(importId, "BASELINE_PREVIEW", MigrationPreview.class);
@@ -220,6 +223,7 @@ public class SpreadsheetMigrationService {
     }
 
     public List<MigrationArtifactService.ArtifactHistoryEntry> history(String importId) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         return migrationArtifactService.getHistory(importId);
     }
 

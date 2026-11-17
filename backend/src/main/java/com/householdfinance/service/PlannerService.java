@@ -56,6 +56,7 @@ public class PlannerService {
     }
 
     public PlannerData getPlannerData() {
+        com.householdfinance.access.AccessContext.requireLegacy();
         var monthlyCommitments = monthlyCommitmentRepository.findAll().stream()
             .sorted(Comparator.comparing(entity -> Objects.toString(entity.getId(), "")))
             .map(entity -> new Commitment(
@@ -98,6 +99,7 @@ public class PlannerService {
 
     @Transactional
     public Account createAccount(AccountUpsertRequest request) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         validateAccountRequest(request, false);
         var requestId = nonNull(request.id());
         if (accountRepository.existsById(requestId)) {
@@ -110,6 +112,7 @@ public class PlannerService {
 
     @Transactional
     public Account updateAccount(String id, AccountUpsertRequest request) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         validateAccountRequest(request, true);
         var entityId = nonNull(id);
         var entity = accountRepository.findById(entityId)
@@ -125,6 +128,7 @@ public class PlannerService {
 
     @Transactional
     public void deleteAccount(String id) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         var entityId = nonNull(id);
         if (!accountRepository.existsById(entityId)) {
             throw new IllegalArgumentException("Account not found: " + id);
@@ -134,6 +138,7 @@ public class PlannerService {
 
     @Transactional
     public Category createCategory(CategoryUpsertRequest request) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         validateCategoryRequest(request, false);
         var requestId = nonNull(request.id());
         if (categoryRepository.existsById(requestId)) {
@@ -146,6 +151,7 @@ public class PlannerService {
 
     @Transactional
     public Category updateCategory(String id, CategoryUpsertRequest request) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         validateCategoryRequest(request, true);
         var entityId = nonNull(id);
         var entity = categoryRepository.findById(entityId)
@@ -160,6 +166,7 @@ public class PlannerService {
 
     @Transactional
     public void deleteCategory(String id) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         var entityId = nonNull(id);
         if (!categoryRepository.existsById(entityId)) {
             throw new IllegalArgumentException("Category not found: " + id);
@@ -169,6 +176,7 @@ public class PlannerService {
 
     @Transactional
     public Commitment createCommitment(CommitmentUpsertRequest request) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         validateCommitmentRequest(request, false);
         var requestId = nonNull(request.id());
         if (monthlyCommitmentRepository.existsById(requestId) || transactionRepository.existsById(requestId)) {
@@ -205,6 +213,7 @@ public class PlannerService {
 
     @Transactional
     public Commitment updateCommitment(String id, CommitmentUpsertRequest request) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         validateCommitmentRequest(request, true);
         var entityId = nonNull(id);
         if (monthlyCommitmentRepository.existsById(entityId)) {
@@ -240,6 +249,7 @@ public class PlannerService {
 
     @Transactional
     public void deleteCommitment(String id) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         var entityId = nonNull(id);
         if (monthlyCommitmentRepository.existsById(entityId)) {
             monthlyCommitmentRepository.deleteById(entityId);

@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 @Entity
 @Table(name = "ledger_accounts")
 public class LedgerAccount {
+  @Column(length=36) public String ownerId = com.householdfinance.access.AccessContext.actor()==null?"owner":com.householdfinance.access.AccessContext.userId();
+  @Column(columnDefinition="boolean default false") public boolean shared;
   @Id
   @Column(length = 36)
   public String id;

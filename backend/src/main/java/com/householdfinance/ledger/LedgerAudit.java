@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 @Entity
 @Table(name = "ledger_audit")
 public class LedgerAudit {
+  @Column(length=36) public String actorId = com.householdfinance.access.AccessContext.actor()==null?"owner":com.householdfinance.access.AccessContext.userId();
   @Id
   @Column(length = 36)
   public String id;

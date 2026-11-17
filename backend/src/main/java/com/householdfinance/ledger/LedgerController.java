@@ -57,10 +57,17 @@ public class LedgerController {
   public LedgerService.Position position(@RequestParam("asOf") String date) {
     return service.position(LocalDate.parse(date));
   }
+  @GetMapping("/shared")
+  public LedgerService.Position shared(@RequestParam("asOf")String date){return service.sharedPosition(LocalDate.parse(date));}
 
   @PostMapping("/accounts")
   public LedgerService.AccountView create(HttpServletRequest r) throws IOException {
     return service.create(body(r, LedgerService.AccountInput.class));
+  }
+
+  @PutMapping("/accounts/{id}/sharing")
+  public LedgerService.AccountView share(@PathVariable("id") String id,HttpServletRequest r)throws IOException {
+    return service.share(id,body(r,LedgerService.Sharing.class));
   }
 
   @GetMapping("/accounts/{id}/activity")

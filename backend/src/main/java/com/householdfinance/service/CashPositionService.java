@@ -31,6 +31,7 @@ public class CashPositionService {
 
     private final CashPositionSnapshotRepository repository;
     private final Clock clock;
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     public CashPositionService(CashPositionSnapshotRepository repository) {
         this.repository = repository;
@@ -43,8 +44,22 @@ public class CashPositionService {
     /** Ledger accounts may be overdrawn; signed balances never represent borrowing headroom. */
     @Transactional
     public Snapshot saveLedger(Input input) { return saveInput(input, true); }
+    @Transactional
+    public Snapshot saveLedger(Input input,java.util.Set<String> sourceAccounts) {
+        var s=saveInput(input,true);var e=repository.findById(s.id()).orElseThrow();
+        e.scopeRefs=String.join(",",new java.util.TreeSet<>(sourceAccounts));repository.saveAndFlush(e);return s;
+    }
+    private boolean visible(CashPositionSnapshotEntity e){
+        if(!com.householdfinance.access.AccessContext.owns(e.ownerId))return false;
+        if(jdbc==null||e.scopeRefs==null||e.scopeRefs.isEmpty())return true;
+        for(String id:e.scopeRefs.split(",")){
+            var allowed=jdbc.queryForList("SELECT OWNER_ID,SHARED FROM LEDGER_ACCOUNTS WHERE ID=?",id);
+            if(allowed.size()!=1||!com.householdfinance.access.AccessContext.reads((String)allowed.get(0).get("OWNER_ID"),Boolean.TRUE.equals(allowed.get(0).get("SHARED"))))return false;
+        }return true;
+    }
 
     private Snapshot saveInput(Input input, boolean signedCash) {
+        com.householdfinance.access.AccessContext.requireEdit();
         if (input == null || input.asOfDate() == null || input.asOfDate().isAfter(LocalDate.now(clock)))
             throw new IllegalArgumentException("asOfDate must be today or an earlier date");
         if (input.sourceNote() == null || input.sourceNote().isBlank() || input.sourceNote().trim().length() > 200)
@@ -52,10 +67,13 @@ public class CashPositionService {
         if (!"REVIEWED".equals(input.verification()) && !"ESTIMATED".equals(input.verification()))
             throw new IllegalArgumentException("verification must be REVIEWED or ESTIMATED");
         requireAmount(input.minimumReserveMinor(), "minimumReserveMinor");
-        if (input.cashBalances() == null || input.cashBalances().isEmpty() || input.cashBalances().size() > MAX_LINES)
-            throw new IllegalArgumentException("Provide 1–30 cash balances");
-        if (input.upcomingCommitments() == null || input.upcomingCommitments().size() > MAX_LINES)
-            throw new IllegalArgumentException("Provide 0–30 upcoming commitments");
+        int cashLimit = signedCash ? com.householdfinance.access.HouseholdLimits.MAX_VISIBLE_ACCOUNTS : MAX_LINES;
+        // Ledger publication may add one pending-debit line per source, plus the reviewed manual commitments.
+        int commitmentLimit = signedCash ? cashLimit + MAX_LINES : MAX_LINES;
+        if (input.cashBalances() == null || input.cashBalances().isEmpty() || input.cashBalances().size() > cashLimit)
+            throw new IllegalArgumentException("Provide 1–"+cashLimit+" cash balances");
+        if (input.upcomingCommitments() == null || input.upcomingCommitments().size() > commitmentLimit)
+            throw new IllegalArgumentException("Provide 0–"+commitmentLimit+" upcoming commitments");
 
         List<CashPositionLine> lines = new ArrayList<>();
         long cash = 0, committed = 0;
@@ -80,12 +98,15 @@ public class CashPositionService {
 
     @Transactional(readOnly = true)
     public Optional<Snapshot> byId(String id) {
-        return repository.findById(id).map(this::toSnapshot);
+        com.householdfinance.access.AccessContext.requireRead();
+        return repository.findById(id).filter(this::visible).map(this::toSnapshot);
     }
 
     @Transactional(readOnly = true)
     public Optional<Snapshot> latest() {
-        return repository.findFirstByOrderByRecordedAtDescIdDesc().map(this::toSnapshot);
+        com.householdfinance.access.AccessContext.requireRead();
+        return repository.findAll().stream().filter(this::visible)
+                .max(java.util.Comparator.comparing(CashPositionSnapshotEntity::getRecordedAt).thenComparing(CashPositionSnapshotEntity::getId)).map(this::toSnapshot);
     }
 
     private Snapshot toSnapshot(CashPositionSnapshotEntity entity) {

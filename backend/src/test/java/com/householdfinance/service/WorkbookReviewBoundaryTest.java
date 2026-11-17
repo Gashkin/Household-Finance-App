@@ -9,6 +9,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@org.junit.jupiter.api.extension.ExtendWith(com.householdfinance.access.OwnerFixture.class)
 public class WorkbookReviewBoundaryTest {
     @Test void confirmationExpiresAtFiveMinutesAndExpiredReviewsDoNotOccupyCapacity() throws Exception {
         var clock=mock(Clock.class);

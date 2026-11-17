@@ -15,14 +15,14 @@ public class WorkspaceController {
     public WorkspaceController(WorkspaceFilter access, WorkspaceBackupService backups, ObjectMapper json) {
         this.access=access; this.backups=backups; this.json=json;
     }
-    record Password(String password) {}
+    record Password(String username,String password) {}
     record Restore(String password, String backup, String confirmation) {}
     @GetMapping("/status") public Map<String, Object> status(HttpServletRequest request) {
         return Map.of("configured",access.configured(),"unlocked",access.authenticated(request));
     }
     @PostMapping("/unlock") public ResponseEntity<Void> unlock(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Password input = read(request,2048,Password.class);
-        return ResponseEntity.status(access.login(input.password(), request,response)).build();
+        return ResponseEntity.status(access.login(input.username(),input.password(), request,response)).build();
     }
     @PostMapping("/lock") public void lock(HttpServletRequest request,HttpServletResponse response) { access.logout(request,response); }
     @GetMapping("/records") public Map<String,Long> records() { return backups.counts(); }
@@ -36,7 +36,8 @@ public class WorkspaceController {
         if (input.backup()==null || input.backup().length()>14*1024*1024) throw new IllegalArgumentException("Backup file required (maximum 10 MiB)");
         byte[] envelope;
         try { envelope=Base64.getDecoder().decode(input.backup()); } catch (Exception e) { throw new IllegalArgumentException("Invalid backup encoding"); }
-        return backups.restore(envelope,input.password(),input.confirmation());
+        var result=backups.restore(envelope,input.password(),input.confirmation());
+        access.revokeAll();return result;
     }
     private <T> T read(HttpServletRequest request,int max,Class<T> type) throws IOException {
         if (request.getContentLengthLong()>max) throw new IllegalArgumentException("Workspace request too large");

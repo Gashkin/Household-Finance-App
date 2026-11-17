@@ -26,6 +26,7 @@ public class MigrationArtifactService {
 
     @Transactional
     public void recordArtifact(String importId, String artifactType, Object payload) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         var entity = new MigrationArtifactEntity();
         entity.setImportId(importId);
         entity.setArtifactType(artifactType);
@@ -36,6 +37,7 @@ public class MigrationArtifactService {
 
     @Transactional(readOnly = true)
     public <T> T getLatestPayload(String importId, String artifactType, Class<T> payloadType) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         return migrationArtifactRepository.findTopByImportIdAndArtifactTypeOrderByCreatedAtDesc(importId, artifactType)
                 .map(MigrationArtifactEntity::getPayload)
                 .map(payload -> deserialize(payload, payloadType))
@@ -44,6 +46,7 @@ public class MigrationArtifactService {
 
     @Transactional(readOnly = true)
     public <T> T getLatestPayloadByArtifactType(String artifactType, Class<T> payloadType) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         return migrationArtifactRepository.findTopByArtifactTypeOrderByCreatedAtDesc(artifactType)
                 .map(MigrationArtifactEntity::getPayload)
                 .map(payload -> deserialize(payload, payloadType))
@@ -52,6 +55,7 @@ public class MigrationArtifactService {
 
     @Transactional(readOnly = true)
     public List<ArtifactHistoryEntry> getHistory(String importId) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         return migrationArtifactRepository.findByImportIdOrderByCreatedAtAsc(importId).stream()
                 .map(entity -> new ArtifactHistoryEntry(
                         entity.getId(),

@@ -63,6 +63,7 @@ public class DecisionPlanService {
   private final ObjectMapper json;
   private final DebtScenarioController debt;
   private final com.householdfinance.workspace.WorkspaceBackupService backups;
+  @org.springframework.beans.factory.annotation.Autowired(required=false) private com.householdfinance.service.CashPositionService sources;
 
   public DecisionPlanService(
       DecisionPlanRepository plans,
@@ -137,6 +138,14 @@ public class DecisionPlanService {
       throw new IllegalStateException("Saved plan could not be read");
     }
   }
+  private boolean visible(DecisionPlan p){
+    if(!com.householdfinance.access.AccessContext.owns(p.ownerId))return false;
+    if(sources==null)return true;
+    var data=read(p);var reports=new ArrayList<DebtScenarioController.Report>();
+    if(data.report()!=null)reports.add(data.report());
+    data.history().stream().filter(h -> h.report()!=null).forEach(h -> reports.add(h.report()));
+    return reports.stream().allMatch(r -> r.cashEvidence()==null||sources.byId(r.cashEvidence().id()).isPresent());
+  }
 
   private View view(DecisionPlan p) {
     var s = read(p);
@@ -149,7 +158,9 @@ public class DecisionPlanService {
 
   @Transactional(readOnly = true)
   public List<View> list() {
+    com.householdfinance.access.AccessContext.requireRead();
     return plans.findAll().stream()
+        .filter(this::visible)
         .sorted(Comparator.comparing((DecisionPlan p) -> p.updatedAt).reversed())
         .map(this::view)
         .toList();
@@ -161,7 +172,8 @@ public class DecisionPlanService {
   }
 
   private DecisionPlan find(String id) {
-    return plans.findById(id).orElseThrow(() -> new IllegalArgumentException("Plan not found"));
+    com.householdfinance.access.AccessContext.requireRead();
+    return plans.findById(id).filter(this::visible).orElseThrow(() -> new IllegalArgumentException("Plan not found"));
   }
 
   private DecisionPlan owned(String id, Long revision) {
@@ -179,8 +191,9 @@ public class DecisionPlanService {
       List<Action> actions,
       String kind,
       String note) {
+    com.householdfinance.access.AccessContext.requireEdit();
     backups.guardPlanMutation();
-    if (old == null) require(plans.count() < 100, "Local plan limit reached");
+    if (old == null) require(plans.findAll().stream().filter(x -> com.householdfinance.access.AccessContext.owns(x.ownerId)).count() < 100, "Local plan limit reached");
     var history = new ArrayList<History>(old == null ? List.of() : old.history());
     require(
         history.size() < 200, "Plan history limit reached; retain this plan and create a new one");

@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties="spring.datasource.url=jdbc:h2:mem:debt-scenario-tests;DB_CLOSE_DELAY=-1")
 @AutoConfigureMockMvc(addFilters=false)
+@org.junit.jupiter.api.extension.ExtendWith(com.householdfinance.access.OwnerFixture.class)
 class DebtScenarioControllerTest {
     @Autowired MockMvc mvc;
 

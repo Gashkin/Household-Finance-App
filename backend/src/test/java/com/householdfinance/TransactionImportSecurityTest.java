@@ -14,6 +14,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @SpringBootTest(properties={"spring.datasource.url=jdbc:h2:mem:legacy-import-security;DB_CLOSE_DELAY=-1"})
+@org.junit.jupiter.api.extension.ExtendWith(com.householdfinance.access.OwnerFixture.class)
 class TransactionImportSecurityTest {
   @Autowired TransactionImportService imports;
   @Autowired AccountRepository accounts;
@@ -46,7 +47,7 @@ class TransactionImportSecurityTest {
     var request=new TransactionImportService.ImportAcceptRequest(preview.importId(),List.of("R1"));
     var barrier=new CyclicBarrier(2);var pool=Executors.newFixedThreadPool(2);
     try {
-      Callable<Integer> accept=()->{barrier.await();return imports.acceptImport(request).acceptedCount();};
+      Callable<Integer> accept=()->com.householdfinance.access.OwnerFixture.call(()->{barrier.await();return imports.acceptImport(request).acceptedCount();});
       var a=pool.submit(accept);var b=pool.submit(accept);
       assertEquals(1,a.get(10,TimeUnit.SECONDS)+b.get(10,TimeUnit.SECONDS));
     } finally { pool.shutdownNow(); }

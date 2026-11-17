@@ -22,6 +22,8 @@ import static org.mockito.Mockito.*;
 @WebMvcTest(WorkbookIngestionController.class)
 @AutoConfigureMockMvc(addFilters=false)
 @Import(WorkbookIngestionService.class)
+@MockitoBean(types=com.householdfinance.access.AccessService.class)
+@org.junit.jupiter.api.extension.ExtendWith(com.householdfinance.access.OwnerFixture.class)
 class WorkbookUploadSecurityTest {
     @Autowired MockMvc http;
     @MockitoBean MigrationArtifactService artifacts;

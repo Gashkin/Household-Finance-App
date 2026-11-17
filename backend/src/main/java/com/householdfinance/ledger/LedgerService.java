@@ -1,5 +1,7 @@
 package com.householdfinance.ledger;
 
+import com.householdfinance.access.AccessContext;
+
 import com.fasterxml.jackson.databind.*;
 import com.householdfinance.service.CashPositionService;
 import java.math.BigDecimal;
@@ -66,7 +68,9 @@ public class LedgerService {
       String reconciledSource,
       boolean reconciled,
       int entries,
-      List<String> warnings) {}
+      List<String> warnings,
+      boolean shared,
+      boolean owned) {}
 
   public record Position(
       LocalDate asOf,
@@ -104,6 +108,7 @@ public class LedgerService {
   private final CashPositionService cash;
   private final ObjectMapper json;
   private final Map<String, Draft> drafts = new HashMap<>();
+  @org.springframework.beans.factory.annotation.Autowired(required=false) private com.householdfinance.access.AccessService identityAccess;
 
   public LedgerService(
       LedgerAccountRepository accounts,
@@ -162,10 +167,13 @@ public class LedgerService {
   private LedgerAccount account(String id) {
     return accounts
         .findById(id)
+        .filter(a -> AccessContext.reads(a.ownerId,a.shared))
         .orElseThrow(() -> new IllegalArgumentException("Unknown ledger account"));
   }
 
   private void revision(LedgerAccount a, Long revision) {
+    AccessContext.requireEdit();
+    check(AccessContext.owns(a.ownerId), "Only the account owner may change this account");
     check(revision != null && a.revision == revision, "Account changed; reload and review again");
   }
 
@@ -227,8 +235,9 @@ public class LedgerService {
 
   @Transactional
   public AccountView create(AccountInput input) {
+    AccessContext.requireEdit();
     check(input != null, "Account required");
-    check(accounts.count() < 30, "Use at most 30 ledger accounts");
+    check(accounts.findAll().stream().filter(a -> AccessContext.owns(a.ownerId)).count() < com.householdfinance.access.HouseholdLimits.ACCOUNTS_PER_USER, "Use at most 30 owned ledger accounts");
     var a = new LedgerAccount();
     a.id = UUID.randomUUID().toString();
     a.name = text(input.name(), 80, "Account name");
@@ -249,8 +258,10 @@ public class LedgerService {
 
   @Transactional
   public void bindSandboxIdentity(String id, String identity) {
+    AccessContext.requireEdit();
     check(identity != null && identity.matches("[0-9a-f]{64}"), "Invalid sandbox account identity");
     var a = account(id);
+    check(AccessContext.owns(a.ownerId), "Bank linking requires the account owner");
     check(
         a.sandboxIdentity == null || a.sandboxIdentity.equals(identity),
         "This ledger is already linked to a different sandbox account");
@@ -315,6 +326,7 @@ public class LedgerService {
 
   @Transactional(readOnly = true)
   public synchronized Preview preview(String id, PreviewInput input) {
+    AccessContext.requireEdit();
     check(input != null, "Import required");
     var a = account(id);
     String source = text(input.source(), 200, "Import source");
@@ -556,18 +568,24 @@ public class LedgerService {
         a.reconciledSource,
         reconciled,
         count,
-        List.copyOf(warnings));
+        List.copyOf(warnings),a.shared,AccessContext.owns(a.ownerId));
   }
 
   @Transactional(readOnly = true)
   public Position position(LocalDate asOf) {
+    return position(asOf,false);
+  }
+  @Transactional(readOnly=true)
+  public Position sharedPosition(LocalDate asOf){return position(asOf,true);}
+  private Position position(LocalDate asOf,boolean sharedOnly){
+    AccessContext.requireRead();
     check(asOf != null && !asOf.isAfter(today()), "Position date must be today or earlier");
     List<AccountView> rows = new ArrayList<>();
     List<String> warnings = new ArrayList<>();
     long cashTotal = 0, debt = 0, income = 0, spent = 0, pendingDebits = 0;
     if (asOf.isBefore(today().minusDays(30)))
       warnings.add("Historical position: more than 30 days old; not current spending evidence");
-    for (var a : accounts.findAll().stream().sorted(Comparator.comparing(a -> a.name)).toList()) {
+    for (var a : accounts.findAll().stream().filter(a -> AccessContext.reads(a.ownerId,a.shared)&&(!sharedOnly||a.shared)).sorted(Comparator.comparing(a -> a.name)).toList()) {
       if (a.openingDate.isAfter(asOf)) {
         warnings.add(a.name + " opened after this date and is excluded");
         continue;
@@ -604,9 +622,14 @@ public class LedgerService {
 
   @Transactional(readOnly = true)
   public List<LedgerAudit> history(String id) {
-    check(id.equals("HOUSEHOLD") || accounts.existsById(id), "Unknown ledger account");
-    return audits.findByAccountIdOrderByRecordedAtDesc(id).stream().limit(100).toList();
+    AccessContext.requireRead();
+    if(id.equals("HOUSEHOLD"))id=AccessContext.publicationId();else account(id);
+    return audits.findByAccountIdOrderByRecordedAtDesc(id).stream()
+        .filter(e -> !e.action.startsWith("PUBLISH") || (e.source.startsWith("Snapshot ") && cash.byId(e.source.substring(9)).isPresent()))
+        .limit(100).toList();
   }
+  @Transactional(readOnly=true)
+  public boolean sourcesVisible(Set<String> ids){AccessContext.requireRead();return ids.stream().allMatch(id -> accounts.findById(id).filter(a -> AccessContext.reads(a.ownerId,a.shared)).isPresent());}
 
   @Transactional
   public Reconciliation reconcile(String id, LocalDate asOf, Reconcile input) {
@@ -656,6 +679,7 @@ public class LedgerService {
 
   @Transactional
   public CashPositionService.Snapshot publish(Publish input) {
+    AccessContext.requireEdit();
     check(
         input != null && Boolean.TRUE.equals(input.acknowledged()),
         "Confirm reconciled cash and check manual commitments against pending debits");
@@ -668,7 +692,7 @@ public class LedgerService {
     var previous = audits.findById(input.requestId()).orElse(null);
     if (previous != null) {
       check(
-          previous.action.equals("PUBLISH") && previous.beforeJson.equals(fingerprint),
+          previous.action.equals("PUBLISH") && AccessContext.owns(previous.actorId) && previous.beforeJson.equals(fingerprint),
           "Publication request already used with other facts");
       return cash.byId(previous.afterJson)
           .orElseThrow(() -> new IllegalArgumentException("Published cash record unavailable"));
@@ -728,17 +752,27 @@ public class LedgerService {
                 "REVIEWED",
                 balances,
                 commitments,
-                reserve));
+                reserve),p.accounts().stream().filter(a -> a.kind().equals("CASH")).map(AccountView::id).collect(java.util.stream.Collectors.toSet()));
     var event = new LedgerAudit();
     event.id = input.requestId();
-    event.accountId = "HOUSEHOLD";
+    event.accountId = AccessContext.publicationId();
     event.action = "PUBLISH";
     event.source = "Snapshot " + snapshot.id();
     event.recordedAt = Instant.now();
     event.beforeJson = fingerprint;
     event.afterJson = snapshot.id();
     audits.save(event);
-    audit("HOUSEHOLD", "PUBLISH_EVIDENCE", event.source, null, provenance);
+    audit(AccessContext.publicationId(), "PUBLISH_EVIDENCE", event.source, null, provenance);
     return snapshot;
+  }
+
+  public record Sharing(Long revision,boolean shared) {}
+  @Transactional
+  public AccountView share(String id,Sharing input){
+    check(input!=null,"Explicit sharing choice required");var a=account(id);revision(a,input.revision());
+    boolean before=a.shared;a.shared=input.shared();a.revision++;accounts.saveAndFlush(a);
+    audit(a.id,"SHARING","Explicit privacy change",before,a.shared);
+    if(identityAccess!=null&&before!=a.shared)identityAccess.scopeChanged();
+    return view(a,today());
   }
 }

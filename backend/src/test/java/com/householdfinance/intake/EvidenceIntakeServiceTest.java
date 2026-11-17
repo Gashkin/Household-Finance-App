@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@org.junit.jupiter.api.extension.ExtendWith(com.householdfinance.access.OwnerFixture.class)
 class EvidenceIntakeServiceTest {
     final CashPositionService cash = mock(CashPositionService.class);
     final EvidenceModelGateway model = mock(EvidenceModelGateway.class);

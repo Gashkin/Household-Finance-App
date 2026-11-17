@@ -18,6 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc(addFilters=false)
 @WebMvcTest(WorkbookIngestionController.class)
+@org.springframework.test.context.bean.override.mockito.MockitoBean(types=com.householdfinance.access.AccessService.class)
 @SuppressWarnings("null")
 class WorkbookIngestionControllerTest {
 

@@ -209,6 +209,7 @@ public class WorkbookIngestionService {
     }
 
     public WorkbookPreview previewWorkbook(MultipartFile file) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("Workbook file is required.");
         }
@@ -242,6 +243,7 @@ public class WorkbookIngestionService {
     }
 
     public WorkbookMappingResult mapWorkbook(MultipartFile file) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         var mappingResult = mapWorkbookInternal(file);
         migrationArtifactService.recordArtifact(mappingResult.importId(), "WORKBOOK_MAPPING", mappingResult);
         return mappingResult;
@@ -249,6 +251,7 @@ public class WorkbookIngestionService {
 
     @Transactional
     public WorkbookLoadValidationResult validateWorkbookLoad(MultipartFile file, String mode) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         var loadMode = parseLoadMode(mode);
         var mappingResult = mapWorkbookInternal(file);
 
@@ -317,6 +320,7 @@ public class WorkbookIngestionService {
 
     @Transactional
     public WorkbookLoadExecutionResult executeValidatedLoad(WorkbookLoadExecuteRequest request) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         if (request == null || request.confirmationToken() == null || request.confirmationToken().isBlank()) {
             throw new IllegalArgumentException("Confirmation token is required. Validate first.");
         }
@@ -394,6 +398,7 @@ public class WorkbookIngestionService {
     }
 
     public WorkbookLoadPostSummary getLatestLoadSummary() {
+        com.householdfinance.access.AccessContext.requireLegacy();
         var summary = migrationArtifactService.getLatestPayloadByArtifactType(
                 "WORKBOOK_LOAD_SUMMARY",
                 WorkbookLoadPostSummary.class
@@ -405,6 +410,7 @@ public class WorkbookIngestionService {
     }
 
     public WorkbookLoadPostSummary getLoadSummary(String executionId) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         var summary = migrationArtifactService.getLatestPayload(
                 executionId,
                 "WORKBOOK_LOAD_SUMMARY",
@@ -417,6 +423,7 @@ public class WorkbookIngestionService {
     }
 
     public List<LoadRejectedRow> getRejectedRows(String executionId) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         var payload = migrationArtifactService.getLatestPayload(
                 executionId,
                 "WORKBOOK_LOAD_REJECTIONS",
@@ -430,6 +437,7 @@ public class WorkbookIngestionService {
 
     @Transactional
     public WorkbookLoadRollbackResult rollbackLoad(String executionId) {
+        com.householdfinance.access.AccessContext.requireLegacy();
         var summary = getLoadSummary(executionId);
         if ("ROLLED_BACK".equals(summary.status())) {
             throw new IllegalArgumentException("Load execution already rolled back: " + executionId);

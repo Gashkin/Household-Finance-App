@@ -63,6 +63,7 @@ export type ForecastWorkspace = {
   today: string;
   suggestedLedgerDate: string | null;
   plan: Plan | null;
+  hiddenPlanRevision?:number|null;
 };
 export type Comparison = {
   revision: number;

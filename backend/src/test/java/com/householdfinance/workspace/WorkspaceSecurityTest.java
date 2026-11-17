@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(properties={"workspace.password=synthetic-test-workspace-password", "spring.datasource.url=jdbc:h2:mem:private-security;DB_CLOSE_DELAY=-1"})
 @AutoConfigureMockMvc
+@org.junit.jupiter.api.extension.ExtendWith(com.householdfinance.access.OwnerFixture.class)
 class WorkspaceSecurityTest {
     @Autowired MockMvc mvc; @Autowired ObjectMapper json; @Autowired JdbcTemplate jdbc; @Autowired WorkspaceBackupService backups;
     Cookie session;
@@ -56,6 +57,8 @@ class WorkspaceSecurityTest {
         clear();
         mvc.perform(postJson("/api/workspace/restore",request)).andExpect(status().isOk());
         assertEquals(before,backups.counts());
+        mvc.perform(get("/api/cash-position/latest").cookie(session)).andExpect(status().isUnauthorized());
+        session=unlock();
         mvc.perform(get("/api/cash-position/latest").cookie(session)).andExpect(status().isOk()).andExpect(jsonPath("$.id").value("snapshot-1")).andExpect(jsonPath("$.liquidCashMinor").value(12345));
         assertEquals("Synthetic private source",jdbc.queryForObject("SELECT PAYLOAD FROM MIGRATION_ARTIFACTS",String.class));
         jdbc.update("INSERT INTO MIGRATION_ARTIFACTS(IMPORT_ID,ARTIFACT_TYPE,CREATED_AT,PAYLOAD) VALUES('next','report',CURRENT_TIMESTAMP,'new')");
