@@ -56,8 +56,9 @@ try {
     if (Test-Path -LiteralPath $Output) { throw 'Choose an empty release destination.' }
     New-Item -ItemType Directory -Path $Output | Out-Null
     Copy-Item -LiteralPath 'backend\target\household-finance-backend-0.0.1-SNAPSHOT.jar' -Destination (Join-Path $Output 'app.jar')
-    foreach($file in @('Common.ps1','Install.ps1','Start.ps1','Readiness.ps1','Test-IdentityBoundary.ps1','Remove-LocalData.ps1','Disable-Production.ps1')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $Output }
+    foreach($file in @('Common.ps1','Install.ps1','Start.ps1','Readiness.ps1','Test-IdentityBoundary.ps1','Inspect-DeploymentHost.ps1','Remove-LocalData.ps1','Disable-Production.ps1')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $Output }
     Copy-Item -LiteralPath 'product\stories\persistent-aib-instance.md' -Destination (Join-Path $Output 'Operating-guide.md')
+    Copy-Item -LiteralPath 'product\stories\production-commissioning.md' -Destination (Join-Path $Output 'Commissioning-guide.md')
     & (Join-Path $env:JAVA_HOME 'bin\jlink.exe') --add-modules java.se,jdk.crypto.ec,jdk.unsupported,jdk.charsets --strip-debug --no-header-files --no-man-pages --output (Join-Path $Output 'runtime')
     if ($LASTEXITCODE) { throw 'Windows runtime packaging failed' }
     $absolute = (Get-Item -LiteralPath $Output).FullName
