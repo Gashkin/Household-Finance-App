@@ -326,7 +326,7 @@ export default function MoneyPositionWorkspace({
           onPreview={(value) => {
             setPreview(value.preview);
             setProposals(
-              value.preview.proposals.map((p) => ({
+              (value.preview?.proposals ?? []).map((p) => ({
                 ...p,
                 include:
                   p.disposition !== "DUPLICATE" && p.disposition !== "CONFLICT",
@@ -334,9 +334,11 @@ export default function MoneyPositionWorkspace({
             );
             setReviewed(false);
             setMessage(
-              "Sandbox activity fetched. Review proposed facts before approval.",
+              value.preview
+                ? "Bank activity fetched. Review proposed facts before approval."
+                : "No bank transactions returned. Dated balance evidence is available; the ledger is unchanged.",
             );
-            setTimeout(
+            if (value.preview) setTimeout(
               () =>
                 document
                   .getElementById("ledger-import-review")

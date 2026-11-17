@@ -69,6 +69,19 @@ class ProductionProtocolTest {
     service.disconnect();
     assertEquals("DISCONNECTED",new SandboxService(gateway,ledger).status().state());
   }
+  @Test void emptyProductionIntervalKeepsBalancesAndNoImplicitLedgerMutation() {
+    var request=input(connect());
+    var before=ledger.position(today);
+    provider.mode="empty";
+    var fetched=service.fetch(request);
+    assertNull(fetched.preview());
+    assertEquals("990.00",fetched.balances().getFirst().amountEuro());
+    assertEquals(before,ledger.position(today));
+    service=new SandboxService(gateway,ledger);
+    assertEquals(fetched.fetchedAt(),service.status().lastSuccessfulFetch());
+    assertEquals("CONNECTED",service.status().state());
+    assertEquals(before,ledger.position(today));
+  }
   @Test void failedRevocationIsDurablyBlockedAndRetryable() {
     var request=input(connect()); provider.mode="delete-fail";
     assertThrows(IllegalArgumentException.class,()->service.disconnect());

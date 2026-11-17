@@ -83,3 +83,24 @@ inherited finding and cannot be resolved by deleting reviews or silently reducin
 On an incident, stop the instance, use `Disable-Production.ps1`, then follow provider/bank
 revocation from the owner-controlled account. Preserve records and encrypted recovery.
 Never run an older binary against a migrated live database.
+
+## Bank balances and transaction review
+
+The connector retrieves selected supported accounts' balances and bounded transaction
+history. A successful empty transaction interval returns balance evidence with
+`preview: null`; it creates no ledger import draft or bank-to-ledger binding. The UI
+clears the preceding unapproved review and states that no activity needs approval.
+An absent supported booked balance is shown as unavailable, never as invented zero.
+
+Provider balance types/dates remain evidence: they do not automatically overwrite
+opening cash or reconcile the ledger. Do not sum different balance types or treat
+credit/available limits as cash. Start from a reviewed dated opening baseline,
+approve the sourced transactions, then compare the appropriate dated booked closing
+balance through the existing explicit reconciliation workflow. Pending activity and
+incomplete history remain visible; any adjustment requires explicit approval.
+No new bank authentication or payment capability is introduced by this workflow.
+
+Synthetic acceptance covers the complete consent/review/reconciliation/revocation
+journey and the empty-period case on desktop/mobile, including removal of an older
+preview and unchanged ledger balances/entries/revision. These tests do not establish
+real AIB coverage, application entitlement or production readiness.

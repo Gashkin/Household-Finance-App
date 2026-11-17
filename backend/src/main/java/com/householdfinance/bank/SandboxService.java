@@ -426,8 +426,9 @@ public class SandboxService {
               "Invalid/repeated sandbox continuation; no partial import");
         }
       } while (continuation != null);
-      check(count > 0, "No sandbox activity in that date range");
-      var preview =
+      // A successfully fetched empty interval still supplies dated balance evidence.
+      // No ledger draft/binding/mutation is created when there is nothing to review.
+      var preview = count == 0 ? null :
           ledger.sandboxPreview(
               target.id(),
               a.identity(),

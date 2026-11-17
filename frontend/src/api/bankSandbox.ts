@@ -21,7 +21,7 @@ export type SandboxBank = {
   maximumConsentSeconds: number;
 };
 export type SandboxFetched = {
-  preview: Preview;
+  preview: Preview | null;
   balances: { type: string; amountEuro: string; date: string }[];
   warnings: string[];
   fetchedAt: string;
