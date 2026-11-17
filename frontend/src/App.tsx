@@ -9,12 +9,13 @@ import MigraterWorkspace from './components/MigraterWorkspace';
 import PlannerWorkspace from './components/PlannerWorkspace';
 import HouseholdAccess from './components/HouseholdAccess';
 import PermittedPosition from './components/PermittedPosition';
+import MemberWorkspace from './components/MemberWorkspace';
 import { useIdentity } from './api/access';
 
 function App() {
   const identity=useIdentity();
   const read=identity?.canRead??false,edit=identity?.canEdit??false,custodian=identity?.custodian??false;
-  const [role, setRole] = useState<'access'|'decision' | 'planner' | 'migrater' | 'consumer' | 'recovery' | 'money' | 'forecast' | 'plans'>(!edit?(read?'money':'access'):location.pathname === '/bank/callback' ? 'money' : 'decision');
+  const [role, setRole] = useState<'member'|'access'|'decision' | 'planner' | 'migrater' | 'consumer' | 'recovery' | 'money' | 'forecast' | 'plans'>(!edit?(read?'money':'access'):location.pathname === '/bank/callback' ? 'money' : 'decision');
 
   const [planId, setPlanId] = useState<string | null>(null);
 
@@ -24,6 +25,7 @@ function App() {
         <h1>Household Finance</h1>
         <nav className="role-switcher" aria-label="Workspaces">
           <button onClick={()=>setRole('access')} className={role==='access'?'active':''}>Household access</button>
+          {read&&<button onClick={()=>setRole('member')} className={role==='member'?'active':''}>Spending &amp; purchases</button>}
           {edit&&<>
           <button onClick={() => setRole('plans')} className={role === 'plans' ? 'active' : ''}>Financial plans</button>
           <button onClick={() => setRole('forecast')} className={role === 'forecast' ? 'active' : ''}>Plan ahead</button>
@@ -46,6 +48,7 @@ function App() {
 
       <main className="app-main">
         {role==='access'?<HouseholdAccess/>:null}
+        {role==='member'?<MemberWorkspace/>:null}
         {role === 'plans' ? <DecisionPlansWorkspace initialId={planId} /> : null}
         {role === 'forecast' ? <ForecastWorkspace /> : null}
         {role === 'money' ? edit?<MoneyPositionWorkspace openDecision={() => setRole('decision')} />:<PermittedPosition/> : null}

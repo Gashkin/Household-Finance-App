@@ -268,9 +268,9 @@ export default function ForecastWorkspace() {
             <>
               <p>
                 Saved starting evidence:{" "}
-                {plan.inputs.baseline.mode === "LEDGER"
-                  ? "Reconciled ledger"
-                  : "Manual estimate"}{" "}
+                {plan.inputs.baseline.mode === "MANUAL"
+                  ? "Manual estimate"
+                  : plan.inputs.baseline.mode === "SHARED_LEDGER"?"Reconciled shared ledger":"Reconciled ledger"}{" "}
                 · {plan.inputs.baseline.date} · cash{" "}
                 {money(plan.inputs.baseline.cashMinor)} · pending debits{" "}
                 {money(plan.inputs.baseline.pendingMinor)} ·{" "}
@@ -299,6 +299,7 @@ export default function ForecastWorkspace() {
                 >
                   <option value="MANUAL">Explicit manual estimate</option>
                   <option value="LEDGER">Reconciled cash ledger</option>
+                  <option value="SHARED_LEDGER">Reconciled shared cash only</option>
                 </select>
               </label>
               <label>

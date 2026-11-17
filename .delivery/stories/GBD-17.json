@@ -1,0 +1,13 @@
+{
+  "work_id":"GBD-17",
+  "page_id":"41ad3419-fef0-81d2-9fd4-e32b6b713a93",
+  "branch":"story/17-delivery",
+  "artifacts":[
+    {"path":"backend/src/main/java/com/householdfinance/member/MemberService.java","contains":["class MemberService","SOURCE_CHANGED"]},
+    {"path":"frontend/src/components/MemberWorkspace.tsx","contains":["Spending &amp; purchases"]},
+    {"path":"backend/src/test/java/com/householdfinance/member/MemberJourneyTest.java","contains":["class MemberJourneyTest","sharedRequestsNeedReceivingEditorDecisionAndReserveOnce"]},
+    {"path":"backend/src/test/java/com/householdfinance/workspace/MemberRecoveryTest.java","contains":["versionTwoDatabaseUpgradesAdditively"]},
+    {"path":"frontend/e2e/00-member-workspace.spec.ts","contains":["member plans, requests, matches"]},
+    {"path":"product/stories/member-spending.md","contains":["GBD-17"]}
+  ]
+}

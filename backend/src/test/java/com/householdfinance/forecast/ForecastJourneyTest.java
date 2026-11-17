@@ -398,7 +398,7 @@ class ForecastJourneyTest {
     byte[] plain = BackupCrypto.decrypt(backup, password);
     var archive = json.readValue(plain, WorkspaceBackupService.Archive.class);
     Arrays.fill(plain, (byte) 0);
-    assertEquals(5, archive.version());
+    assertEquals(6, archive.version());
     assertTrue(archive.tables().containsKey("FORECAST_PLANS"));
     clear();
     backups.restore(backup, password, "RESTORE INTO EMPTY WORKSPACE");

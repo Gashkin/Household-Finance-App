@@ -477,7 +477,7 @@ class LedgerJourneyTest {
         json.readValue(
             BackupCrypto.decrypt(encrypted, "synthetic-backup-passphrase-1234"),
             WorkspaceBackupService.Archive.class);
-    assertEquals(5, archive.version());
+    assertEquals(6, archive.version());
     var tables = new ArrayList<>(before.keySet());
     Collections.reverse(tables);
     for (String table : tables) jdbc.update("DELETE FROM " + table);

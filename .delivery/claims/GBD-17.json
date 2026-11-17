@@ -1,0 +1,9 @@
+{
+  "work_id":"GBD-17",
+  "page_id":"41ad3419-fef0-81d2-9fd4-e32b6b713a93",
+  "branch":"story/17-delivery",
+  "token":"claim-token:codex-gbd17-20261117-71d3b582",
+  "claimed_at":"2026-11-17T05:25:11Z",
+  "base_sha":"f21daa24c07a9077cd628bc8316c1b122d2a5790",
+  "history":[{"event":"claim","method":"GitHub create-only refs API succeeded before Notion ownership was written and re-read. Local worktree starts from the same human-integrated main."}]
+}
