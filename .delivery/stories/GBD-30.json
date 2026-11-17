@@ -1,0 +1,35 @@
+{
+  "work_id": "GBD-30",
+  "page_id": "41ad3419-fef0-81f2-a6a6-f653a2bbc6d9",
+  "branch": "story/30-delivery",
+  "artifacts": [
+    {
+      "path": "AnalysisScripts/audit_repository_hygiene.py",
+      "contains": [
+        "prohibited_tracked_file_count",
+        "paths_or_contents_emitted"
+      ]
+    },
+    {
+      "path": "AnalysisScripts/test_audit_repository_hygiene.py",
+      "contains": [
+        "test_gitignore_does_not_hide_force_tracked_outputs",
+        "DO_NOT_EMIT_SECRET_CONTENT"
+      ]
+    },
+    {
+      "path": "windows/Inspect-DeploymentHost.ps1",
+      "contains": [
+        "PrivilegedRunnerBoundaryBlocked",
+        "ProductionIsolationVerified=$false"
+      ]
+    },
+    {
+      "path": "product/stories/production-commissioning.md",
+      "contains": [
+        "Both unconditional Windows and direct-Java production holds remain in place.",
+        "Provider evidence request"
+      ]
+    }
+  ]
+}
