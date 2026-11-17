@@ -104,3 +104,18 @@ Synthetic acceptance covers the complete consent/review/reconciliation/revocatio
 journey and the empty-period case on desktop/mobile, including removal of an older
 preview and unchanged ledger balances/entries/revision. These tests do not establish
 real AIB coverage, application entitlement or production readiness.
+
+## Initial installed intake policy
+
+The installed Windows launcher explicitly disables binary workbook imports with
+`--workbook.import.enabled=false`. Preview, mapping, validation and execution
+are rejected server-side before application inspection of workbook bytes or POI parsing, including
+attempts to replay an earlier review. The command-line setting overrides an inherited
+developer opt-in. Bank review, manual/CSV activity, encrypted recovery and inspection
+of historical import receipts remain available.
+
+Development/synthetic runs retain the existing default-enabled workbook workflow.
+Do not launch a development configuration against real records. This is a restriction
+of supported installed intake, not an absolute heap/time bound or parser sandbox.
+A future direct-Java banking activation must enforce the same supported intake model;
+the current unconditional direct-Java and Windows banking holds remain in place.

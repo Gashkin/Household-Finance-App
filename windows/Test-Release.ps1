@@ -185,6 +185,9 @@ function Unlock-SyntheticInstance {
     Invoke-WebRequest "${baseUrl}/api/workspace/unlock" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body '{"password":"synthetic-install-password"}' -WebSession $web -UseBasicParsing | Out-Null
     return $web
 }
+# Even an inherited developer opt-in cannot enable binary intake in the installed runtime.
+$originalWorkbookImportEnabled=$env:WORKBOOK_IMPORT_ENABLED
+$env:WORKBOOK_IMPORT_ENABLED='true'
 $process=Start-Process -FilePath (Join-Path $env:WINDIR 'System32/WindowsPowerShell/v1.0/powershell.exe') -ArgumentList @('-NoProfile','-File',('"'+$startScript+'"'),'-Port',[string]$fixturePort) -WorkingDirectory $instance -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $instance 'app.log') -RedirectStandardError (Join-Path $instance 'error.log')
 try {
     $ready=$false
@@ -209,6 +212,20 @@ try {
     Invoke-WebRequest "${baseUrl}/api/workspace/unlock" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body '{"password":"synthetic-install-password"}' -WebSession $session -UseBasicParsing | Out-Null
     $status=Invoke-RestMethod "${baseUrl}/api/banking/status" -WebSession $session
     if($status.configured -or $status.environment -ne 'SANDBOX') { throw 'Production was enabled by default.' }
+    $boundary='gbd30-synthetic-workbook-boundary'
+    $multipart="--$boundary`r`nContent-Disposition: form-data; name=`"file`"; filename=`"synthetic.xlsx`"`r`nContent-Type: application/octet-stream`r`n`r`nsynthetic-not-a-workbook`r`n--$boundary--`r`n"
+    foreach($route in @('preview','map','validate')) {
+        $disabled=$false
+        try {
+            Invoke-WebRequest "${baseUrl}/migration/workbook/$route" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType "multipart/form-data; boundary=$boundary" -Body ([Text.Encoding]::UTF8.GetBytes($multipart)) -WebSession $session -UseBasicParsing | Out-Null
+        } catch {
+            if(-not $_.Exception.Response -or $_.Exception.Response.StatusCode.value__ -ne 400){throw}
+            $details=if($_.ErrorDetails){[string]$_.ErrorDetails.Message}else{''}
+            if($details -notlike '*Workbook imports are disabled*'){throw 'Installed workbook intake reached validation/parsing instead of the disabled policy.'}
+            $disabled=$true
+        }
+        if(-not $disabled){throw 'Installed workbook intake was enabled by an inherited setting.'}
+    }
     if(-not (Test-Path -LiteralPath (Join-Path $installed 'data\household-finance.mv.db'))) { throw 'Launcher did not use the persistent private data directory.' }
     $today=[DateTime]::UtcNow.ToString('yyyy-MM-dd')
     $account=@{name='Synthetic Windows recovery account';kind='CASH';openingDate=$today;openingEuro='123.45';source='Synthetic Windows opening'}
@@ -239,6 +256,7 @@ try {
     [Array]::Clear($bytes,0,$bytes.Length)
     Write-Host 'Packaged Windows runtime, actual launcher/restart/encrypted restore, static app, callback, private ACLs, DPAPI and authenticated banking checks passed using synthetic data.'
 } finally {
+    $env:WORKBOOK_IMPORT_ENABLED=$originalWorkbookImportEnabled
     $env:LOCALAPPDATA=$originalLocalAppData
     Stop-SyntheticInstance $process
     Assert-FixturePath $instance

@@ -35,3 +35,13 @@ timestamp: 2026-11-16T00:00:00Z
 ## Source Anchors
 - [WorkbookIngestionService](../../../backend/src/main/java/com/householdfinance/service/WorkbookIngestionService.java)
 - [Ordered Backlog](../../../backlog/ordered-backlog.md)
+
+## Installed-runtime availability
+
+The Windows packaged launcher forces `workbook.import.enabled=false`. The four
+preview/map/validate/execute entry points reject work before reading workbook bytes
+or calling POI; old confirmation tokens cannot bypass the disabled policy.
+Bank/manual/CSV intake and recovery remain available. Development/synthetic runs
+default to enabled so the existing bounded-preflight and decimal regression suite
+continues to exercise the parser. This restriction is not an end-to-end parser
+deadline or memory sandbox; see the GBD-30 commissioning guide for supported use.

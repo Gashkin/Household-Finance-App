@@ -60,6 +60,32 @@
       "contains": [
         "empty bank refresh keeps balance evidence and clears an older activity review"
       ]
+    },
+    {
+      "path": "backend/src/main/java/com/householdfinance/service/WorkbookIngestionService.java",
+      "contains": [
+        "requireWorkbookImport()",
+        "Workbook imports are disabled"
+      ]
+    },
+    {
+      "path": "backend/src/test/java/com/householdfinance/WorkbookImportPolicyTest.java",
+      "contains": [
+        "disabledServiceDoesNotEvenInspectMultipartBytes",
+        "disabledPolicyRejectsAnAttemptToExecuteAnOldReview"
+      ]
+    },
+    {
+      "path": "windows/Start.ps1",
+      "contains": [
+        "--workbook.import.enabled=false"
+      ]
+    },
+    {
+      "path": "windows/Test-Release.ps1",
+      "contains": [
+        "Installed workbook intake was enabled by an inherited setting."
+      ]
     }
   ]
 }

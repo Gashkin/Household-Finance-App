@@ -178,6 +178,13 @@ public class WorkbookIngestionService {
 
     private final MigrationArtifactService migrationArtifactService;
     private final Clock clock;
+    @org.springframework.beans.factory.annotation.Value("${workbook.import.enabled:true}")
+    private boolean workbookImportEnabled = true;
+
+    private void requireWorkbookImport() {
+        if (!workbookImportEnabled) throw new IllegalArgumentException(
+            "Workbook imports are disabled in this instance. Use reviewed CSV, manual entry or bank activity.");
+    }
             private final AccountRepository accountRepository;
             private final CategoryRepository categoryRepository;
             private final MonthlyCommitmentRepository monthlyCommitmentRepository;
@@ -210,6 +217,7 @@ public class WorkbookIngestionService {
 
     public WorkbookPreview previewWorkbook(MultipartFile file) {
         com.householdfinance.access.AccessContext.requireLegacy();
+        requireWorkbookImport();
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("Workbook file is required.");
         }
@@ -244,6 +252,7 @@ public class WorkbookIngestionService {
 
     public WorkbookMappingResult mapWorkbook(MultipartFile file) {
         com.householdfinance.access.AccessContext.requireLegacy();
+        requireWorkbookImport();
         var mappingResult = mapWorkbookInternal(file);
         migrationArtifactService.recordArtifact(mappingResult.importId(), "WORKBOOK_MAPPING", mappingResult);
         return mappingResult;
@@ -252,6 +261,7 @@ public class WorkbookIngestionService {
     @Transactional
     public WorkbookLoadValidationResult validateWorkbookLoad(MultipartFile file, String mode) {
         com.householdfinance.access.AccessContext.requireLegacy();
+        requireWorkbookImport();
         var loadMode = parseLoadMode(mode);
         var mappingResult = mapWorkbookInternal(file);
 
@@ -321,6 +331,7 @@ public class WorkbookIngestionService {
     @Transactional
     public WorkbookLoadExecutionResult executeValidatedLoad(WorkbookLoadExecuteRequest request) {
         com.householdfinance.access.AccessContext.requireLegacy();
+        requireWorkbookImport();
         if (request == null || request.confirmationToken() == null || request.confirmationToken().isBlank()) {
             throw new IllegalArgumentException("Confirmation token is required. Validate first.");
         }
