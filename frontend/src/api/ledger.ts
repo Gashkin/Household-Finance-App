@@ -40,6 +40,7 @@ export type Position = {
   warnings: string[];
 };
 export type Activity = {
+  linkedEntryId?: string | null;
   id: string;
   reference: string;
   date: string;

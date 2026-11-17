@@ -534,6 +534,26 @@ public class LedgerService {
     return view(a, today());
   }
 
+  public static boolean isTransferRelationship(LedgerEntry e) {
+    return Set.of("TRANSFER", "CARD_SETTLEMENT").contains(Objects.toString(e.linkType, ""));
+  }
+
+  private static boolean isReversalRelationship(LedgerEntry e) {
+    return Set.of("REFUND", "REVERSAL").contains(Objects.toString(e.linkType, ""));
+  }
+
+  public static long spendingContribution(LedgerEntry e) {
+    if (!e.status.equals("BOOKED") || isTransferRelationship(e)) return 0;
+    if (isReversalRelationship(e)) return e.amountMinor > 0 ? -e.amountMinor : 0;
+    return e.kind.equals("ACTIVITY") ? Math.max(0, -e.amountMinor) : 0;
+  }
+
+  private static long incomeContribution(LedgerEntry e) {
+    if (!e.status.equals("BOOKED") || isTransferRelationship(e)) return 0;
+    if (isReversalRelationship(e)) return Math.min(0, e.amountMinor);
+    return e.kind.equals("ACTIVITY") ? Math.max(0, e.amountMinor) : 0;
+  }
+
   private AccountView view(LedgerAccount a, LocalDate asOf) {
     long balance = a.openingMinor, pending = 0, pendingDebit = 0, income = 0, spent = 0;
     int count = 0, pendingCount = 0;
@@ -549,15 +569,8 @@ public class LedgerService {
         continue;
       }
       balance = sum(balance, e.amountMinor);
-      if (e.kind.equals("ACTIVITY") || Set.of("REFUND","REVERSAL").contains(Objects.toString(e.linkType,""))) {
-        if (Set.of("REFUND","REVERSAL").contains(Objects.toString(e.linkType,""))) {
-          if(e.amountMinor>0) spent = sum(spent, -e.amountMinor);
-          else income = sum(income, e.amountMinor);
-          continue;
-        }
-        if (e.amountMinor > 0) income = sum(income, e.amountMinor);
-        else spent = sum(spent, -e.amountMinor);
-      }
+      income = sum(income, incomeContribution(e));
+      spent = sum(spent, spendingContribution(e));
     }
     boolean reconciled =
         asOf.equals(a.reconciledDate)
@@ -639,7 +652,8 @@ public class LedgerService {
       return list.stream().limit(500).map(e -> {
         var safe = new LedgerEntry(); safe.id=e.id; safe.accountId=e.accountId;
         safe.reference=e.reference; safe.date=e.date; safe.description=e.description;
-        safe.amountMinor=e.amountMinor; safe.status=e.status; safe.kind=e.kind; safe.source=e.source;
+        safe.amountMinor=e.amountMinor; safe.status=e.status;
+        safe.kind=e.linkedEntryId==null?e.kind:"TRANSFER"; safe.source=e.source;
         safe.reviewState=e.reviewState; return safe;
       }).toList();
     }

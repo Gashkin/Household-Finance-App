@@ -142,6 +142,17 @@ class MemberJourneyTest {
     call("PUT","/api/member/purchases/"+id,reader,Map.of("revision",3,"action","MATCH","accountId",account,"entryId",entry),200);
     assertEquals(2000,call("GET","/api/member/report",reader,null,200).path("purchaseReservationsMinor").asLong());
   }
+  @Test void relatedTransfersCannotRemainMatchedAsMemberPurchases()throws Exception{
+    seed();var p=newPurchase(reader,"10.00",false);String id=p.path("id").asText();call("PUT","/api/member/purchases/"+id,reader,Map.of("revision",1,"action","BOUGHT"),200);reopen();
+    call("POST","/api/ledger/accounts/"+account+"/activity",owner,Map.of("revision",currentAccount().path("revision").asLong(),"row",Map.of("reference","related-payment","date",today,"description","Synthetic related debit","amountEuro","-10.00","status","BOOKED","kind","ACTIVITY"),"source","Synthetic source","acknowledgedOverlap",true),200);
+    JsonNode entry=null;for(var e:call("GET","/api/ledger/accounts/"+account+"/activity",owner,null,200))if(e.path("reference").asText().equals("related-payment"))entry=e;assertNotNull(entry);
+    call("PUT","/api/member/purchases/"+id,reader,Map.of("revision",2,"action","MATCH","accountId",account,"entryId",entry.path("id").asText()),200);
+    var counterpart=createAccount("Synthetic private counterpart","100.00",false);String other=counterpart.path("id").asText();call("POST","/api/ledger/accounts/"+other+"/activity",owner,Map.of("revision",0,"row",Map.of("reference","related-credit","date",today,"description","Synthetic private related credit","amountEuro","10.00","status","BOOKED","kind","ACTIVITY"),"source","Synthetic source","acknowledgedOverlap",true),200);
+    var credit=call("GET","/api/ledger/accounts/"+other+"/activity",owner,null,200).get(0);
+    call("POST","/api/ledger/review/activity/"+entry.path("id").asText()+"/link",owner,Map.of("revision",currentAccount().path("revision").asLong(),"otherId",credit.path("id").asText(),"otherRevision",1,"type","TRANSFER","reason","Synthetic source-backed transfer"),200);
+    var result=call("GET","/api/member",reader,null,200).path("purchases").get(0);assertFalse(result.path("matchValid").asBoolean());assertTrue(result.path("actualMinor").isNull());
+    for(var e:call("GET","/api/ledger/accounts/"+account+"/activity",reader,null,200))if(e.path("reference").asText().equals("related-payment")){assertEquals("TRANSFER",e.path("kind").asText());assertTrue(e.path("linkedEntryId").isNull());}
+  }
   @Test void withdrawalHidesPublicationRequestsHistoryAndExport()throws Exception{
     seed();var p=newPurchase(reader,"15.00",true);String id=p.path("id").asText();
     call("PUT","/api/ledger/accounts/"+account+"/sharing",owner,Map.of("revision",currentAccount().path("revision").asLong(),"shared",false),200);reader=login("member",MEMBER);

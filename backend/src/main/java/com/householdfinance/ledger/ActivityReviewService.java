@@ -95,7 +95,7 @@ public class ActivityReviewService {
   }
   private List<String> issues(LedgerEntry e){
     var list=new ArrayList<String>();if(!e.reviewState.equals("CONFIRMED"))list.add("PROVISIONAL");
-    if(e.categoryId==null&&e.kind.equals("ACTIVITY"))list.add("CATEGORY");
+    if(e.categoryId==null&&e.kind.equals("ACTIVITY")&&!LedgerService.isTransferRelationship(e))list.add("CATEGORY");
     if(e.status.equals("PENDING"))list.add("PENDING");
     if(e.kind.equals("TRANSFER")&&e.linkedEntryId==null)list.add("COUNTERPART");return list;
   }
@@ -115,7 +115,7 @@ public class ActivityReviewService {
     check(input!=null,"Link choice required");var e=entry(id);var a=account(e.accountId);revision(a,input.revision());protect(a,e);
     check(e.status.equals("BOOKED")&&!e.kind.equals("ADJUSTMENT"),"Link booked non-adjustment activity only");
     var other=entry(input.otherId());var b=account(other.accountId);revision(b,input.otherRevision());protect(b,other);
-    check(!e.id.equals(other.id)&&e.linkedEntryId==null&&other.status.equals("BOOKED"),"Choose an unlinked booked counterpart");
+    check(!e.id.equals(other.id)&&e.linkedEntryId==null&&other.status.equals("BOOKED")&&!other.kind.equals("ADJUSTMENT"),"Choose a booked counterpart that is not a reconciliation adjustment");
     String type=Objects.toString(input.type(),"");check(Set.of("TRANSFER","CARD_SETTLEMENT","REFUND","REVERSAL").contains(type),"Unknown relationship");
     var before=List.of(encode(e),encode(other));
     if(type.equals("TRANSFER")||type.equals("CARD_SETTLEMENT")){
@@ -123,14 +123,14 @@ public class ActivityReviewService {
       check(!a.kind.equals("DEBT")||!b.kind.equals("DEBT"),"Choose at least one cash account");
       if(type.equals("CARD_SETTLEMENT"))check(!a.kind.equals(b.kind),"Card settlement requires cash and debt accounts");
       check(entries.findAll().stream().noneMatch(r->e.id.equals(r.linkedEntryId)||other.id.equals(r.linkedEntryId)),"Activity already has dependent links");
-      e.kind=other.kind="TRANSFER";other.linkedEntryId=e.id;other.linkType=type;other.reviewState="CONFIRMED";
+      other.linkedEntryId=e.id;other.linkType=type;other.reviewState="CONFIRMED";
     } else {
       check(a.id.equals(b.id)&&other.linkedEntryId==null&&other.kind.equals("ACTIVITY")&&Long.signum(e.amountMinor)==-Long.signum(other.amountMinor)&&!e.date.isBefore(other.date),"Refund/reversal must oppose an original activity in the same account and follow its date");
       if(type.equals("REFUND"))check(other.amountMinor<0,"A refund must reference an original debit");
       long refunded=entries.findByAccountIdOrderByDateAscReferenceAsc(a.id).stream().filter(r->other.id.equals(r.linkedEntryId)&&!r.status.equals("VOID")).mapToLong(r->Math.abs(r.amountMinor)).reduce(0,Math::addExact);
       check(Math.addExact(refunded,Math.abs(e.amountMinor))<=Math.abs(other.amountMinor),"Cumulative refunds/reversals exceed the original amount");
       check(entries.findAll().stream().noneMatch(r->e.id.equals(r.linkedEntryId)),"Activity already has dependent links");
-      e.kind="TRANSFER";e.categoryId=other.categoryId;
+      e.categoryId=other.categoryId;
     }
     e.linkedEntryId=other.id;e.linkType=type;e.reviewState="CONFIRMED";
     audit(a.id,"LINK",input.reason(),before,List.of(e,other));if(!a.id.equals(b.id))audit(b.id,"LINK",input.reason(),before,List.of(e,other));changed(a);if(!a.id.equals(b.id))changed(b);
@@ -139,8 +139,8 @@ public class ActivityReviewService {
     check(input!=null,"Unlink reason required");var e=entry(id);var a=account(e.accountId);revision(a,input.revision());protect(a,e);
     check(e.linkedEntryId!=null&&e.linkedEntryId.equals(input.otherId()),"Reload the existing relationship");var other=entry(e.linkedEntryId);var b=account(other.accountId);revision(b,input.otherRevision());protect(b,other);
     var before=List.of(encode(e),encode(other));boolean mutual=e.id.equals(other.linkedEntryId);
-    e.linkedEntryId=null;e.linkType=null;e.kind="ACTIVITY";e.reviewState="PROVISIONAL";
-    if(mutual){other.linkedEntryId=null;other.linkType=null;other.kind="ACTIVITY";other.reviewState="PROVISIONAL";}
+    e.linkedEntryId=null;e.linkType=null;e.reviewState="PROVISIONAL";
+    if(mutual){other.linkedEntryId=null;other.linkType=null;other.reviewState="PROVISIONAL";}
     audit(a.id,"UNLINK",input.reason(),before,List.of(e,other));changed(a);if(!a.id.equals(b.id)){audit(b.id,"UNLINK",input.reason(),before,List.of(e,other));changed(b);}
   }
   @Transactional public void reopen(String id,Reopen input){
@@ -159,7 +159,7 @@ public class ActivityReviewService {
       checks.add(a.name()+": last local activity review "+latest.map(h->h.recordedAt.toString()).orElse("not recorded")+"; verify source freshness separately");
     }
     if(unresolved>0)checks.add(unresolved+" unresolved activity items remain open");
-    long spending=queue.stream().filter(i->!i.entry().date.isBefore(date.withDayOfMonth(1))&&i.entry().status.equals("BOOKED")).mapToLong(i->{var e=i.entry();return e.kind.equals("ACTIVITY")?Math.max(0,-e.amountMinor):e.amountMinor>0&&Set.of("REFUND","REVERSAL").contains(Objects.toString(e.linkType,""))?-e.amountMinor:0;}).sum();
+    long spending=queue.stream().filter(i->!i.entry().date.isBefore(date.withDayOfMonth(1))).mapToLong(i->LedgerService.spendingContribution(i.entry())).sum();
     long budget=categories().stream().filter(c->!c.retired()&&c.parentId()==null).mapToLong(c->LedgerService.money(c.budgetEuro())).sum();
     checks.add(budget==0?"No category budget recorded; budget variance is unknown":"Month net spending less category budget: €"+java.math.BigDecimal.valueOf(spending-budget,2).toPlainString());
     var plan=forecast.get().plan();

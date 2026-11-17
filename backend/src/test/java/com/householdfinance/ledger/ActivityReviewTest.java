@@ -80,4 +80,35 @@ class ActivityReviewTest {
    for(String bad:List.of("null","{\"unknown\":true}","{\"revision\":0.5}","{\"retired\":\"true\"}","{\"name\":123}"))mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/ledger/review/categories").cookie(cookie).header("X-Workspace-Request","1").contentType("application/json").content(bad)).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest());
    assertTrue(review.categories().isEmpty());
  }
+ @Test void relationshipReviewPreservesIdenticalSourceReplayBeforeAndAfterReconciliation(){
+   for(String type:List.of("TRANSFER","CARD_SETTLEMENT","REFUND")){
+     var a=account("Synthetic source "+type,"CASH");var b=type.equals("REFUND")?a:account("Synthetic counterpart "+type,type.equals("CARD_SETTLEMENT")?"DEBT":"CASH");
+     var original=add(a.id(),"original-"+type,"-10.00","ACTIVITY");var incoming=add(b.id(),"incoming-"+type,"4.00","ACTIVITY");
+     if(!type.equals("REFUND")){
+       ledger.correct(b.id(),incoming.id,new LedgerService.Correction(view(b.id()).revision(),new LedgerService.Row(incoming.reference,today,"Synthetic merchant","10.00","BOOKED","ACTIVITY"),"Synthetic source correction before linking"));incoming=ledger.activity(b.id()).getFirst();
+     }
+     if(type.equals("REFUND"))link(incoming,original,type);else link(original,incoming,type);
+     replay(a.id(),original.reference,"-10.00");replay(b.id(),incoming.reference,type.equals("REFUND")?"4.00":"10.00");
+     for(String id:new HashSet<>(List.of(a.id(),b.id()))){var current=view(id);ledger.reconcile(id,today,new LedgerService.Reconcile(current.revision(),java.math.BigDecimal.valueOf(current.bookedMinor(),2).toPlainString(),"Synthetic reconciled source",true,false));}
+     replay(a.id(),original.reference,"-10.00");replay(b.id(),incoming.reference,type.equals("REFUND")?"4.00":"10.00");
+     var changed=ledger.preview(a.id(),new LedgerService.PreviewInput("reference,date,description,amount,status,kind\n"+original.reference+","+today+",Synthetic merchant,-11.00,BOOKED,ACTIVITY\n","Synthetic changed source"));assertEquals("CONFLICT",changed.proposals().getFirst().disposition());
+     var statusChanged=ledger.preview(a.id(),new LedgerService.PreviewInput("reference,date,description,amount,status,kind\n"+original.reference+","+today+",Synthetic merchant,-10.00,PENDING,ACTIVITY\n","Synthetic changed booking state"));assertEquals("CONFLICT",statusChanged.proposals().getFirst().disposition());
+   }
+ }
+ void replay(String id,String reference,String amount){
+   var before=ledger.activity(id);long revision=view(id).revision(),balance=view(id).bookedMinor();var preview=ledger.preview(id,new LedgerService.PreviewInput("reference,date,description,amount,status,kind\n"+reference+","+today+",Synthetic merchant,"+amount+",BOOKED,ACTIVITY\n","Synthetic identical replay"));assertEquals("DUPLICATE",preview.proposals().getFirst().disposition());
+   var result=ledger.approve(id,preview.id(),new LedgerService.Approval(revision,List.of(preview.proposals().getFirst().row()),true));assertEquals(0,result.added());assertEquals(1,result.duplicates());assertEquals(revision,view(id).revision());assertEquals(balance,view(id).bookedMinor());assertEquals(before.size(),ledger.activity(id).size());
+   for(var e:before){var after=ledger.activity(id).stream().filter(x->x.id.equals(e.id)).findFirst().orElseThrow();assertEquals(e.linkedEntryId,after.linkedEntryId);assertEquals(e.linkType,after.linkType);assertEquals(e.reviewState,after.reviewState);}
+ }
+ @Test void adjustmentCannotEnterEitherSideOfTransferOrLoseItsSourcedIdentity(){
+   var a=account("Synthetic ordinary source","CASH");var b=account("Synthetic adjustment source","CASH");var debit=add(a.id(),"debit","-10.00","ACTIVITY");
+   ledger.reconcile(b.id(),today,new LedgerService.Reconcile(0L,"1010.00","Synthetic sourced adjustment",true,true));var adjustment=ledger.activity(b.id()).getFirst();review.reopen(b.id(),new ActivityReviewService.Reopen(view(b.id()).revision(),"Synthetic explicit reopening"));
+   long ar=view(a.id()).revision(),br=view(b.id()).revision(),auditCount=review.visibleAuditCount();
+   assertThrows(IllegalArgumentException.class,()->link(debit,adjustment,"TRANSFER"));assertThrows(IllegalArgumentException.class,()->link(adjustment,debit,"TRANSFER"));
+   var kept=ledger.activity(b.id()).getFirst();assertEquals("ADJUSTMENT",kept.kind);assertNull(kept.linkedEntryId);assertEquals(1000,kept.amountMinor);assertEquals(ar,view(a.id()).revision());assertEquals(br,view(b.id()).revision());assertEquals(auditCount,review.visibleAuditCount());
+ }
+ @Test void unlinkKeepsSourceTransferFactsAndRestoresTheMissingCounterpartIssue(){
+   var a=account("Synthetic first cash","CASH");var b=account("Synthetic second cash","CASH");var left=add(a.id(),"left","-10.00","TRANSFER");var right=add(b.id(),"right","10.00","TRANSFER");link(left,right,"TRANSFER");
+   review.unlink(left.id,new ActivityReviewService.Link(view(a.id()).revision(),right.id,view(b.id()).revision(),"TRANSFER","Synthetic reviewed unlink"));assertEquals("TRANSFER",ledger.activity(a.id()).getFirst().kind);assertEquals(2,review.queue(null,today,today,"COUNTERPART",null).size());assertEquals(0,ledger.position(today).spendingMinor());
+ }
 }

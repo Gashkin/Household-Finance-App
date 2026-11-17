@@ -92,7 +92,7 @@ TypeScript build caches, Maven targets and browser artifacts are ignored.
 `feature/work_order_001` checkout predates the dependency-cleanup integration;
 it must not be used as the base for new delivery.
 
-Local verification: backend 208 discovered, 192 passed, 16 platform skips;
+Opening implementation local verification: backend 208 discovered, 192 passed, 16 platform skips;
 frontend production build and 20 transport/domain tests passed; full browser
 suite 37 passed and one intentional mobile recovery skip. Stage `frontend/dist`
 in `backend/target/classes/static` as CI does before the packaged single-origin
@@ -107,3 +107,16 @@ The five npm findings are that package and its build-tool dependants. No audit
 exception, forced Vite downgrade or security-gate change is part of this story.
 This inherited gate blocks integration independently of the passing product
 tests; hosted verification must report its actual result.
+
+The single opening review at `78518d7` returned **UNABLE TO VERIFY**, including
+two confirmed integrity findings. Failing-before regressions reproduced both.
+Relationship review now preserves the source row's original kind, so an
+unchanged CSV/bank refresh remains a duplicate after linking, reconciliation and
+restart. Relationship-aware ledger/guide totals and member matching interpret
+the separate link metadata; linking cannot turn settlements into purchases.
+Unlink also retains the original source kind. Adjustments are rejected on both
+sides of a proposed link before any mutation. Added regressions cover transfer,
+card-settlement and partial-refund replay, real amount/status conflicts, durable
+replay, member match invalidation and atomic counterpart-adjustment rejection.
+Owner verification and current-head CI are recorded in PR #29. The opening SHA
+and verdict remain unchanged; no additional independent review is requested.

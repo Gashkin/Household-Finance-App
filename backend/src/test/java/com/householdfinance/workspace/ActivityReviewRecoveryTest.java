@@ -37,7 +37,30 @@ class ActivityReviewRecoveryTest {
    try(var app=start("restored")){app.getBean(AccessService.class).ensureOwner();assertEquals(counts,app.getBean(WorkspaceBackupService.class).restore(backup,ARCHIVE,"RESTORE INTO EMPTY WORKSPACE"));assertState(app,account);}
    try(var app=start("restored")){assertState(app,account);}
  }
- void assertState(ConfigurableApplicationContext app,String account){var review=app.getBean(ActivityReviewService.class);var ledger=app.getBean(LedgerService.class);assertTrue(review.rules().getFirst().approved());assertEquals("Interest & Fees",review.categories().getFirst().name());assertEquals(1,review.guide(today).completedReviews().size());assertEquals(600,ledger.position(today).spendingMinor());assertTrue(ledger.position(today).accounts().getFirst().reconciled());assertThrows(IllegalArgumentException.class,()->ledger.manual(account,new LedgerService.Manual(4L,new LedgerService.Row("late",today,"Synthetic late entry","-1.00","BOOKED","ACTIVITY"),"Synthetic late source",true)));assertTrue(ledger.history(account).stream().allMatch(h->h.actorId.equals("owner")));}
+ void assertState(ConfigurableApplicationContext app,String account){
+   var review=app.getBean(ActivityReviewService.class);var ledger=app.getBean(LedgerService.class);
+   assertTrue(review.rules().getFirst().approved());assertEquals("Interest & Fees",review.categories().getFirst().name());assertEquals(1,review.guide(today).completedReviews().size());assertEquals(600,ledger.position(today).spendingMinor());assertTrue(ledger.position(today).accounts().getFirst().reconciled());
+   assertThrows(IllegalArgumentException.class,()->ledger.manual(account,new LedgerService.Manual(4L,new LedgerService.Row("late",today,"Synthetic late entry","-1.00","BOOKED","ACTIVITY"),"Synthetic late source",true)));assertTrue(ledger.history(account).stream().allMatch(h->h.actorId.equals("owner")));
+   assertReplay(ledger,account,"original","Synthetic purchase","-10.00");assertReplay(ledger,account,"refund","Synthetic partial reversal","4.00");
+ }
+ void assertReplay(LedgerService ledger,String account,String reference,String description,String amount){
+   var before=ledger.activity(account).stream().filter(e->e.reference.equals(reference)).findFirst().orElseThrow();assertEquals("ACTIVITY",before.kind);
+   var preview=ledger.preview(account,new LedgerService.PreviewInput("reference,date,description,amount,status,kind\n"+reference+","+today+","+description+","+amount+",BOOKED,ACTIVITY\n","Synthetic durable identical source"));assertEquals("DUPLICATE",preview.proposals().getFirst().disposition());
+   assertEquals(0,ledger.approve(account,preview.id(),new LedgerService.Approval(preview.revision(),List.of(preview.proposals().getFirst().row()),true)).added());var after=ledger.activity(account).stream().filter(e->e.id.equals(before.id)).findFirst().orElseThrow();assertEquals(before.linkedEntryId,after.linkedEntryId);assertEquals(before.linkType,after.linkType);assertEquals(before.categoryId,after.categoryId);assertEquals(before.reviewState,after.reviewState);
+ }
+ @Test void transfersAndCardSettlementsRetainOriginalReplayIdentityAfterFileRestart(){
+   for(String type:List.of("TRANSFER","CARD_SETTLEMENT")){
+     String left,right;
+     try(var app=start(type)){
+       var ledger=app.getBean(LedgerService.class);var review=app.getBean(ActivityReviewService.class);
+       left=ledger.create(new LedgerService.AccountInput("Synthetic left "+type,"CASH",today,"100.00","Synthetic source")).id();right=ledger.create(new LedgerService.AccountInput("Synthetic right "+type,type.equals("TRANSFER")?"CASH":"DEBT",today,"100.00","Synthetic source")).id();
+       ledger.manual(left,new LedgerService.Manual(0L,new LedgerService.Row("left",today,"Synthetic left source","-10.00","BOOKED","ACTIVITY"),"Synthetic receipt",true));ledger.manual(right,new LedgerService.Manual(0L,new LedgerService.Row("right",today,"Synthetic right source","10.00","BOOKED","ACTIVITY"),"Synthetic receipt",true));
+       review.link(ledger.activity(left).getFirst().id,new ActivityReviewService.Link(1L,ledger.activity(right).getFirst().id,1L,type,"Synthetic related source evidence"));
+       ledger.reconcile(left,today,new LedgerService.Reconcile(2L,"90.00","Synthetic left statement",true,false));ledger.reconcile(right,today,new LedgerService.Reconcile(2L,"110.00","Synthetic right statement",true,false));
+     }
+     try(var app=start(type)){var ledger=app.getBean(LedgerService.class);assertReplay(ledger,left,"left","Synthetic left source","-10.00");assertReplay(ledger,right,"right","Synthetic right source","10.00");assertEquals(0,ledger.position(today).spendingMinor());assertEquals(0,ledger.position(today).incomeMinor());assertEquals(20000,ledger.position(today).netMinor());}
+   }
+ }
  @Test void actualVersionSixArchiveRestoresAsProvisionalWithoutInventedClassifications()throws Exception{
    byte[] v6;
    try(var app=start("v6-source")){
