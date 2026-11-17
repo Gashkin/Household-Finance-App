@@ -4,8 +4,8 @@ import com.householdfinance.controller.WorkbookIngestionController;
 import com.householdfinance.service.WorkbookIngestionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -16,16 +16,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc(addFilters=false)
+@org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc(addFilters=false)
 @WebMvcTest(WorkbookIngestionController.class)
-@org.springframework.boot.test.mock.mockito.MockBean(com.householdfinance.access.AccessService.class)
+@org.springframework.test.context.bean.override.mockito.MockitoBean(types=com.householdfinance.access.AccessService.class)
 @SuppressWarnings("null")
 class WorkbookIngestionControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private WorkbookIngestionService workbookIngestionService;
 
     @Test

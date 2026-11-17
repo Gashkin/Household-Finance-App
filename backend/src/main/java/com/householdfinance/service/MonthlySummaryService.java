@@ -1,79 +1,27 @@
 package com.householdfinance.service;
 
+import java.time.YearMonth;
+import java.time.ZoneId;
+import java.util.List;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-
+/** The legacy planner is not evidence of reviewed monthly cashflow or spendability. */
 @Service
 public class MonthlySummaryService {
-
     public record MonthlyTransaction(String date, String description, double amount, String account) {}
-
     public record MonthlyOverview(
-            String month,
-            double startingBalance,
-            double actualInflow,
-            double actualOutflow,
-            double committedOutgoings,
-            double projectedEndBalance,
-            double allowableSpend,
-            List<MonthlyTransaction> recentTransactions
-    ) {}
-
-    private final PlannerService plannerService;
-
-    public MonthlySummaryService(PlannerService plannerService) {
-        this.plannerService = plannerService;
-    }
+            String month, Double startingBalance, Double actualInflow, Double actualOutflow,
+            Double committedOutgoings, Double projectedEndBalance, Double allowableSpend,
+            List<MonthlyTransaction> recentTransactions, String status, String explanation) {}
 
     public MonthlyOverview getMonthlyOverview() {
         com.householdfinance.access.AccessContext.requireLegacy();
-        var plannerData = plannerService.getPlannerData();
-        var recentTransactions = sampleTransactions();
-
-        var startingBalance = plannerData.accounts().stream()
-                .mapToDouble(PlannerService.Account::balance)
-                .sum();
-
-        var committedOutgoings = plannerData.commitments().stream()
-                .mapToDouble(PlannerService.Commitment::amount)
-                .sum();
-
-        var actualInflow = recentTransactions.stream()
-                .mapToDouble(MonthlyTransaction::amount)
-                .filter(amount -> amount > 0)
-                .sum();
-
-        var actualOutflow = recentTransactions.stream()
-                .mapToDouble(MonthlyTransaction::amount)
-                .filter(amount -> amount < 0)
-                .map(Math::abs)
-                .sum();
-
-        var projectedEndBalance = startingBalance + actualInflow - actualOutflow - committedOutgoings;
-        var allowableSpend = Math.max(0, projectedEndBalance);
-
+        // Unknown is not zero. Current balances, legacy plans and synthetic fixtures
+        // cannot establish an opening balance or reviewed actual monthly activity.
         return new MonthlyOverview(
-                "2026-07",
-                round(startingBalance),
-                round(actualInflow),
-                round(actualOutflow),
-                round(committedOutgoings),
-                round(projectedEndBalance),
-                round(allowableSpend),
-                recentTransactions
-        );
-    }
-
-    private List<MonthlyTransaction> sampleTransactions() {
-        return List.of(
-                new MonthlyTransaction("2026-06-04", "Salary", 3200.00, "Checking"),
-                new MonthlyTransaction("2026-06-03", "Fuel", -68.11, "Credit Card"),
-                new MonthlyTransaction("2026-06-01", "Groceries", -54.20, "Checking")
-        );
-    }
-
-    private double round(double value) {
-        return Math.round(value * 100.0) / 100.0;
+                YearMonth.now(ZoneId.of("Europe/Dublin")).toString(),
+                null, null, null, null, null, null, List.of(), "UNAVAILABLE",
+                "This legacy dashboard has no verified monthly cashflow summary. "
+                + "Use Money position for reviewed account evidence and Plan ahead for dated affordability.");
     }
 }

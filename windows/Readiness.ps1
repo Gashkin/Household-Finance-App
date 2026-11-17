@@ -24,7 +24,7 @@ try {
     Assert-PrivatePath $secrets
     $target = Join-Path $secrets ($parsed.ToString()+'.pem')
     if (-not (Test-Path -LiteralPath $target)) { Copy-Item -LiteralPath $source -Destination $target; Set-PrivatePath $target $false }
-    elseif ((Get-FileHash -LiteralPath $source).Hash -ne (Get-FileHash -LiteralPath $target).Hash) { throw 'Existing key differs. Rotate and revoke deliberately.' }
+    elseif ((Get-ReleaseFileHash $source) -ne (Get-ReleaseFileHash $target)) { throw 'Existing key differs. Rotate and revoke deliberately.' }
     Assert-PrivatePath $target
     $config.AppId=$parsed.ToString(); $config.KeyPath=$target; $config.ReadinessCommit=$manifest.commit; $config.ReadinessAt=[DateTimeOffset]::UtcNow.ToString('o'); $config.Production=$true
     $config | Export-Clixml -LiteralPath (Join-Path $root 'config.xml')

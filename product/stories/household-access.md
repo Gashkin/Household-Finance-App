@@ -6,6 +6,8 @@ One local workspace can serve named people without granting everyone access to p
 
 Set `WORKSPACE_PASSWORD` to 16–256 characters and start the application as described in the README. Sign in as `owner`. The first sign-in creates a salted password verifier in the database. Once initialized, the environment bootstrap password can be removed; changing it does not overwrite a persisted password. Existing financial records belong to `owner` and remain private.
 
+The versioned GBD-15 database upgrades through Flyway migration V2, which assigns existing records to `owner` and keeps accounts private. Schema validation, checksum checks and rejection of unversioned or newer databases remain enforced. An older unversioned database is not silently adopted: recover its encrypted archive into a fresh versioned installation. Database migration V2 and encrypted archive format version 5 are separate version numbers.
+
 Open **Household access**, confirm your current password, and create an invitation with a unique username (3–40 letters, digits, dots, underscores or hyphens; stored lowercase). Pass the private code to its intended person. It expires after seven days and works once. Replacing or revoking it invalidates the previous code. No mail service or external identity provider receives credentials.
 
 The person chooses **Accept invitation**, explicitly accepts, and sets their own password. A new account has no roles. Reload Household access, then grant the needed roles. You can disable and reactivate accepted accounts. Another administrator must change your own roles; the last active administrator cannot be removed. Conflicting changes require reload rather than overwriting another administrator's decision.
@@ -22,6 +24,8 @@ The person chooses **Accept invitation**, explicitly accepts, and sets their own
 | Share or withdraw own account | No | Yes | No |
 
 Roles combine by union. Admin+Reader can manage people and read permitted data; Admin alone cannot read finances. Ownership and explicit account sharing limit financial roles. New accounts are private, including when created by the original owner. Shared account data includes its activity, reconciliation and account audit history. Sharing does not transfer ownership.
+
+Admission remains bounded to 30 people and 30 owned accounts per person. Derived forecasts and ledger publications support the resulting permitted source set, up to 900 accounts, without counting inaccessible records. Manual cash forms and user-entered commitments retain their 30-line limit; a publication can additionally retain one protected pending-debit line per cash source.
 
 The Reader's **Permitted money position** counts only explicitly shared accounts, excluding everyone's private accounts, including their own. It always states its limited scope. It never implies a complete household picture or supplies an invented spending allowance. Editors' existing money-position and forecast tools include their own records plus shared accounts, with a limited-scope notice. Cash snapshots, saved forecasts and decision plans stay personal. Derived snapshots retain source-account IDs; withdrawal also hides forecasts, reports, historical plan evidence and publication audit entries that depend on a source no longer permitted. An editor can explicitly replace a hidden baseline after reviewing new evidence.
 
@@ -45,4 +49,4 @@ Encrypted version-5 archives retain identities and record ownership. Restore req
 
 The richer member spending report, planned purchases and requests remain [GBD-17](https://app.notion.com/p/41ad3419fef081d29fd4e32b6b713a93), currently Backlog and dependent on GBD-16. This basic shared Reader view supplies immediate usable access without claiming that later journey is delivered.
 
-This branch starts from main `9f607c4` and preserves the independent GBD-15 security work. Its ownership/schema/recovery changes must be reconciled with that story when either lands. No real accounts, bank credentials or actual financial records were used. Live H2 files remain unencrypted by the application; use device encryption and OS permissions. Approval of this PR does not authorize real-bank activation or internet exposure. Only a human may merge.
+The branch incorporates human-integrated GBD-15 main `cc8af88`, preserving its dependency upgrades, explicit migrations, recovery-capacity guard, legacy route restrictions and production hold. No real accounts, bank credentials or actual financial records were used. Live H2 files remain unencrypted by the application; use device encryption and OS permissions. Approval of this PR does not authorize real-bank activation or internet exposure. Only a human may merge.

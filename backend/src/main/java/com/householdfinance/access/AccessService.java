@@ -66,6 +66,7 @@ public class AccessService {
     var list=jdbc.query("SELECT ID,USERNAME,ROLES,STATE,REVISION,CREDENTIAL FROM HOUSEHOLD_USERS WHERE ID=?",(r,n)->new User(r.getString(1),r.getString(2),roles(r.getString(3)),r.getString(4),r.getLong(5),r.getString(1).equals("owner"),r.getString(6)!=null),id);
     return list.isEmpty()?null:list.get(0);
   }
+  @Transactional
   public AccessContext.Actor authenticate(String username,String password) {
     ensureOwner();
     if(username==null)username="owner";
@@ -143,6 +144,7 @@ public class AccessService {
     String id=list.get(0).get("ID").toString();jdbc.update("UPDATE HOUSEHOLD_USERS SET CREDENTIAL=?,RECOVERY_HASH=NULL,REVISION=REVISION+1 WHERE ID=?",credential(password),id);
     audit(id,id,"RECOVER","SUCCESS");return new Outcome(true,"Password changed; previous sessions and recovery code revoked");
   }
+  @Transactional
   public void audit(String actor,String target,String action,String outcome){
     jdbc.update("INSERT INTO ACCESS_AUDIT(ID,ACTOR_ID,TARGET_ID,ACTION,OUTCOME,RECORDED_AT) VALUES(?,?,?,?,?,?)",UUID.randomUUID().toString(),actor,target,action,outcome,java.sql.Timestamp.from(Instant.now(clock)));
     jdbc.update("DELETE FROM ACCESS_AUDIT WHERE ID IN (SELECT ID FROM ACCESS_AUDIT ORDER BY RECORDED_AT DESC,ID DESC OFFSET 5000 ROWS)");

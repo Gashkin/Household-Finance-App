@@ -6,13 +6,13 @@ import java.time.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties={"evidence.intake.access-key=synthetic-test-access-0000","evidence.ai.enabled=false"}) @AutoConfigureMockMvc(addFilters=false)
+@SpringBootTest(properties={"spring.datasource.url=jdbc:h2:mem:evidence-intake-tests;DB_CLOSE_DELAY=-1","evidence.intake.access-key=synthetic-test-access-0000","evidence.ai.enabled=false"}) @AutoConfigureMockMvc(addFilters=false)
 @org.junit.jupiter.api.extension.ExtendWith(com.householdfinance.access.OwnerFixture.class)
 class EvidenceIntakeControllerTest {
     @Autowired MockMvc mvc; @Autowired ObjectMapper mapper; @Autowired CashPositionSnapshotRepository repository;

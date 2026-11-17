@@ -13,6 +13,7 @@ timestamp: 2026-07-27T00:00:00Z
 - [Testing Strategy](testing-strategy.md)
 - [UI Component Patterns](ui-component-patterns.md)
 - [Existing Code Patterns](existing-code-patterns.md)
+- [Schema and Release Compatibility](schema-compatibility.md)
 
 ## Source Anchors
 - ops/pass2/testing-strategy.md

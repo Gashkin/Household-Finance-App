@@ -10,6 +10,28 @@ Preparation is synthetic. No real AIB consent, provider production activation, a
 
 ## Install, use, update and recover
 
+### Verify the download before running any package script
+
+The expected source commit must come from the independent review and explicit
+owner release approval, not from the downloaded ZIP's manifest. Open the successful
+**Windows release verification** run on the authenticated GitHub repository, verify
+its repository, workflow, source SHA and synthetic Windows job results, and read
+the **Package ZIP SHA256** in that run's job summary. Download the artifact from
+that same run. If GitHub wraps it in an artifact archive, extract the inner
+`household-finance.zip` as data without running any scripts. Calculate its SHA256
+with `Get-FileHash` and compare against the independently obtained summary digest
+before extracting/executing the package's installer or dot-sourcing `Common.ps1`.
+
+A missing/mismatched source, run, review or digest blocks installation. A PR
+artifact is a test candidate, never approval for real-data use. The source-level
+production hold and GBD-15 readiness/owner-consent gates still apply. Package
+self-hashes only detect corruption after this external trust check; they cannot
+authenticate their own verifier. GitHub/repository administration and the accepted
+build runner remain trusted supply-chain boundaries and must be assessed under
+F6/F7; this procedure does not waive those controls.
+
+### Install and operate the accepted package
+
 1. Obtain the Windows ZIP for the reviewed exact commit from **Windows release verification**. Confirm the workflow, repository/commit and review evidence; hashes detect corruption, not a malicious replacement of both manifest and files. Extract to an ordinary local directory; do not put a private key or financial files there. Run `Install.ps1` in Windows PowerShell under a dedicated standard Windows runtime account that has no development, coding-agent or runner workloads. Do not reuse the coding/runner Windows profile for production. Organisation script policies may require locally unblocking a downloaded trusted release; do not disable machine-wide script policy.
 2. Choose a workspace password of 16–256 characters and save it in your password manager. Installation stores password and the connection encryption key using Windows current-user DPAPI, with an owner-only directory and ACL. They are not portable to a different Windows profile or device.
 3. Use the **Household Finance** desktop shortcut. Open the displayed loopback URL and unlock. Keep the foreground window open; Ctrl+C stops the instance. Banking and AI egress are disabled by default. Manual and CSV operation remain available.
@@ -43,6 +65,20 @@ Select the authorised account and matching local cash/debt ledger, with dated op
 Consent expiry/status is displayed and revalidated at the provider before every fetch. Disconnect revokes the API session and clears local connection references; failed revocation remains durably blocked and retryable across restart. Local forgetting is explicit and does not revoke wider bank/provider consent, erase approved records, or delete backups. Forgetting is blocked while session revocation is pending; retain its reference to retry. If a successful/uncertain exchange provides no usable session ID, the unresolved state is durably blocked, since no safe DELETE target exists. Revoke at the bank/provider and use the separate explicit external-revocation confirmation before clearing it; do not claim the application verified that external action. To revoke all consent use AIB's **Manage Shared Account Information** or [Enable Banking consent controls](https://enablebanking.com/data-sharing-consents/). To erase all local financial records stop the app and run `Remove-LocalData.ps1`; it requires explicit confirmation and fixed private paths. This is logical deletion, not physical secure erasure. Delete separately retained backups and exported reports deliberately.
 
 For suspected compromise stop the app; revoke consent at AIB/provider, revoke/rotate the application signing key, secure the Windows account/device, and rebuild/recover from a known reviewed release and encrypted backup. Do not attach raw logs, data folders, dumps, screenshots, keys or transactions to issues. A protected initialization marker distinguishes a deliberately provisioned empty workspace from a subsequently lost connection file. Missing initialized state, corruption or wrong keys stop production startup without overwriting it; deletion of the whole private data directory is a separate deliberate reset. Windows reparse points, including junctions, are rejected by both launcher and Java store checks. A failed/corrupt/wrong-key connection store must be investigated without overwriting it; manual/CSV remains available after deliberately disabling production. Keep a compromised device offline until assessed.
+
+## Database compatibility and recovery
+
+This release uses versioned Flyway migrations and Hibernate schema validation.
+It refuses an unversioned nonempty database, a newer schema or changed migration
+checksums. Do not enable automatic baselining, schema updates, repair or cleaning
+to force launch. Retain the original instance offline; export and verify an
+encrypted backup under its original reviewed release, then restore into an empty
+versioned instance. Prove exact old/new release recovery with synthetic records
+before using real records. An old binary without compatibility guards must be
+retired and denied access through production identity isolation; these changes
+cannot retrofit every historical binary. Flyway currently warns that bundled H2
+2.4.240 is newer than its upstream verified H2 baseline; retain this in the
+independent compatibility assessment.
 
 ## Trust boundaries and verification
 

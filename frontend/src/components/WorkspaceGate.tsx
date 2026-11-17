@@ -51,6 +51,7 @@ export default function WorkspaceGate({children}:{children:ReactNode}) {
       {mode!=='login'&&<label>{mode==='join'?'Invitation code':'Recovery code'}<input type="password" autoComplete="off" value={code} onChange={e=>setCode(e.target.value)} maxLength={100} required/></label>}
       <label>{mode==='login'?'Workspace password':'New account password'}<input type="password" autoComplete={mode==='login'?'current-password':'new-password'} value={password} onChange={e=>setPassword(e.target.value)} minLength={16} maxLength={256} required/></label>
       {mode==='join'&&<label><input type="checkbox" checked={accepted} onChange={e=>setAccepted(e.target.checked)}/>I accept this household invitation</label>}
+      {mode==='join'&&<p>The original owner is the recovery custodian and can archive all stored records, including private accounts. Join a household only if you trust that custodian and the people who control this device.</p>}
       <button disabled={busy||(mode==='join'&&!accepted)}>{mode==='login'?'Unlock workspace':mode==='join'?'Create my account':'Reset account password'}</button></form></>}
     {message&&<p role="status">{message}</p>}
     {error&&<p role="alert">{error}</p>}<p>Your database stays on this device. Recovery backups use a separate passphrase.</p></main>;

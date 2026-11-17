@@ -1,4 +1,5 @@
 # Install or update an already extracted, reviewed release. Does not contact a bank.
+param([string]$ShortcutDirectory = [Environment]::GetFolderPath('Desktop'))
 . "$PSScriptRoot\Common.ps1"
 $root = Get-InstanceRoot
 $manifest = Get-PackageManifest $PSScriptRoot
@@ -66,9 +67,9 @@ try {
     else { Move-Item -LiteralPath $next -Destination $active }
     # Stable shortcut locates the active version without changing any data paths.
     $launcher = Join-Path $root 'Launch.cmd'
-    '@echo off' + "`r`n" + 'set /p VERSION=<"%LOCALAPPDATA%\HouseholdFinance\active.txt"' + "`r`n" + 'powershell.exe -NoProfile -File "%LOCALAPPDATA%\HouseholdFinance\versions\%VERSION%\Start.ps1"' | Set-Content -LiteralPath $launcher -Encoding ASCII
+    '@echo off' + "`r`n" + 'set /p VERSION=<"%LOCALAPPDATA%\HouseholdFinance\active.txt"' + "`r`n" + '"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -File "%LOCALAPPDATA%\HouseholdFinance\versions\%VERSION%\Start.ps1"' | Set-Content -LiteralPath $launcher -Encoding ASCII
     $shell = New-Object -ComObject WScript.Shell
-    $desktop=[Environment]::GetFolderPath('Desktop')
+    $desktop=$ShortcutDirectory
     if(-not (Test-Path -LiteralPath $desktop)){New-Item -ItemType Directory -Path $desktop | Out-Null}
     $shortcut = $shell.CreateShortcut((Join-Path $desktop 'Household Finance.lnk'))
     $shortcut.TargetPath = $launcher

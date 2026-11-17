@@ -26,11 +26,11 @@ import java.util.Objects;
 public class PlannerService {
 
     public record Account(String id, String name, String type, double balance) {}
-    public record AccountUpsertRequest(String id, String name, String type, double balance) {}
+    public record AccountUpsertRequest(String id, String name, String type, java.math.BigDecimal balance) {}
     public record Category(String id, String name, String budget) {}
     public record CategoryUpsertRequest(String id, String name, String budget) {}
         public record Commitment(String id, String title, double amount, String dueDate, String category, Integer dayOfMonth) {}
-        public record CommitmentUpsertRequest(String id, String title, double amount, String dueDate, String category, Integer dayOfMonth) {}
+        public record CommitmentUpsertRequest(String id, String title, java.math.BigDecimal amount, String dueDate, String category, Integer dayOfMonth) {}
     public record PlannerData(List<Account> accounts, List<Category> categories, List<Commitment> commitments) {}
 
     private final AccountRepository accountRepository;
@@ -106,7 +106,7 @@ public class PlannerService {
             throw new IllegalArgumentException("Account id already exists: " + requestId);
         }
 
-        var saved = accountRepository.save(new AccountEntity(requestId, request.name(), request.type(), request.balance()));
+        var saved = accountRepository.save(new AccountEntity(requestId, request.name(), request.type(), LegacyMoney.require(request.balance(), true)));
         return new Account(saved.getId(), saved.getName(), saved.getType(), saved.getBalance());
     }
 
@@ -120,7 +120,7 @@ public class PlannerService {
 
         entity.setName(request.name());
         entity.setType(request.type());
-        entity.setBalance(request.balance());
+        entity.setBalance(LegacyMoney.require(request.balance(), true));
 
         var saved = accountRepository.save(entity);
         return new Account(saved.getId(), saved.getName(), saved.getType(), saved.getBalance());
@@ -188,7 +188,7 @@ public class PlannerService {
                     new MonthlyCommitmentEntity(
                             requestId,
                             request.title(),
-                            request.amount(),
+                            LegacyMoney.require(request.amount(), false),
                             normalizeDayOfMonth(request.dayOfMonth()),
                             request.category()
                     )
@@ -202,7 +202,7 @@ public class PlannerService {
                         requestId,
                         dueDate,
                         request.title(),
-                        request.amount(),
+                        LegacyMoney.require(request.amount(), false),
                         request.category(),
                         TransactionType.ONE_OFF_FUTURE,
                         null
@@ -223,7 +223,7 @@ public class PlannerService {
             var entity = monthlyCommitmentRepository.findById(entityId)
                     .orElseThrow(() -> new IllegalArgumentException("Commitment not found: " + id));
             entity.setTitle(request.title());
-            entity.setAmount(request.amount());
+            entity.setAmount(LegacyMoney.require(request.amount(), false));
             entity.setCategory(request.category());
             entity.setDayOfMonth(normalizeDayOfMonth(request.dayOfMonth()));
             var saved = monthlyCommitmentRepository.save(entity);
@@ -238,7 +238,7 @@ public class PlannerService {
         }
 
         entity.setTitle(request.title());
-        entity.setAmount(request.amount());
+        entity.setAmount(LegacyMoney.require(request.amount(), false));
         entity.setCategory(request.category());
         entity.setTxnDate(parseNonRecurringDueDate(request.dueDate()));
         entity.setTxnType(TransactionType.ONE_OFF_FUTURE);
@@ -277,6 +277,7 @@ public class PlannerService {
         if (isBlank(request.type())) {
             throw new IllegalArgumentException("Account type is required.");
         }
+        LegacyMoney.require(request.balance(), true);
     }
 
     private void validateCategoryRequest(CategoryUpsertRequest request, boolean update) {
@@ -292,6 +293,7 @@ public class PlannerService {
         if (isBlank(request.budget())) {
             throw new IllegalArgumentException("Category budget is required.");
         }
+        LegacyMoney.parse(request.budget(), false);
     }
 
     private void validateCommitmentRequest(CommitmentUpsertRequest request, boolean update) {
@@ -307,6 +309,7 @@ public class PlannerService {
         if (isBlank(request.dueDate())) {
             throw new IllegalArgumentException("Commitment dueDate is required.");
         }
+        LegacyMoney.require(request.amount(), false);
         if (!isRecurringDueDate(request.dueDate())) {
             parseNonRecurringDueDate(request.dueDate());
         }

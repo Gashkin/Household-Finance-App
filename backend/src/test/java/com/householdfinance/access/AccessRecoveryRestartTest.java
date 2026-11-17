@@ -72,12 +72,11 @@ class AccessRecoveryRestartTest {
     }
   }
   @Test void existingSingleOwnerDatabaseMigratesAccountsToPrivateWithoutLosingBalances() throws Exception {
-    try(var app=start("legacy",OLD)) {
-      app.getBean(LedgerService.class).create(new LedgerService.AccountInput("Synthetic legacy private","CASH",LocalDate.now(),"23.45","Synthetic legacy evidence"));
-    }
-    // Reproduce the pre-GBD-16 schema on a disposable file database, then let normal startup upgrade it.
-    try(var connection=java.sql.DriverManager.getConnection("jdbc:h2:file:"+directory.resolve("legacy"),"sa","");var sql=connection.createStatement()) {
-      for(String statement:List.of("ALTER TABLE LEDGER_ACCOUNTS DROP COLUMN OWNER_ID","ALTER TABLE LEDGER_ACCOUNTS DROP COLUMN SHARED","ALTER TABLE CASH_POSITION_SNAPSHOTS DROP COLUMN OWNER_ID","ALTER TABLE CASH_POSITION_SNAPSHOTS DROP COLUMN SCOPE_REFS","ALTER TABLE DECISION_PLANS DROP COLUMN OWNER_ID","ALTER TABLE LEDGER_AUDIT DROP COLUMN ACTOR_ID","DROP TABLE ACCESS_AUDIT","DROP TABLE HOUSEHOLD_USERS"))sql.execute(statement);
+    String url="jdbc:h2:file:"+directory.resolve("legacy")+";DB_CLOSE_ON_EXIT=FALSE";
+    // Create an authentic GBD-15 version-1 database, without booting entities that require version 2.
+    org.flywaydb.core.Flyway.configure().dataSource(url,"sa","").target("1").load().migrate();
+    try(var connection=java.sql.DriverManager.getConnection(url,"sa","");var sql=connection.prepareStatement("INSERT INTO LEDGER_ACCOUNTS(ID,NAME,KIND,OPENING_DATE,OPENING_MINOR,SOURCE,REVISION) VALUES(?,?,'CASH',?,2345,?,0)")) {
+      sql.setString(1,UUID.randomUUID().toString());sql.setString(2,"Synthetic legacy private");sql.setObject(3,LocalDate.now(java.time.ZoneId.of("Europe/Dublin")));sql.setString(4,"Synthetic legacy evidence");sql.executeUpdate();
     }
     try(var app=start("legacy",OLD)) {
       var access=app.getBean(AccessService.class);access.ensureOwner();

@@ -1,9 +1,9 @@
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
-import {PASSWORD} from './workspace-helper';
+import {PASSWORD,BACKEND_URL} from './workspace-helper';
 
 test('locked workspace, encrypted download and safe recovery controls',async({page,request},testInfo)=>{
-  expect((await request.get((process.env.WORKSPACE_TEST_BACKEND || 'http://127.0.0.1:8080')+'/planner')).status()).toBe(401);
+  expect((await request.get(`${BACKEND_URL}/planner`)).status()).toBe(401);
   await page.goto('/');
   await expect(page.getByRole('heading',{name:'Private local workspace'})).toBeVisible();
   await expect(page.getByRole('button',{name:'Compare scenarios'})).toHaveCount(0);
@@ -35,8 +35,8 @@ test('locked workspace, encrypted download and safe recovery controls',async({pa
 
 test('recover an encrypted backup in a fresh workspace without partial writes',async({page,request},testInfo)=>{
   test.skip(testInfo.project.name!=='desktop','Recovery database is shared; mobile covers the locked and backup layouts.');
-  const auth=await request.post((process.env.WORKSPACE_TEST_BACKEND || 'http://127.0.0.1:8080')+'/api/workspace/unlock',{headers:{'X-Workspace-Request':'1'},data:{password:PASSWORD}});expect(auth.status()).toBe(204);
-  const backup=await request.post((process.env.WORKSPACE_TEST_BACKEND || 'http://127.0.0.1:8080')+'/api/workspace/backup',{headers:{'X-Workspace-Request':'1'},data:{password:'separate-synthetic-backup-passphrase'}});expect(backup.ok()).toBeTruthy();
+  const auth=await request.post(`${BACKEND_URL}/api/workspace/unlock`,{headers:{'X-Workspace-Request':'1'},data:{password:PASSWORD}});expect(auth.status()).toBe(204);
+  const backup=await request.post(`${BACKEND_URL}/api/workspace/backup`,{headers:{'X-Workspace-Request':'1'},data:{password:'separate-synthetic-backup-passphrase'}});expect(backup.ok()).toBeTruthy();
   const bytes=await backup.body();
   await page.goto('http://127.0.0.1:4174/');await page.getByLabel('Workspace password',{exact:true}).fill(PASSWORD);await page.getByRole('button',{name:'Unlock workspace',exact:true}).click();
   await page.getByRole('button',{name:'Backup & recovery',exact:true}).click();

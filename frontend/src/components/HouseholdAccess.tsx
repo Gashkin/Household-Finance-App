@@ -24,7 +24,7 @@ export default function HouseholdAccess(){
     <h3>Recent access events</h3><ul>{audit.slice(0,20).map((a,i)=><li key={i}>{a.RECORDED_AT} · {a.ACTION} · {a.OUTCOME} · actor {person(a.ACTOR_ID)} · target {person(a.TARGET_ID)}</li>)}</ul></>}
     {me?.canRead&&<><h3>Account privacy</h3><p>New accounts are private. Sharing exposes the account, its activity and audit evidence to financial Readers and Editors. Sharing does not give another person ownership or a right to change it.</p>
     {accounts.map(a=><div key={a.id}><strong>{a.name}</strong> · {a.shared?'Shared':'Private'} {me.canEdit&&a.owned&&<button disabled={busy} onClick={()=>void run(async()=>{await ledger('/accounts/'+a.id+'/sharing',{revision:a.revision,shared:!a.shared},'PUT');setMessage('Account privacy updated. Review any forecasts based on this account.');})}>{a.shared?'Make private':'Share with household'}</button>}</div>)}</>}
-    {me?.custodian&&<p>Your original-owner account also has the separate recovery-custodian capability. Whole-workspace encrypted backups contain every person's records and credentials. Keep archives private; ordinary Admins cannot download or restore them.</p>}
+    <p>The original owner is also the recovery custodian and can archive every person's stored records and password verifiers, including private accounts. This is a separate capability; ordinary Admins cannot download or restore whole-workspace backups. Keep archives private.</p>
     {!secret&&message&&<p role="status">{message}</p>}{error&&<p role="alert">{error}</p>}
   </section>;
 }

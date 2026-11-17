@@ -1,6 +1,6 @@
-param([Parameter(Mandatory=$true)][string]$Package)
+param([Parameter(Mandatory=$true)][string]$Package, [switch]$KeepEvidence)
 $ErrorActionPreference = 'Stop'
-# CI is synthetic, hosted and isolated: never the owner's persistent personal runner.
+# Synthetic temporary profile only; results never certify a real production identity.
 . (Join-Path $Package 'Common.ps1')
 Get-PackageManifest $Package | Out-Null
 # Parse every packaged script before any installation.
@@ -9,7 +9,20 @@ foreach ($file in Get-ChildItem -LiteralPath $Package -Filter '*.ps1') {
     [Management.Automation.Language.Parser]::ParseFile($file.FullName,[ref]$tokens,[ref]$parseErrors) | Out-Null
     if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
 }
-$instance = Join-Path $env:RUNNER_TEMP ('gbd14-'+[Guid]::NewGuid().ToString())
+$fixtureParent=[IO.Path]::GetFullPath($env:RUNNER_TEMP)
+$instance = [IO.Path]::GetFullPath((Join-Path $fixtureParent ('gbd15-'+[Guid]::NewGuid().ToString())))
+if(-not $instance.StartsWith($fixtureParent+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) { throw 'Fixture directory escapes its temporary parent.' }
+function Assert-FixturePath([string]$Path) {
+    $resolved=[IO.Path]::GetFullPath($Path)
+    if($resolved -ne $instance -and -not $resolved.StartsWith($instance+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) { throw 'Fixture operation escapes its temporary instance.' }
+    if((Test-Path -LiteralPath $resolved) -and ((Get-Item -LiteralPath $resolved -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Fixture operation cannot traverse a reparse point.' }
+}
+$listener=New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback,0)
+$listener.Start()
+$fixturePort=$listener.LocalEndpoint.Port
+$listener.Stop()
+$baseUrl="http://127.0.0.1:$fixturePort"
+$shortcutDirectory=Join-Path $instance 'synthetic-desktop'
 New-Item -ItemType Directory -Path $instance | Out-Null
 Set-PrivatePath $instance $true
 Assert-PrivatePath $instance
@@ -19,6 +32,12 @@ function Assert-Rejected([scriptblock]$Operation) {
     $rejected=$false
     try { & $Operation } catch { $rejected=$true }
     if(-not $rejected){throw 'An unsafe path was accepted.'}
+}
+function Set-SyntheticWeakDirectoryAcl([string]$Path) {
+    Assert-FixturePath $Path
+    # Native DACL-only grant avoids attempting privileged audit/SACL writes.
+    & icacls.exe $Path /grant '*S-1-1-0:(R)' | Out-Null
+    if($LASTEXITCODE -ne 0) { throw 'Could not prepare the synthetic weak DACL.' }
 }
 # Amended acceptance is not satisfied by the earlier READINESS PASSED prompt.
 # Missing, false and string-valued eligibility all fail closed.
@@ -32,9 +51,13 @@ $same.productionEligible=$true
 Assert-Rejected { Assert-SameRelease $same $release }
 # Even a locally modified manifest that claims eligibility cannot activate banking.
 Assert-Rejected { Assert-ProductionReleaseCleared $same }
-# Hosted runner is an administrator and must never qualify as the production
-# runtime even with a filtered token. This does not certify the owner's users.
-Assert-Rejected { Assert-StandardRuntimeIdentity }
+# Exercise the predicate for the actual test identity without treating a standard
+# account as proof of host isolation. Hosted administrators must be rejected.
+$identity=[Security.Principal.WindowsIdentity]::GetCurrent()
+$groups=@($identity.Groups | ForEach-Object { $_.Value })
+if($identity.IsSystem -or $identity.User.Value -notlike 'S-1-5-21-*' -or 'S-1-5-32-544' -in $groups) {
+    Assert-Rejected { Assert-StandardRuntimeIdentity }
+} else { Assert-StandardRuntimeIdentity | Out-Null }
 $nested=Join-Path $instance 'nested\private'
 New-Item -ItemType Directory -Path $nested -Force | Out-Null
 Set-PrivatePath $nested $true
@@ -50,10 +73,7 @@ $junction=Join-Path $instance 'junction'
 New-Item -ItemType Junction -Path $junction -Target $nested | Out-Null
 Assert-Rejected { Assert-PrivatePath $junction }
 [IO.Directory]::Delete($junction)
-$acl=Get-Acl -LiteralPath $nested
-$everyone=New-Object Security.Principal.SecurityIdentifier('S-1-1-0')
-$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($everyone,'Read','Allow')))
-Set-Acl -LiteralPath $nested -AclObject $acl
+Set-SyntheticWeakDirectoryAcl $nested
 Assert-Rejected { Assert-PrivatePath $nested }
 Set-PrivatePath $nested $true
 # Round-trip Windows DPAPI without disclosing any plaintext in logs.
@@ -72,17 +92,14 @@ function Read-Host { param([string]$Prompt,[switch]$AsSecureString)
 try {
     $env:LOCALAPPDATA=Join-Path $instance 'profile'
     New-Item -ItemType Directory -Path $env:LOCALAPPDATA | Out-Null
-    & (Join-Path $Package 'Install.ps1')
+    & (Join-Path $Package 'Install.ps1') -ShortcutDirectory $shortcutDirectory
     $installed=Join-Path $env:LOCALAPPDATA 'HouseholdFinance'
     $first=(Get-Content -LiteralPath (Join-Path $installed 'active.txt') -Raw).Trim()
     $versionsPath=Join-Path $installed 'versions'
     Assert-PrivatePath $versionsPath
     # A weak versions ACL must prevent reinstalling even if the root stays private.
-    $versionsAcl=Get-Acl -LiteralPath $versionsPath
-    $everyone=New-Object Security.Principal.SecurityIdentifier('S-1-1-0')
-    $versionsAcl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($everyone,'Read','Allow')))
-    Set-Acl -LiteralPath $versionsPath -AclObject $versionsAcl
-    try { Assert-Rejected { & (Join-Path $Package 'Install.ps1') } }
+    Set-SyntheticWeakDirectoryAcl $versionsPath
+    try { Assert-Rejected { & (Join-Path $Package 'Install.ps1') -ShortcutDirectory $shortcutDirectory } }
     finally { Set-PrivatePath $versionsPath $true }
     Assert-PrivatePath $versionsPath
     # A coherent but stale local manifest cannot replace the incoming reviewed release.
@@ -96,7 +113,7 @@ try {
         $stale=Get-Content -LiteralPath $storedManifestPath -Raw | ConvertFrom-Json
         ($stale.files | Where-Object { $_.path -eq 'Common.ps1' }).sha256=(Get-FileHash -LiteralPath $storedCommonPath).Hash
         $stale | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $storedManifestPath -Encoding UTF8
-        Assert-Rejected { & (Join-Path $Package 'Install.ps1') }
+        Assert-Rejected { & (Join-Path $Package 'Install.ps1') -ShortcutDirectory $shortcutDirectory }
         if((Get-Content -LiteralPath (Join-Path $installed 'active.txt') -Raw).Trim() -ne $first){throw 'Rejected reinstall changed the active release.'}
     } finally {
         [IO.File]::WriteAllBytes($storedCommonPath,$storedCommon)
@@ -108,7 +125,7 @@ try {
     $changed=$originalManifest | ConvertFrom-Json
     $changed.commit='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
     $changed | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $Package 'manifest.json') -Encoding UTF8
-    & (Join-Path $Package 'Install.ps1')
+    & (Join-Path $Package 'Install.ps1') -ShortcutDirectory $shortcutDirectory
     if((Get-Content -LiteralPath (Join-Path $installed 'active.txt') -Raw).Trim() -ne $changed.commit){throw 'Update did not activate.'}
     if((Get-Content -LiteralPath (Join-Path $installed 'previous.txt') -Raw).Trim() -ne $first){throw 'Previous release not retained.'}
     if((Get-Content -LiteralPath (Join-Path $installed 'data\sentinel.txt') -Raw).Trim() -ne 'synthetic-preserved-record'){throw 'Update changed records.'}
@@ -154,10 +171,10 @@ function Stop-SyntheticInstance {
 function Restart-SyntheticInstance {
     param($Previous)
     Stop-SyntheticInstance $Previous
-    $next=Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-File',('"'+$startScript+'"')) -WorkingDirectory $instance -PassThru -RedirectStandardOutput (Join-Path $instance 'restart.log') -RedirectStandardError (Join-Path $instance 'restart-error.log')
+    $next=Start-Process -FilePath (Join-Path $env:WINDIR 'System32/WindowsPowerShell/v1.0/powershell.exe') -ArgumentList @('-NoProfile','-File',('"'+$startScript+'"'),'-Port',[string]$fixturePort) -WorkingDirectory $instance -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $instance 'restart.log') -RedirectStandardError (Join-Path $instance 'restart-error.log')
     for($attempt=0;$attempt -lt 90;$attempt++) {
         if($next.HasExited){throw 'Synthetic restart failed.'}
-        try { $health=Invoke-WebRequest 'http://127.0.0.1:8080/health' -UseBasicParsing; if($health.StatusCode -eq 200){return $next} } catch {}
+        try { $health=Invoke-WebRequest "${baseUrl}/health" -UseBasicParsing; if($health.StatusCode -eq 200){return $next} } catch {}
         Start-Sleep -Seconds 1
     }
     if(-not $next.HasExited){ & taskkill.exe /PID $next.Id /T /F | Out-Null; $next.WaitForExit() }
@@ -165,15 +182,15 @@ function Restart-SyntheticInstance {
 }
 function Unlock-SyntheticInstance {
     $web=New-Object Microsoft.PowerShell.Commands.WebRequestSession
-    Invoke-WebRequest 'http://127.0.0.1:8080/api/workspace/unlock' -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body '{"password":"synthetic-install-password"}' -WebSession $web -UseBasicParsing | Out-Null
+    Invoke-WebRequest "${baseUrl}/api/workspace/unlock" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body '{"password":"synthetic-install-password"}' -WebSession $web -UseBasicParsing | Out-Null
     return $web
 }
-$process=Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile','-File',('"'+$startScript+'"')) -WorkingDirectory $instance -PassThru -RedirectStandardOutput (Join-Path $instance 'app.log') -RedirectStandardError (Join-Path $instance 'error.log')
+$process=Start-Process -FilePath (Join-Path $env:WINDIR 'System32/WindowsPowerShell/v1.0/powershell.exe') -ArgumentList @('-NoProfile','-File',('"'+$startScript+'"'),'-Port',[string]$fixturePort) -WorkingDirectory $instance -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $instance 'app.log') -RedirectStandardError (Join-Path $instance 'error.log')
 try {
     $ready=$false
     for($i=0;$i -lt 90;$i++) {
         if($process.HasExited) { Get-Content -LiteralPath (Join-Path $instance 'error.log'); throw 'Packaged launcher failed to start.' }
-        try { $response=Invoke-WebRequest 'http://127.0.0.1:8080/health' -UseBasicParsing; if($response.StatusCode -eq 200) {$ready=$true;break} } catch {}
+        try { $response=Invoke-WebRequest "${baseUrl}/health" -UseBasicParsing; if($response.StatusCode -eq 200) {$ready=$true;break} } catch {}
         Start-Sleep -Seconds 1
     }
     if(-not $ready) { throw 'Packaged launcher health timeout.' }
@@ -182,46 +199,50 @@ try {
     try { & (Join-Path (Split-Path $startScript) 'Readiness.ps1') }
     catch { $locked=$_.Exception.Message -like 'Stop Household Finance or the other configuration operation*' }
     if(-not $locked -or (Get-FileHash -LiteralPath (Join-Path $installed 'config.xml')).Hash -ne $beforeConfig){throw 'Readiness did not reject the active instance before config access.'}
-    $shell=Invoke-WebRequest 'http://127.0.0.1:8080/' -UseBasicParsing
+    $shell=Invoke-WebRequest "${baseUrl}/" -UseBasicParsing
     if($shell.StatusCode -ne 200 -or $shell.Content -notmatch '/assets/') { throw 'Packaged app shell missing.' }
-    $callback=Invoke-WebRequest 'http://127.0.0.1:8080/bank/callback?code=synthetic-secret&state=synthetic-state' -UseBasicParsing
+    $callback=Invoke-WebRequest "${baseUrl}/bank/callback?code=synthetic-secret&state=synthetic-state" -UseBasicParsing
     if($callback.Headers['Referrer-Policy'] -ne 'no-referrer') { throw 'Callback referrer protection missing.' }
-    try { Invoke-WebRequest 'http://127.0.0.1:8080/api/banking/status' -UseBasicParsing | Out-Null; throw 'Unprotected banking endpoint.' }
+    try { Invoke-WebRequest "${baseUrl}/api/banking/status" -UseBasicParsing | Out-Null; throw 'Unprotected banking endpoint.' }
     catch { if ($_.Exception.Response.StatusCode.value__ -ne 401) { throw } }
     $session=New-Object Microsoft.PowerShell.Commands.WebRequestSession
-    Invoke-WebRequest 'http://127.0.0.1:8080/api/workspace/unlock' -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body '{"password":"synthetic-install-password"}' -WebSession $session -UseBasicParsing | Out-Null
-    $status=Invoke-RestMethod 'http://127.0.0.1:8080/api/banking/status' -WebSession $session
+    Invoke-WebRequest "${baseUrl}/api/workspace/unlock" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body '{"password":"synthetic-install-password"}' -WebSession $session -UseBasicParsing | Out-Null
+    $status=Invoke-RestMethod "${baseUrl}/api/banking/status" -WebSession $session
     if($status.configured -or $status.environment -ne 'SANDBOX') { throw 'Production was enabled by default.' }
     if(-not (Test-Path -LiteralPath (Join-Path $installed 'data\household-finance.mv.db'))) { throw 'Launcher did not use the persistent private data directory.' }
     $today=[DateTime]::UtcNow.ToString('yyyy-MM-dd')
     $account=@{name='Synthetic Windows recovery account';kind='CASH';openingDate=$today;openingEuro='123.45';source='Synthetic Windows opening'}
-    Invoke-RestMethod 'http://127.0.0.1:8080/api/ledger/accounts' -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($account | ConvertTo-Json) -WebSession $session | Out-Null
+    Invoke-RestMethod "${baseUrl}/api/ledger/accounts" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($account | ConvertTo-Json) -WebSession $session | Out-Null
     $backupFile=Join-Path $instance 'synthetic.hfb'
-    Invoke-WebRequest 'http://127.0.0.1:8080/api/workspace/backup' -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body '{"password":"synthetic-recovery-passphrase"}' -WebSession $session -UseBasicParsing -OutFile $backupFile | Out-Null
+    Invoke-WebRequest "${baseUrl}/api/workspace/backup" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body '{"password":"synthetic-recovery-passphrase"}' -WebSession $session -UseBasicParsing -OutFile $backupFile | Out-Null
     $bytes=[IO.File]::ReadAllBytes($backupFile)
     if($bytes.Length -lt 45 -or [Text.Encoding]::UTF8.GetString($bytes).Contains('Synthetic Windows recovery account')){throw 'Encrypted backup failed.'}
-    $beforeRestart=Invoke-RestMethod ('http://127.0.0.1:8080/api/ledger?asOf='+$today) -WebSession $session
+    $beforeRestart=Invoke-RestMethod ("${baseUrl}/api/ledger?asOf="+$today) -WebSession $session
     if($beforeRestart.cashMinor -ne 12345){throw 'Synthetic opening position was not committed before restart.'}
     $process=Restart-SyntheticInstance $process
     $session=Unlock-SyntheticInstance
-    $position=Invoke-RestMethod ('http://127.0.0.1:8080/api/ledger?asOf='+$today) -WebSession $session
+    $position=Invoke-RestMethod ("${baseUrl}/api/ledger?asOf="+$today) -WebSession $session
     if($position.cashMinor -ne 12345){throw ('Synthetic records lost after actual Windows restart: observed '+$position.cashMinor+' minor units.')}
     Stop-SyntheticInstance $process
-    Move-Item -LiteralPath (Join-Path $installed 'data') -Destination (Join-Path $installed 'original-synthetic-data')
+    $originalData=Join-Path $installed 'data'
+    $recoveryData=Join-Path $installed 'original-synthetic-data'
+    Assert-FixturePath $originalData; Assert-FixturePath $recoveryData
+    Move-Item -LiteralPath $originalData -Destination $recoveryData
     $process=Restart-SyntheticInstance $process
     $session=Unlock-SyntheticInstance
     $restore=@{password='synthetic-recovery-passphrase';backup=[Convert]::ToBase64String($bytes);confirmation='RESTORE INTO EMPTY WORKSPACE'}
-    Invoke-RestMethod 'http://127.0.0.1:8080/api/workspace/restore' -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($restore | ConvertTo-Json) -WebSession $session | Out-Null
-    Assert-Rejected { Invoke-RestMethod ('http://127.0.0.1:8080/api/ledger?asOf='+$today) -WebSession $session | Out-Null }
+    Invoke-RestMethod "${baseUrl}/api/workspace/restore" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($restore | ConvertTo-Json) -WebSession $session | Out-Null
+    Assert-Rejected { Invoke-RestMethod ("${baseUrl}/api/ledger?asOf="+$today) -WebSession $session | Out-Null }
     $session=Unlock-SyntheticInstance
-    $position=Invoke-RestMethod ('http://127.0.0.1:8080/api/ledger?asOf='+$today) -WebSession $session
+    $position=Invoke-RestMethod ("${baseUrl}/api/ledger?asOf="+$today) -WebSession $session
     if($position.cashMinor -ne 12345){throw 'Packaged Windows encrypted restore changed synthetic records.'}
     [Array]::Clear($bytes,0,$bytes.Length)
     Write-Host 'Packaged Windows runtime, actual launcher/restart/encrypted restore, static app, callback, private ACLs, DPAPI and authenticated banking checks passed using synthetic data.'
 } finally {
     $env:LOCALAPPDATA=$originalLocalAppData
     Stop-SyntheticInstance $process
-    for($attempt=0;$attempt -lt 12;$attempt++) {
+    Assert-FixturePath $instance
+    for($attempt=0;-not $KeepEvidence -and $attempt -lt 12;$attempt++) {
         try { Remove-Item -LiteralPath $instance -Recurse -Force -ErrorAction Stop; break }
         catch { if($attempt -eq 11){throw}; Start-Sleep -Seconds 1 }
     }

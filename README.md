@@ -2,7 +2,7 @@
 
 ## Dated cash evidence → debt decision (current product slice)
 
-First configure `WORKSPACE_PASSWORD` (16–256 characters) in the backend environment. This seeds the named `owner` account on its first sign-in. Then run the Java 21 / Spring Boot backend with `cd backend && mvn spring-boot:run`. In another terminal run
+First configure `WORKSPACE_PASSWORD` (16–256 characters) in the backend environment. This seeds the named `owner` account on its first sign-in. Then run the Java 21 / Spring Boot backend with `cd backend && mvn -s ../.mvn/settings.xml spring-boot:run`. In another terminal run
 `cd frontend && npm ci && npm run dev`, then open http://localhost:5173.
 
 The **Debt decision** workspace lets you save a dated household cash position (cash accounts, next 30 days'

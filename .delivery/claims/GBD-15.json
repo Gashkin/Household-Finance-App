@@ -1,0 +1,14 @@
+{
+  "work_id": "GBD-15",
+  "page_id": "419d3419-fef0-8126-ba7c-e9278f572384",
+  "branch": "story/15-delivery",
+  "token": "claim-token:codex-gbd15-mwigzqfv",
+  "claimed_at": "2026-11-15T23:32:57Z",
+  "base_sha": "9f607c4d2fbea6224ae47671c52cbf3a3e3e0845",
+  "history": [
+    {
+      "event": "claim",
+      "method": "GitHub REST POST create-only ref, then connected Notion ownership write/readback. Generated claim token, not platform session ID. Independent whole-app audit and owner-host/provider evidence remain mandatory before provisioning or activation."
+    }
+  ]
+}

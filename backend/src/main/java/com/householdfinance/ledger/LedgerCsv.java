@@ -7,6 +7,10 @@ public final class LedgerCsv {
   private LedgerCsv() {}
 
   public static List<List<String>> parse(String csv) {
+    return parse(csv,List.of("reference", "date", "description", "amount", "status", "kind"));
+  }
+
+  public static List<List<String>> parse(String csv, List<String> header) {
     if (csv == null || csv.length() > 100_000)
       throw new IllegalArgumentException("CSV must contain at most 100,000 characters");
     if (csv.startsWith("\uFEFF")) csv = csv.substring(1);
@@ -53,11 +57,11 @@ public final class LedgerCsv {
     }
     if (rows.isEmpty()
         || !rows.remove(0)
-            .equals(List.of("reference", "date", "description", "amount", "status", "kind")))
+            .equals(header))
       throw new IllegalArgumentException(
-          "CSV header must be reference,date,description,amount,status,kind");
-    if (rows.isEmpty() || rows.size() > 500 || rows.stream().anyMatch(r -> r.size() != 6))
-      throw new IllegalArgumentException("Provide 1–500 complete six-column activity rows");
+          "CSV header must be "+String.join(",",header));
+    if (rows.isEmpty() || rows.size() > 500 || rows.stream().anyMatch(r -> r.size() != header.size()))
+      throw new IllegalArgumentException("Provide 1–500 complete activity rows");
     return rows;
   }
 }

@@ -2,11 +2,11 @@ package com.householdfinance.controller;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-@SpringBootTest @AutoConfigureMockMvc(addFilters=false)
+@SpringBootTest(properties="spring.datasource.url=jdbc:h2:mem:debt-report-tests;DB_CLOSE_DELAY=-1") @AutoConfigureMockMvc(addFilters=false)
 @org.junit.jupiter.api.extension.ExtendWith(com.householdfinance.access.OwnerFixture.class)
 class DebtReportControllerTest {
     @Autowired MockMvc mvc;

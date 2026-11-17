@@ -60,15 +60,18 @@ public class TransactionImportService {
             private final AccountRepository accountRepository;
     private final Map<String, List<ImportedTransaction>> previewCacheByImportId = new ConcurrentHashMap<>();
     private final List<TransactionHistoryItem> historyItems = new CopyOnWriteArrayList<>();
+    private final org.springframework.transaction.support.TransactionTemplate writes;
 
     public TransactionImportService(
             MigrationArtifactService migrationArtifactService,
                 TransactionRepository transactionRepository,
-                AccountRepository accountRepository
+                AccountRepository accountRepository,
+                org.springframework.transaction.PlatformTransactionManager transactionManager
     ) {
         this.migrationArtifactService = migrationArtifactService;
         this.transactionRepository = transactionRepository;
             this.accountRepository = accountRepository;
+        this.writes=new org.springframework.transaction.support.TransactionTemplate(transactionManager);
     }
 
     public ImportPreview previewCsv(String csvContent) {
@@ -77,36 +80,17 @@ public class TransactionImportService {
         var transactions = new ArrayList<ImportedTransaction>();
         var duplicateKeys = new HashSet<String>();
 
-        if (csvContent == null || csvContent.isBlank()) {
-            var emptyPreview = new ImportPreview(importId, List.of());
-            migrationArtifactService.recordArtifact(importId, "IMPORT_PREVIEW", emptyPreview);
-            return emptyPreview;
-        }
-
-        var lines = csvContent.split("\\r?\\n");
-        if (lines.length <= 1) {
-            var emptyPreview = new ImportPreview(importId, List.of());
-            migrationArtifactService.recordArtifact(importId, "IMPORT_PREVIEW", emptyPreview);
-            return emptyPreview;
-        }
-
-        for (int index = 1; index < lines.length; index++) {
-            var line = lines[index].trim();
-            if (line.isBlank()) {
-                continue;
-            }
-
-            var parts = line.split(",");
-            if (parts.length < 4) {
-                continue;
-            }
-
-            var date = parts[0].trim();
-            var description = parts[1].trim();
-            var amount = parseAmount(parts[2].trim());
-            var account = parts[3].trim();
-
-            var dedupeKey = (date + "|" + description + "|" + amount).toLowerCase();
+        var rows=com.householdfinance.ledger.LedgerCsv.parse(csvContent,List.of("date","description","amount","account"));
+        for (var parts:rows) {
+            var date = parts.get(0).trim();
+            try { LocalDate.parse(date); }
+            catch (RuntimeException e) { throw new IllegalArgumentException("Transaction date must be YYYY-MM-DD."); }
+            var description = parts.get(1).trim();
+            var amount = parseAmount(parts.get(2).trim());
+            var account = parts.get(3).trim();
+            if (description.isBlank() || description.length()>500 || account.isBlank() || account.length()>128)
+                throw new IllegalArgumentException("Provide a description (maximum 500 characters) and account (maximum 128 characters).");
+            var dedupeKey = (date + "|" + description + "|" + amount + "|" + account).toLowerCase(Locale.ROOT);
             var duplicate = !duplicateKeys.add(dedupeKey);
             var rowId = "R" + (transactions.size() + 1);
 
@@ -114,20 +98,28 @@ public class TransactionImportService {
         }
 
         var preview = new ImportPreview(importId, List.copyOf(transactions));
-        previewCacheByImportId.put(importId, preview.transactions());
         migrationArtifactService.recordArtifact(importId, "IMPORT_PREVIEW", preview);
+        previewCacheByImportId.put(importId, preview.transactions());
         return preview;
     }
 
-    public ImportAcceptResult acceptImport(ImportAcceptRequest request) {
+    public synchronized ImportAcceptResult acceptImport(ImportAcceptRequest request) {
         com.householdfinance.access.AccessContext.requireLegacy();
+        if (request==null || request.importId()==null || request.importId().isBlank())
+            throw new IllegalArgumentException("importId is required.");
         var importId = request.importId();
         var acceptedRowIds = request.acceptedRowIds() == null ? List.<String>of() : request.acceptedRowIds();
+        if (acceptedRowIds.size()>500) throw new IllegalArgumentException("Accept at most 500 rows at once.");
         var previewRows = previewCacheByImportId.getOrDefault(importId, List.of());
         var acceptedCount = 0;
         var skippedCount = 0;
+        var selected=new HashSet<String>();
+        var additions=new ArrayList<TransactionHistoryItem>();
 
         for (var rowId : acceptedRowIds) {
+            if (!selected.add(rowId) || historyItems.stream().anyMatch(h->h.importId().equals(importId) && h.rowId().equals(rowId))) {
+                skippedCount++; continue;
+            }
             var previewRow = previewRows.stream()
                     .filter(row -> row.rowId().equals(rowId))
                     .findFirst();
@@ -137,7 +129,7 @@ public class TransactionImportService {
             }
 
             var row = previewRow.get();
-            historyItems.add(new TransactionHistoryItem(
+            additions.add(new TransactionHistoryItem(
                     "H-" + UUID.randomUUID(),
                     importId,
                     row.rowId(),
@@ -155,6 +147,8 @@ public class TransactionImportService {
 
         var result = new ImportAcceptResult(importId, acceptedCount, skippedCount);
         migrationArtifactService.recordArtifact(request.importId(), "IMPORT_ACCEPT", result);
+        // Publish in-memory history only after the persisted receipt has committed.
+        historyItems.addAll(additions);
         return result;
     }
 
@@ -177,7 +171,7 @@ public class TransactionImportService {
         return new MapToFutureResult(request.historyId(), request.futureCommitmentId());
     }
 
-    public ResolveHistoryResult resolveHistory(ResolveHistoryRequest request) {
+    public synchronized ResolveHistoryResult resolveHistory(ResolveHistoryRequest request) {
         com.householdfinance.access.AccessContext.requireLegacy();
         if (request == null || request.historyId() == null || request.historyId().isBlank()) {
             throw new IllegalArgumentException("historyId is required.");
@@ -200,6 +194,7 @@ public class TransactionImportService {
             throw new IllegalArgumentException("Transaction history row already resolved: " + request.historyId());
         }
 
+        var result=writes.execute(status -> {
         String resolvedFutureCommitmentId = null;
         String resolvedCategory = currentItem.category();
         String resolvedAction = action;
@@ -246,6 +241,12 @@ public class TransactionImportService {
             resolvedCategory = normalizedCategory;
         }
 
+        return new ResolveHistoryResult(
+                request.historyId(), resolvedAction, resolvedFutureCommitmentId, resolvedCategory,
+                balanceUpdate == null ? null : balanceUpdate.accountId(),
+                balanceUpdate == null ? null : balanceUpdate.updatedBalance());
+        });
+        // Commit the related balance/commitment writes before changing resolution state.
         historyItems.remove(currentItem);
         historyItems.add(new TransactionHistoryItem(
                 currentItem.historyId(),
@@ -256,19 +257,12 @@ public class TransactionImportService {
                 currentItem.amount(),
                 currentItem.account(),
                 currentItem.duplicate(),
-                resolvedFutureCommitmentId,
-                resolvedCategory,
-                resolvedAction
+                result.futureCommitmentId(),
+                result.category(),
+                result.action()
         ));
 
-        return new ResolveHistoryResult(
-                request.historyId(),
-                resolvedAction,
-                resolvedFutureCommitmentId,
-                resolvedCategory,
-                balanceUpdate == null ? null : balanceUpdate.accountId(),
-                balanceUpdate == null ? null : balanceUpdate.updatedBalance()
-        );
+        return result;
     }
 
     private TransactionHistoryItem findHistoryItem(String historyId) {
@@ -316,10 +310,15 @@ public class TransactionImportService {
     }
 
     private double parseAmount(String rawAmount) {
+        if (!rawAmount.matches("-?[0-9]+(?:\\.[0-9]{1,2})?"))
+            throw new IllegalArgumentException("Amount must be a finite decimal with at most two decimal places.");
         try {
-            return Double.parseDouble(rawAmount.replace("$", "").replace(",", ""));
+            var decimal=new java.math.BigDecimal(rawAmount);
+            if (decimal.abs().compareTo(new java.math.BigDecimal("90071992547409.91"))>0)
+                throw new IllegalArgumentException("Amount is outside the supported range.");
+            return decimal.doubleValue();
         } catch (NumberFormatException ignored) {
-            return 0.0;
+            throw new IllegalArgumentException("Amount must be a finite decimal with at most two decimal places.");
         }
     }
 }
