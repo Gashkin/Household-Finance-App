@@ -1,0 +1,14 @@
+{
+  "work_id": "GBD-30",
+  "page_id": "41ad3419-fef0-81f2-a6a6-f653a2bbc6d9",
+  "branch": "story/30-delivery",
+  "token": "claim-token:codex-gbd30-mwjyvl4u",
+  "claimed_at": "2026-11-17T00:41:22.881Z",
+  "base_sha": "cc8af8879034bb47315f98e7b1742e1c4bf98640",
+  "history": [
+    {
+      "event": "claim",
+      "method": "Owner-selected GBD-30 execution. Create-only GitHub branch with committed claim; Notion ownership readback before implementation. No live banking or production hold removal."
+    }
+  ]
+}
