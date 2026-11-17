@@ -89,6 +89,18 @@ class MemberJourneyTest {
     call("POST","/api/member/publication",owner,Map.of("revision",0,"forecastRevision",f.path("plan").path("revision").asLong(),"acknowledged",true),400);
     assertFalse(call("GET","/api/member/export",reader,null,200).toString().contains("Private forecast label"));
   }
+  @Test void ordinaryLedgerForecastIsRejectedEvenWhenEveryCashAccountIsShared()throws Exception{
+    seed();var existing=call("GET","/api/forecast",owner,null,200).path("plan");
+    var f=call("POST","/api/forecast",owner,Map.of("revision",existing.path("revision").asLong(),"name","Ordinary ledger","baseline",Map.of("mode","LEDGER","date",today),"endDate",LocalDate.parse(today).plusDays(7).toString(),"reserveEuro","0","events",List.of(),"acknowledged",true),200);
+    call("POST","/api/member/publication",owner,Map.of("revision",1,"forecastRevision",f.path("plan").path("revision").asLong(),"acknowledged",true),400);
+  }
+  @Test void optimisticPersistenceFailureReturnsConflictWithoutPrivateDetails()throws Exception{
+    var mock=org.mockito.Mockito.mock(MemberService.class);
+    org.mockito.Mockito.when(mock.get()).thenThrow(new org.springframework.dao.OptimisticLockingFailureException("Private persistence details"));
+    var standalone=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(new MemberController(mock,json)).build();
+    var response=standalone.perform(get("/api/member")).andExpect(status().isConflict()).andReturn().getResponse().getContentAsString();
+    assertTrue(response.contains("refresh"));assertFalse(response.contains("Private persistence"));
+  }
   @Test void readerCanPlanWithoutAdminAndRetriesDoNotDuplicateOrOverwrite()throws Exception{
     seed();var id=UUID.randomUUID().toString();var input=draft(reader,id,"700.00",false);
     var saved=call("POST","/api/member/purchases",reader,input,200);assertEquals(-2000,saved.path("report").path("spendingRoomMinor").asLong());assertEquals("EXCEEDS_REVIEWED_ROOM",saved.path("purchases").get(0).path("assessment").asText());
@@ -122,6 +134,11 @@ class MemberJourneyTest {
     reconcile("915.00");saveForecastAndPublish();assertEquals(59500,call("GET","/api/member/report",reader,null,200).path("spendingRoomMinor").asLong());
     var second=newPurchase(reader,"20.00",false);call("PUT","/api/member/purchases/"+second.path("id").asText(),reader,Map.of("revision",1,"action","BOUGHT"),200);
     call("PUT","/api/member/purchases/"+second.path("id").asText(),reader,Map.of("revision",2,"action","MATCH","accountId",account,"entryId",entry),400);
+    call("PUT","/api/ledger/accounts/"+account+"/activity/"+entry,owner,Map.of("revision",currentAccount().path("revision").asLong(),"row",Map.of("reference","actual-one","date",today,"description","Corrected actual purchase","amountEuro","-86.00","status","BOOKED","kind","ACTIVITY"),"reason","Synthetic correction"),200);
+    var changed=call("GET","/api/member",reader,null,200);JsonNode original=null;for(var item:changed.path("purchases"))if(item.path("id").asText().equals(id))original=item;
+    assertNotNull(original);assertFalse(original.path("matchValid").asBoolean());assertTrue(original.path("actualMinor").isNull());assertEquals(10000,changed.path("report").path("purchaseReservationsMinor").asLong());
+    call("PUT","/api/member/purchases/"+id,reader,Map.of("revision",3,"action","MATCH","accountId",account,"entryId",entry),200);
+    assertEquals(2000,call("GET","/api/member/report",reader,null,200).path("purchaseReservationsMinor").asLong());
   }
   @Test void withdrawalHidesPublicationRequestsHistoryAndExport()throws Exception{
     seed();var p=newPurchase(reader,"15.00",true);String id=p.path("id").asText();

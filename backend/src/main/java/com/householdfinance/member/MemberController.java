@@ -39,4 +39,6 @@ public class MemberController {
   @PutMapping("/preferences") public MemberService.Workspace preferences(HttpServletRequest r)throws IOException{return service.preferences(body(r,MemberService.PreferenceInput.class));}
   @ExceptionHandler({IllegalArgumentException.class,ArithmeticException.class,java.time.DateTimeException.class})
   public ResponseEntity<Map<String,String>> invalid(Exception e){return ResponseEntity.badRequest().body(Map.of("error",e instanceof java.time.DateTimeException?"Use a valid YYYY-MM-DD date":Objects.toString(e.getMessage(),"Invalid member request")));}
+  @ExceptionHandler(org.springframework.dao.OptimisticLockingFailureException.class)
+  public ResponseEntity<Map<String,String>> conflict(){return ResponseEntity.status(409).body(Map.of("error","Decision changed; refresh before trying again"));}
 }

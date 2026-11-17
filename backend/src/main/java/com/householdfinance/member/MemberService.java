@@ -24,7 +24,7 @@ public class MemberService {
       ForecastService.Stored forecast, Instant publishedAt) {}
   public record Purchase(String title, String category, long amountMinor, LocalDate date,
       String state, String requestDecision, boolean sharedRequest, String reviewerId, Set<String> sourceIds,
-      String accountId, String entryId, String decisionReason) {}
+      String accountId, String entryId, String decisionReason, String matchedFingerprint) {}
   public record NewPurchase(String id, String title, String category, String amountEuro,
       LocalDate date, Boolean sharedRequest, String reportToken, Boolean acknowledged) {}
   public record Change(Long revision, String action, String accountId, String entryId, String reason, String reportToken) {}
@@ -80,10 +80,15 @@ public class MemberService {
     var r=records.findById("prefs:"+AccessContext.userId()).orElse(null);
     return new PreferenceView(revision(r),r==null?new Preferences(List.of("Everyday","Home","Other"),"DETAIL",true,Instant.EPOCH):read(r,Preferences.class));
   }
-  private LedgerEntry match(Purchase p){
+  private String activityFingerprint(LedgerEntry e){return token(List.of(e.id,e.accountId,e.reference,e.date,e.description,e.amountMinor,e.status,e.kind,e.source));}
+  private LedgerEntry eligibleActivity(Purchase p){
     if(p.entryId()==null||p.accountId()==null)return null;
     if(accounts.findById(p.accountId()).filter(a->a.shared&&a.kind.equals("CASH")&&AccessContext.reads(a.ownerId,a.shared)).isEmpty())return null;
     return entries.findById(p.entryId()).filter(e->e.accountId.equals(p.accountId())&&e.status.equals("BOOKED")&&e.kind.equals("ACTIVITY")&&e.amountMinor<0&&!e.date.isAfter(today())).orElse(null);
+  }
+  private LedgerEntry match(Purchase p){
+    var entry=eligibleActivity(p);
+    return entry!=null&&Objects.equals(p.matchedFingerprint(),activityFingerprint(entry))?entry:null;
   }
   private PurchaseView view(MemberRecord r,Report report){
     var p=read(r,Purchase.class);var m=match(p);Long actual=m==null?null:-m.amountMinor;
@@ -142,7 +147,7 @@ public class MemberService {
     AccessContext.requireEdit();var r=records.findById("board").orElse(null);
     check(r==null||AccessContext.owns(r.ownerId),"Only the publishing editor can replace this shared forecast");
     check(input!=null&&input.revision()!=null&&input.forecastRevision()!=null&&Boolean.TRUE.equals(input.acknowledged()),"Explicit publication consent and revisions required");conflict(input.revision()==revision(r));
-    var view=forecasts.get().plan();check(view!=null&&view.currentDecisionReady()&&Set.of("LEDGER","SHARED_LEDGER").contains(view.inputs().baseline().mode()),"Save today's reconciled shared-source ledger forecast first");conflict(input.forecastRevision()==view.revision());
+    var view=forecasts.get().plan();check(view!=null&&view.currentDecisionReady()&&"SHARED_LEDGER".equals(view.inputs().baseline().mode()),"Save today's reconciled shared-source ledger forecast first");conflict(input.forecastRevision()==view.revision());
     var p=ledger.sharedPosition(today());Map<String,Long> refs=new TreeMap<>();p.accounts().stream().filter(a->a.kind().equals("CASH")).forEach(a->refs.put(a.id(),a.revision()));
     check(sharedSources(refs.keySet())&&refs.equals(view.inputs().baseline().revisions()),"Every forecast cash source must be explicitly shared; private forecasts cannot be published");
     write("board","BOARD",AccessContext.userId(),new Board(AccessContext.userId(),AccessContext.actor().username(),view.revision(),view.inputs(),Instant.now()),r);
@@ -164,14 +169,14 @@ public class MemberService {
     check(records.findByKindOrderByUpdatedAtDesc("PURCHASE").stream().filter(r->AccessContext.owns(r.ownerId)).count()<200,"Local purchase limit reached");
     check(input.date()!=null&&!input.date().isBefore(today())&&!input.date().isAfter(today().plusDays(365)),"Choose a purchase date within the next year");
     var b=report.board();check(!input.sharedRequest()||(b!=null&&report.evidenceState().equals("REVIEWED")&&!b.publisherId().equals(AccessContext.userId())),"A shared request needs a current published forecast and a different publishing editor");
-    var p=new Purchase(title,category,amount,input.date(),input.sharedRequest()?"REQUESTED":"PLANNED",input.sharedRequest()?"PENDING":"NONE",input.sharedRequest(),input.sharedRequest()?b.publisherId():null,input.sharedRequest()?b.forecast().baseline().revisions().keySet():Set.of(),null,null,"");
+    var p=new Purchase(title,category,amount,input.date(),input.sharedRequest()?"REQUESTED":"PLANNED",input.sharedRequest()?"PENDING":"NONE",input.sharedRequest(),input.sharedRequest()?b.publisherId():null,input.sharedRequest()?b.forecast().baseline().revisions().keySet():Set.of(),null,null,"",null);
     var r=write(id,"PURCHASE",AccessContext.userId(),p,null);event(r,p,"CREATED");return get();
   }
   private void event(MemberRecord r,Purchase p,String action){var report=report();write(UUID.randomUUID().toString(),"EVENT",r.ownerId,new Event(r.id,AccessContext.actor().username(),action,Instant.now(),p,report.token(),report.evidenceState()),null);}
   @Transactional public Workspace change(String id,Change input){
     AccessContext.requireRead();var r=purchase(id);var p=read(r,Purchase.class);
     check(input!=null&&input.revision()!=null&&input.action()!=null,"Complete decision and revision required");conflict(input.revision()==revision(r)&&Objects.equals(input.reportToken(),report().token()));
-    String state=p.state(),decision=p.requestDecision(),account=p.accountId(),entry=p.entryId(),reason=p.decisionReason();
+    String state=p.state(),decision=p.requestDecision(),account=p.accountId(),entry=p.entryId(),reason=p.decisionReason(),fingerprint=p.matchedFingerprint();
     if(Set.of("APPROVE","DECLINE").contains(input.action())){
       AccessContext.requireEdit();check(p.sharedRequest()&&AccessContext.userId().equals(p.reviewerId())&&!AccessContext.owns(r.ownerId)&&decision.equals("PENDING")&&!state.equals("CANCELLED"),"Only the receiving editor can decide a pending request");
       check(report().evidenceState().equals("REVIEWED"),"Review and republish current source evidence before deciding");reason=text(input.reason(),200);decision=input.action().equals("APPROVE")?"APPROVED":"DECLINED";if(!state.equals("BOUGHT"))state=decision;
@@ -182,16 +187,18 @@ public class MemberService {
         case "BOUGHT" -> {check(Set.of("PLANNED","REQUESTED","APPROVED","DECLINED").contains(state),"This purchase is already bought or cancelled");state="BOUGHT";}
         case "MATCH" -> {
           check(state.equals("BOUGHT"),"Mark bought before matching actual activity");account=text(input.accountId(),36);entry=text(input.entryId(),36);
-          var candidate=new Purchase(p.title(),p.category(),p.amountMinor(),p.date(),state,decision,p.sharedRequest(),p.reviewerId(),p.sourceIds(),account,entry,reason);
-          check(match(candidate)!=null,"Choose a permitted shared cash account's booked outgoing activity");
+          var candidate=new Purchase(p.title(),p.category(),p.amountMinor(),p.date(),state,decision,p.sharedRequest(),p.reviewerId(),p.sourceIds(),account,entry,reason,null);
+          var actual=eligibleActivity(candidate);
+          check(actual!=null,"Choose a permitted shared cash account's booked outgoing activity");
+          fingerprint=activityFingerprint(actual);
           final String matched=entry;
           check(records.findByKindOrderByUpdatedAtDesc("PURCHASE").stream().filter(other->!other.id.equals(id)).map(other->read(other,Purchase.class)).noneMatch(other->matched.equals(other.entryId())),"This activity already has a purchase match");
         }
-        case "UNMATCH" -> {check(state.equals("BOUGHT")&&entry!=null,"No actual match to remove");account=null;entry=null;}
+        case "UNMATCH" -> {check(state.equals("BOUGHT")&&entry!=null,"No actual match to remove");account=null;entry=null;fingerprint=null;}
         default -> throw new IllegalArgumentException("Unknown purchase action");
       }
     }
-    var next=new Purchase(p.title(),p.category(),p.amountMinor(),p.date(),state,decision,p.sharedRequest(),p.reviewerId(),p.sourceIds(),account,entry,reason);
+    var next=new Purchase(p.title(),p.category(),p.amountMinor(),p.date(),state,decision,p.sharedRequest(),p.reviewerId(),p.sourceIds(),account,entry,reason,fingerprint);
     write(id,"PURCHASE",r.ownerId,next,r);event(r,next,input.action());return get();
   }
   public List<Event> history(String id){
