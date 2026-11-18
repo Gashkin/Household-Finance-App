@@ -326,7 +326,7 @@ class ForecastJourneyTest {
                     0L,
                     "Horizon",
                     manual(today, "1000", "0"),
-                    today.plusDays(91),
+                    today.plusMonths(12).plusDays(1),
                     "0",
                     List.of(),
                     true)));

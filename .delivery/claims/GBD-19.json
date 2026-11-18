@@ -1,0 +1,14 @@
+{
+  "work_id": "GBD-19",
+  "page_id": "41ad3419-fef0-81e2-b93e-d682c98869d4",
+  "branch": "story/19-delivery",
+  "token": "01a1ef78-1c9d-75a0-82d0-284184da8eb1",
+  "claimed_at": "2026-11-18T16:24:31Z",
+  "base_sha": "0e909defab47cf0ce78348003b868bac84ef9b4e",
+  "history": [
+    {
+      "event": "claim",
+      "method": "Connected GitHub create-only canonical ref succeeded before Notion claim write and mandatory readback. Platform session ID retained. Live Product Build design trial applies: no feature implementation until explicit owner design approval. Figma and Canva artifacts tracked on canonical Notion story."
+    }
+  ]
+}

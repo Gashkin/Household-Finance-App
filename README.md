@@ -14,6 +14,8 @@ the comparison itself is not saved. See [the journey and API notes](product/date
 
 **Spending & purchases** gives named members a shared-only spending report, personal purchase plans, auditable shared requests, explicit actual-transaction matching and local preferences. [Setup, financial rules, permissions and recovery](product/stories/member-spending.md).
 
+**Plan ahead** maintains recurring bills and expected income, reviews explicit payment matches and explains six-month household/account cash risk. Existing dated/manual plans remain available separately. [Schedules, payroll, CSV updates and recovery](product/stories/recurring-bills.md).
+
 ## OKF Knowledge Model
 
 This repository uses an OKF-first knowledge model for contributor and agent context.

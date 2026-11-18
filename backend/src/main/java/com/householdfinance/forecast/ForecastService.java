@@ -184,7 +184,7 @@ public class ForecastService {
           b.date() != null
               && value.endDate() != null
               && value.endDate().isAfter(b.date())
-              && ChronoUnit.DAYS.between(b.date(), value.endDate()) <= 90,
+              && !value.endDate().isAfter(b.date().plusMonths(12)),
           "Invalid saved horizon");
       check(
           Set.of("LEDGER", "SHARED_LEDGER", "MANUAL").contains(Objects.toString(b.mode(), ""))
@@ -336,8 +336,8 @@ public class ForecastService {
     check(
         input.endDate() != null
             && input.endDate().isAfter(baseline.date())
-            && ChronoUnit.DAYS.between(baseline.date(), input.endDate()) <= 90,
-        "Choose a horizon of 1–90 days after the starting evidence date");
+            && !input.endDate().isAfter(baseline.date().plusMonths(12)),
+        "Choose a horizon of up to 12 calendar months after the starting evidence date");
     long reserve = amount(input.reserveEuro(), false);
     var stored =
         new Stored(

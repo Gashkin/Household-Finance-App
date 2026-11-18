@@ -366,7 +366,6 @@ export default function ForecastWorkspace() {
                 type="date"
                 value={end}
                 min={dateAfter(date, 1)}
-                max={dateAfter(date, 90)}
                 onChange={(e) => changed(() => setEnd(e.target.value))}
                 required
               />
