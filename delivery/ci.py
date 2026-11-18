@@ -66,7 +66,7 @@ def publish_readiness(git, result):
     body = {'name': 'Story merge readiness', 'head_sha': sha,
             'status': 'completed' if ready or failed else 'in_progress',
             'output': {'title': 'Readiness blocked' if failed else 'Ready for human review' if ready else 'Awaiting required evidence',
-                       'summary': result['blocked'] if failed else '\n'.join(result['pending']) if not ready else f"Current-head CI, identity, Copilot count and resolved threads verified. Copilot reviewed SHA: {result.get('copilot_reviewed_sha', 'unknown')}. Bound owner delta receipt used: {bool(result.get('owned_delta_verified'))}. This is not a new independent review. Independent GPT receipt/order remain owner-verified. Human merge only."}}
+                       'summary': result['blocked'] if failed else '\n'.join(result['pending']) if not ready else "Current-head CI, canonical identity and resolved threads verified. Provider review counts and historical delta receipts are not gates. The independent opening review remains owner-verified under Product Build policy; this check does not assert it ran. Human merge only."}}
     if ready or failed: body['conclusion'] = 'failure' if failed else 'success'
     # Always re-read the actual PR head before attaching a readiness result.
     if git.pr(result['pr'])['head']['sha'] != sha: raise Blocked('Head changed before readiness publication; refresh required')
