@@ -13,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 /** Durable expectations, never fabricated ledger activity or allocation movements. */
 @Service
 public class CommitmentService {
+  // 62-day income override plus the difference between two +/-31-day offsets.
+  private static final int MAX_RESOLVED_SHIFT_DAYS=124;
   public record Rule(String name,String accountId,String categoryId,String direction,String certainty,
       String amountType,String amountEuro,String frequency,LocalDate anchor,LocalDate end,
       String payrollId,int offsetDays,String counterpartId) {}
@@ -91,6 +93,10 @@ public class CommitmentService {
     // Validate linked payroll effects before the first durable write, including conflicting delays.
     for(var edit:exceptions)if(edit.frozenRule()!=null&&"INCOME_LINKED".equals(edit.frozenRule().frequency()))payDate(next,edit.frozenRule().payrollId(),LocalDate.parse(edit.id().substring(edit.id().indexOf('/')+1)));
     occurrences(next,today(),today().plusMonths(12),today());
+    if(!old.payrolls().equals(next.payrolls())&&!old.schedules().isEmpty()){
+      LocalDate start=resolvedStart(old,today());
+      if(start.isBefore(today()))check(occurrences(old,start,today().minusDays(1),today()).equals(occurrences(next,start,today().minusDays(1),today())),"Payroll change would rewrite past obligations; retain the historical calendar and use a future effective date");
+    }
     var r=records.findById(stateId()).orElseGet(LedgerReviewRecord::new);r.id=stateId();r.ownerId=AccessContext.userId();r.kind="COMMITMENTS";r.revision=next.revision();r.payload=encode(next);records.save(r);
     var audit=new LedgerAudit();audit.id=UUID.randomUUID().toString();audit.accountId=AccessContext.publicationId();audit.action="COMMITMENT_CHANGE";audit.source=why;audit.recordedAt=Instant.now();audit.beforeJson=encode(old);audit.afterJson=encode(next);audits.save(audit);return next;
   }
@@ -199,13 +205,13 @@ public class CommitmentService {
     visible(s);date(from);date(to);check(!to.isBefore(from),"End must follow start");
     var rows=new LinkedHashMap<String,Occurrence>();
     // Include moved occurrences whose nominal dates lie outside the visible window.
-    LocalDate scanFrom=from.minusDays(63),scanTo=to.plusDays(63);
+    LocalDate scanFrom=from.minusDays(MAX_RESOLVED_SHIFT_DAYS),scanTo=to.plusDays(MAX_RESOLVED_SHIFT_DAYS);
     for(var sc:s.schedules())for(int i=0;i<sc.versions().size();i++){var v=sc.versions().get(i);if(v.cancelled())continue;
       LocalDate boundary=i+1<sc.versions().size()?sc.versions().get(i+1).from():null;
-      LocalDate begin=scanFrom.isAfter(v.from().minusDays(63))?scanFrom:v.from().minusDays(63),end=scanTo;
-      if(boundary!=null&&boundary.plusDays(63).isBefore(end))end=boundary.plusDays(63);
-      if(v.rule().end()!=null&&v.rule().end().plusDays(63).isBefore(end))end=v.rule().end().plusDays(63);
-      for(var nominal:slots(v.rule(),begin,end)){var o=occurrence(s,sc,v,nominal,baseline);if(!o.date().isBefore(v.from())&&(boundary==null||o.date().isBefore(boundary))&&(v.rule().end()==null||!o.date().isAfter(v.rule().end()))&&!o.date().isBefore(from)&&!o.date().isAfter(to))rows.put(o.id(),o);check(rows.size()<=10000,"Too many occurrences; review and close old obligations before projecting");}
+      LocalDate begin=scanFrom.isAfter(v.from().minusDays(MAX_RESOLVED_SHIFT_DAYS))?scanFrom:v.from().minusDays(MAX_RESOLVED_SHIFT_DAYS),end=scanTo;
+      if(boundary!=null&&boundary.plusDays(MAX_RESOLVED_SHIFT_DAYS).isBefore(end))end=boundary.plusDays(MAX_RESOLVED_SHIFT_DAYS);
+      if(v.rule().end()!=null&&v.rule().end().plusDays(MAX_RESOLVED_SHIFT_DAYS).isBefore(end))end=v.rule().end().plusDays(MAX_RESOLVED_SHIFT_DAYS);
+      for(var nominal:slots(v.rule(),begin,end)){var selected=effectiveVersion(s,sc,nominal);if(selected==null)continue;var o=occurrence(s,sc,selected,nominal,baseline);if(!o.date().isBefore(from)&&!o.date().isAfter(to))rows.put(o.id(),o);check(rows.size()<=10000,"Too many occurrences; review and close old obligations before projecting");}
     }
     for(var edit:s.exceptions()){var o=find(s,edit.id());if(!o.date().isBefore(from)&&!o.date().isAfter(to)){var sc=s.schedules().stream().filter(x->x.id().equals(o.scheduleId())).findFirst().orElseThrow();var frozen=new Version(o.nominalDate(),false,edit.frozenRule());rows.put(o.id(),occurrence(s,sc,frozen,o.nominalDate(),baseline));}}
     check(rows.size()<=10000,"Too many occurrences; shorten the selected range");return rows.values().stream().sorted(Comparator.comparing(Occurrence::date).thenComparing(Occurrence::id)).toList();
@@ -215,11 +221,17 @@ public class CommitmentService {
     var s=visible(read());var o=find(s,occurrenceId);var r=ruleFor(s,o);var a=account(r.accountId());
     return entries.findByAccountIdOrderByDateAscReferenceAsc(a.id).stream().filter(e->usableActual(r,e,false)||usableActual(r,e,true)).map(e->new Candidate(e.id,e.accountId,e.date,e.description,e.amountMinor,e.status,a.revision)).toList();
   }
-  private Rule ruleFor(State s,Occurrence o){var edit=s.exceptions().stream().filter(x->x.id().equals(o.id())).findFirst().orElse(null);if(edit!=null&&edit.frozenRule()!=null)return edit.frozenRule();return s.schedules().stream().filter(x->x.id().equals(o.scheduleId())).findFirst().orElseThrow().versions().stream().filter(v->!v.from().isAfter(o.date())).reduce((a,b)->b).orElseThrow().rule();}
+  // Resolve identity before applying a query window: an earlier eligible version owns
+  // its occurrence even when a later offset would move that identity across a boundary.
+  private Version effectiveVersion(State s,Schedule sc,LocalDate nominal){
+    for(int i=0;i<sc.versions().size();i++){var v=sc.versions().get(i);if(v.cancelled()||!slots(v.rule(),nominal,nominal).contains(nominal))continue;var o=occurrence(s,sc,v,nominal,today());if(!o.date().isBefore(v.from())&&(v.rule().end()==null||!o.date().isAfter(v.rule().end()))&&(i+1==sc.versions().size()||o.date().isBefore(sc.versions().get(i+1).from())))return v;}
+    return null;
+  }
+  private Rule ruleFor(State s,Occurrence o){var edit=s.exceptions().stream().filter(x->x.id().equals(o.id())).findFirst().orElse(null);if(edit!=null&&edit.frozenRule()!=null)return edit.frozenRule();var sc=s.schedules().stream().filter(x->x.id().equals(o.scheduleId())).findFirst().orElseThrow();return Objects.requireNonNull(effectiveVersion(s,sc,o.nominalDate())).rule();}
   private Occurrence find(State s,String id){
     try{int slash=id.indexOf('/');String schedule=uuid(id.substring(0,slash));LocalDate nominal=LocalDate.parse(id.substring(slash+1));date(nominal);var sc=s.schedules().stream().filter(x->x.id().equals(schedule)).findFirst().orElseThrow();var saved=s.exceptions().stream().filter(x->x.id().equals(id)).findFirst().orElse(null);
       if(saved!=null&&saved.frozenRule()!=null)return occurrence(s,sc,new Version(nominal,false,saved.frozenRule()),nominal,today());
-      for(int i=0;i<sc.versions().size();i++){var v=sc.versions().get(i);if(v.cancelled()||!slots(v.rule(),nominal,nominal).contains(nominal))continue;var o=occurrence(s,sc,v,nominal,today());if(!o.date().isBefore(v.from())&&(v.rule().end()==null||!o.date().isAfter(v.rule().end()))&&(i+1==sc.versions().size()||o.date().isBefore(sc.versions().get(i+1).from())))return o;}
+      var selected=effectiveVersion(s,sc,nominal);if(selected!=null)return occurrence(s,sc,selected,nominal,today());
       throw new IllegalArgumentException("Unknown occurrence");
     }catch(RuntimeException e){throw new IllegalArgumentException("Unknown or unavailable occurrence");}
   }
@@ -248,12 +260,18 @@ public class CommitmentService {
     List<CashLine> lines=new ArrayList<>();for(var a:base.accounts())lines.add(project(a.id(),a.name(),a.startingMinor(),in.baseline(),in.end(),rows,in.uncertain(),in.cashOnly()));
     var household=project(null,base.household().name(),base.household().startingMinor(),in.baseline(),in.end(),rows,in.uncertain(),in.cashOnly());return new Comparison(base,new Outlook(in.baseline(),in.end(),false,List.copyOf(warnings),List.copyOf(rows),household,List.copyOf(lines)));
   }
+  private LocalDate resolvedStart(State state,LocalDate baseline){
+    LocalDate earliest=state.schedules().stream().flatMap(s->s.versions().stream()).map(v->v.rule().anchor()).min(LocalDate::compareTo).orElse(baseline).minusDays(MAX_RESOLVED_SHIFT_DAYS);
+    return earliest.isBefore(LocalDate.of(2000,1,1))?LocalDate.of(2000,1,1):earliest.isBefore(baseline)?earliest:baseline;
+  }
   @Transactional(readOnly=true) public Outlook outlook(LocalDate baseline,LocalDate end,boolean uncertain,boolean cashOnly){
     date(baseline);date(end);check(!baseline.isAfter(today())&&!baseline.isBefore(today().minusYears(1))&&end.isAfter(baseline)&&!end.isAfter(baseline.plusMonths(12)),"Choose 1 to 12 calendar months after a baseline within the past year");
     var state=visible(read());var position=ledger.position(baseline);var cash=position.accounts().stream().filter(a->a.owned()&&a.kind().equals("CASH")).toList();
     var ids=cash.stream().map(LedgerService.AccountView::id).collect(java.util.stream.Collectors.toSet());
-    LocalDate earliest=state.schedules().stream().flatMap(s->s.versions().stream()).map(v->v.rule().anchor()).min(LocalDate::compareTo).orElse(baseline);
-    var all=occurrences(state,earliest.isBefore(baseline)?earliest:baseline,end,baseline);var warnings=new ArrayList<String>();
+    // Monthly anchor/calendar day difference (30), calendar movement (31), and
+    // offset (31) fit within 124 days; linked income overrides can move 62 days
+    // plus the two linked offsets (62). Keep all supported pre-anchor obligations.
+    var all=occurrences(state,resolvedStart(state,baseline),end,baseline);var warnings=new ArrayList<String>();
     check(all.stream().noneMatch(o->o.state().equals("MATCH_NEEDS_REVIEW")),"Linked activity changed or settled; review its match in Upcoming before calculating a new outlook");
     check(state.schedules().stream().flatMap(x->x.versions().stream()).allMatch(v->ids.contains(v.rule().accountId())&&(v.rule().counterpartId()==null||v.rule().counterpartId().isBlank()||ids.contains(v.rule().counterpartId()))),"Starting evidence excludes a scheduled account; choose a later baseline");
     for(var o:all){warnings.addAll(o.warnings());if(o.state().equals("OVERDUE")||o.state().equals("DATA_UNCONFIRMED"))warnings.add(o.name()+": "+o.state()+"; unpaid expenses stay reserved and overdue income is not assumed received.");}
