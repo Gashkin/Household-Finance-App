@@ -23,7 +23,7 @@ class MemoryGit:
         self.trees = {'main-1': {'feature.py': 'working capability', 'tests.py': 'regression'}}
         self.parents = {'main-1': None}
         self.prs = []
-        self.review_items = [{'id': 123, 'state': 'COMMENTED', 'user': {'login': 'copilot-pull-request-reviewer[bot]', 'type': 'Bot'}}]
+        self.review_items = []
         self.thread_items = []
         self.check = {'id': 1, 'status': 'completed', 'conclusion': 'success', 'html_url': 'https://example.test/check'}
         self.open_barrier = None
@@ -189,30 +189,26 @@ class CoordinationIntegrationTests(unittest.TestCase):
         with self.assertRaisesRegex(Blocked, 'artifact'): self.c.verify(STORY, 1)
         with self.assertRaisesRegex(Blocked, 'advanced'): self.c.verify(STORY, 1, expected_main='old-main')
 
-    def test_one_review_and_resolved_threads_are_required_without_requesting_reviews(self):
+    def test_resolved_threads_are_required_without_counting_or_requesting_reviews(self):
         self.ready_pr()
         self.git.review_items = []
-        with self.assertRaisesRegex(Blocked, 'exactly one'): self.c.pr_gate(STORY, 1)
+        self.assertEqual(self.c.pr_gate(STORY, 1)['number'], 1)
         self.git.review_items = [{'id': i, 'state': 'COMMENTED', 'user': {'login': 'Copilot', 'type': 'Bot'}} for i in [1, 2]]
-        with self.assertRaisesRegex(Blocked, 'found 2'): self.c.pr_gate(STORY, 1)
-        self.git.review_items = self.git.review_items[:1]
+        self.assertEqual(self.c.pr_gate(STORY, 1)['number'], 1)
         self.git.thread_items = [{'isResolved': False}]
         with self.assertRaisesRegex(Blocked, 'conversations'): self.c.pr_gate(STORY, 1)
         self.git.thread_items[0]['isResolved'] = True
         self.assertEqual(self.c.pr_gate(STORY, 1)['number'], 1)
 
-    def test_owner_exception_is_limited_to_two_reviews_for_gbd10(self):
+    def test_historical_provider_exception_is_not_gate_configuration(self):
         self.ready_pr()
         story = {**STORY, 'copilot_review_exception': {'count': 2, 'authorised_by': 'owner',
             'reason': 'One premature ledger review; final review only after sandbox integration and tests'}}
-        with self.assertRaisesRegex(Blocked, 'exactly two'): self.c.pr_gate(story, 1)
-        self.git.review_items.append({**self.git.review_items[0], 'id': 124})
-        self.assertEqual(self.c.pr_gate(story, 1)['number'], 1)
-        with self.assertRaisesRegex(Blocked, 'found 2'): self.c.pr_gate(STORY, 1)
-        self.git.review_items.append({**self.git.review_items[0], 'id': 125})
-        with self.assertRaisesRegex(Blocked, 'found 3'): self.c.pr_gate(story, 1)
-        with self.assertRaises(Blocked): validate_definition({**story, 'work_id': 'GBD-14', 'branch': 'story/14-delivery'})
-        with self.assertRaises(Blocked): validate_definition({**story, 'copilot_review_exception': {'count': 3}})
+        for count in [0, 1, 2, 3]:
+            self.git.review_items = [{'id': i, 'state': 'COMMENTED', 'user': {'login': 'Copilot', 'type': 'Bot'}} for i in range(count)]
+            self.assertEqual(self.c.pr_gate(story, 1)['number'], 1)
+        validate_definition({**story, 'work_id': 'GBD-14', 'branch': 'story/14-delivery'})
+        validate_definition({**story, 'copilot_review_exception': {'count': 3}})
 
     def test_closed_pr_cannot_be_bypassed_and_slug_cannot_change_claim_identity(self):
         self.ready_pr(); self.git.prs[0]['state'] = 'closed'
@@ -293,14 +289,14 @@ class CoordinationIntegrationTests(unittest.TestCase):
         self.assertIn('skipped', event_check(self.git, 'issue_comment', {'issue': {'number': 5}}))
 
 
-    def test_draft_pending_review_is_not_failure_or_merge_ready(self):
+    def test_draft_is_not_failure_or_merge_ready_without_a_provider_gate(self):
         pr = self.ready_pr()
         self.git.prs[0]['draft'] = True
         self.git.review_items = []
         result = self.c.pr_readiness(STORY, 1)
         self.assertFalse(result['review_ready'])
         self.assertIn('Draft PR', result['pending'][0])
-        with self.assertRaises(Blocked): self.c.pr_gate(STORY, 1)
+        self.assertEqual(self.c.pr_gate(STORY, 1)['number'], 1)
         self.git.prs[0]['body'] += marker('GBD-99')
         with self.assertRaisesRegex(Blocked, 'exactly one'): self.c.pr_readiness(STORY, 1)
 
@@ -309,7 +305,7 @@ class CoordinationIntegrationTests(unittest.TestCase):
         self.git.trees[pr['head']['sha']]['.delivery/stories/GBD-10.json'] = json.dumps(STORY)
         self.git.review_items = []
         result = event_check(self.git, 'pull_request_target', {'action': 'ready_for_review', 'pull_request': pr})
-        self.assertFalse(result['review_ready'])
+        self.assertTrue(result['review_ready'])
         self.git.review_items = [{'id': 1, 'state': 'COMMENTED', 'user': {'login': 'Copilot', 'type': 'Bot'}}]
         self.git.check = None
         self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'])
@@ -324,12 +320,11 @@ class CoordinationIntegrationTests(unittest.TestCase):
         self.git.thread_items = [{'isResolved': False}]
         self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'])
         self.git.review_items *= 2
-        with self.assertRaisesRegex(Blocked, 'Too many'): self.c.pr_readiness(STORY, 1)
-
-    def test_stale_review_requires_bound_owner_delta_receipt_without_another_review(self):
-        pr = self.ready_pr()
-        self.git.review_items[0]['commit_id'] = 'reviewed-old-head'
         self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'])
+
+    def test_old_review_receipts_do_not_replace_current_ci(self):
+        pr = self.ready_pr()
+        self.git.review_items = [{'id': 1, 'state': 'COMMENTED', 'commit_id': 'reviewed-old-head', 'user': {'login': 'Copilot', 'type': 'Bot'}}]
         receipt = {'head_sha': pr['head']['sha'], 'base_sha': pr['base']['sha'],
                    'review_id': self.git.review_items[0]['id'], 'reviewed_sha': 'reviewed-old-head'}
         prefix = pr['body']
@@ -337,25 +332,25 @@ class CoordinationIntegrationTests(unittest.TestCase):
         attest(receipt)
         result = self.c.pr_readiness(STORY, 1)
         self.assertTrue(result['review_ready'])
-        self.assertTrue(result['owned_delta_verified'])
-        self.assertEqual(result['copilot_reviewed_sha'], 'reviewed-old-head')
+        self.assertNotIn('owned_delta_verified', result)
+        self.assertNotIn('copilot_reviewed_sha', result)
         for field in ['head_sha', 'base_sha', 'review_id', 'reviewed_sha']:
             bad = {**receipt, field: 99 if field == 'review_id' else 'wrong'}
             attest(bad)
-            self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'], field)
+            self.assertTrue(self.c.pr_readiness(STORY, 1)['review_ready'], field)
         attest({**receipt, 'review_id': True})
-        self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'])
+        self.assertTrue(self.c.pr_readiness(STORY, 1)['review_ready'])
         attest(receipt)
         self.git.prs[0]['body'] += '\n<!-- gbd-owned-verification ' + json.dumps(receipt) + ' -->'
-        self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'])
+        self.assertTrue(self.c.pr_readiness(STORY, 1)['review_ready'])
         self.git.prs[0]['body'] = prefix + '\n<!-- gbd-owned-verification invalid-json -->'
-        self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'])
+        self.assertTrue(self.c.pr_readiness(STORY, 1)['review_ready'])
         attest(receipt)
         self.git.check = {'status': 'completed', 'conclusion': 'failure'}
         with self.assertRaisesRegex(Blocked, 'CI failed'): self.c.pr_readiness(STORY, 1)
         self.git.check = {'status': 'completed', 'conclusion': 'success'}
         self.git.review_items[0]['commit_id'] = None
-        self.assertFalse(self.c.pr_readiness(STORY, 1)['review_ready'])
+        self.assertTrue(self.c.pr_readiness(STORY, 1)['review_ready'])
         self.assertEqual(len(self.git.review_items), 1)
 
 
@@ -368,7 +363,7 @@ class WireContractTests(unittest.TestCase):
             def pages(self, path, key): return [{'id': 8, 'name': 'Story merge readiness', 'app': {'slug': 'github-actions'}}]
             def api(self, method, path, body): self.calls.append((method, path, body))
         git = Remote()
-        pending = {'pr': 1, 'head_sha': 'current', 'review_ready': False, 'pending': ['Copilot pending']}
+        pending = {'pr': 1, 'head_sha': 'current', 'review_ready': False, 'pending': ['Required CI pending']}
         publish_readiness(git, pending)
         self.assertEqual(git.calls[-1][2]['status'], 'in_progress')
         self.assertNotIn('conclusion', git.calls[-1][2])

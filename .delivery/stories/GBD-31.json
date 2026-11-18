@@ -1,0 +1,11 @@
+{
+  "work_id": "GBD-31",
+  "page_id": "41cd3419-fef0-8150-90ee-c6d6b80a2ea5",
+  "branch": "story/31-delivery",
+  "artifacts": [
+    {"path":"delivery/coordinator.py","contains":["def thread_gate", "review_threads_resolved", "Required CI failed on current head"]},
+    {"path":"delivery/ci.py","contains":["Provider review counts and historical delta receipts are not gates", "canonical identity and resolved threads verified"]},
+    {"path":"delivery/tests/test_no_copilot_guard.py","contains":["test_readiness_with_no_copilot_does_not_query_review_history", "test_unresolved_threads_still_prevent_completion_without_partial_notion_write"]},
+    {"path":"delivery/README.md","contains":["Provider review history is not queried", "activates only after human integration"]}
+  ]
+}

@@ -60,12 +60,7 @@ def validate_definition(story):
         needles = item.get('contains')
         require(isinstance(path, str) and path and not path.startswith('/') and '..' not in path.split('/'), 'Unsafe artifact path')
         require(isinstance(needles, list) and bool(needles) and all(isinstance(value, str) and value.strip() for value in needles), 'contains must be a nonempty list of nonblank marker strings')
-    exception = story.get('copilot_review_exception')
-    if exception is not None:
-        require(story['work_id'] == 'GBD-10' and exception == {
-            'count': 2, 'authorised_by': 'owner',
-            'reason': 'One premature ledger review; final review only after sandbox integration and tests'
-        }, 'Only the explicit owner-authorised GBD-10 two-review exception is allowed')
+    # Historical provider-count fields are provenance only, never gate configuration.
     return story
 
 
@@ -160,14 +155,8 @@ class Coordinator:
         self.sync(story, token)
         return pr
 
-    def review_gate(self, number, story=None):
-        actors = {'copilot', 'copilot-pull-request-reviewer', 'copilot-pull-request-reviewer[bot]'}
-        reviews = [r for r in self.git.reviews(number) if r['user']['login'].lower() in actors
-                   and r['user'].get('type') == 'Bot' and r['state'] != 'PENDING']
-        expected = (story or {}).get('copilot_review_exception', {}).get('count', 1)
-        require(len(reviews) == expected, f"Expected exactly {'one' if expected == 1 else 'two'} independent Copilot review(s), found {len(reviews)}. No additional re-reviews")
+    def thread_gate(self, number):
         require(not any(not t['isResolved'] for t in self.git.threads(number)), "Review conversations remain open; assess, reply with evidence and resolve them")
-        return reviews[-1]['id']
 
     def pr_identity(self, story, number):
         validate_definition(story)
@@ -182,49 +171,20 @@ class Coordinator:
 
     def pr_gate(self, story, number):
         pr = self.pr_identity(story, number)
-        self.review_gate(number, story)
+        self.thread_gate(number)
         return pr
-
-    @staticmethod
-    def owned_delta_receipt(pr, review):
-        # This is the existing owner's attestation, not a second independent review.
-        # PR writers already control story metadata; the claim token is not a secret.
-        entries = re.findall(r'<!-- gbd-owned-verification (.*?) -->', pr.get('body') or '', re.DOTALL)
-        if len(entries) != 1: return False
-        try: receipt = json.loads(entries[0])
-        except (ValueError, TypeError): return False
-        return (isinstance(receipt, dict)
-                and set(receipt) == {'head_sha', 'base_sha', 'review_id', 'reviewed_sha'}
-                and receipt['head_sha'] == pr['head']['sha']
-                and bool(pr['base'].get('sha'))
-                and receipt['base_sha'] == pr['base'].get('sha')
-                and type(receipt['review_id']) is int
-                and receipt['review_id'] == review['id']
-                and bool(review.get('commit_id'))
-                and receipt['reviewed_sha'] == review['commit_id'])
 
     def pr_readiness(self, story, number):
         pr = self.pr_identity(story, number)
         pending = []
         if pr.get('draft'): pending.append('Draft PR; human merge readiness is not asserted')
-        actors = {'copilot', 'copilot-pull-request-reviewer', 'copilot-pull-request-reviewer[bot]'}
-        reviews = [r for r in self.git.reviews(number) if r['user']['login'].lower() in actors
-                   and r['user'].get('type') == 'Bot' and r['state'] != 'PENDING']
-        expected = story.get('copilot_review_exception', {}).get('count', 1)
-        require(len(reviews) <= expected, 'Too many Copilot reviews; inspect review sequence')
-        owned_delta = False
-        reviewed_sha = reviews[-1].get('commit_id') if reviews else None
-        if len(reviews) < expected: pending.append('Required Copilot review pending; owner requests it after independent GPT review and corrections')
-        elif reviewed_sha != pr['head']['sha']:
-            owned_delta = self.owned_delta_receipt(pr, reviews[-1])
-            if not owned_delta: pending.append('Copilot reviewed an earlier or unknown head; current-head owner delta verification is required, not another Copilot request')
         if any(not t['isResolved'] for t in self.git.threads(number)): pending.append('Review conversations require disposition and resolution')
         # Missing checks are represented by required_check's pending sentinel; API errors fail closed.
         check = self.git.required_check(pr['head']['sha']) or {}
         if check.get('status') != 'completed': pending.append('Required CI pending on current head')
         else: require(check.get('conclusion') == 'success', 'Required CI failed on current head')
         require(self.git.pr(number)['head']['sha'] == pr['head']['sha'], 'PR changed during readiness verification; refresh')
-        return {'pr': number, 'head_sha': pr['head']['sha'], 'review_ready': not pending, 'pending': pending, 'copilot_reviewed_sha': reviewed_sha, 'owned_delta_verified': owned_delta}
+        return {'pr': number, 'head_sha': pr['head']['sha'], 'review_ready': not pending, 'pending': pending}
 
     def verify(self, story, number, expected_main=None):
         validate_definition(story)
@@ -240,7 +200,7 @@ class Coordinator:
         main = self.git.head('main')
         require(expected_main is None or expected_main == main, "Main advanced; verify the latest main CI, not a stale event")
         require(self.git.reachable(pr['merge_commit_sha'], main), "Merged away from main (PR #16 failure mode). Retarget/integrate under human control; do not mark Done")
-        review = self.review_gate(number, story)
+        self.thread_gate(number)
         check = self.git.required_check(main)
         require(check and check['status'] == 'completed' and check['conclusion'] == 'success', "Required build-and-test has not passed on this main SHA")
         hashes = {}
@@ -250,7 +210,7 @@ class Coordinator:
             hashes[artifact['path']] = hashlib.sha256(content.encode()).hexdigest()
         require(self.git.head('main') == main, "Main changed during verification; retry against latest main")
         return {'work_id': story['work_id'], 'pr': number, 'main_sha': main, 'merge_sha': pr['merge_commit_sha'],
-                'check_url': check['html_url'], 'copilot_review': review, 'artifacts_sha256': hashes,
+                'check_url': check['html_url'], 'review_threads_resolved': True, 'artifacts_sha256': hashes,
                 'verified_at': now(), 'eligible_for_done': True}
 
     def finish(self, story, token, number):
