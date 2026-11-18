@@ -99,14 +99,27 @@ in `backend/target/classes/static` as CI does before the packaged single-origin
 browser tests. The review test closes its session instead of exhausting the
 existing 32-session admission cap.
 
-The unchanged frontend dependency manifest/lockfile currently fail the high
+The unchanged frontend dependency manifest/lockfile initially failed the high
 severity npm advisory gate: transitive picomatch
 [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf), reviewed
 17 November 2026, affects versions through 4.0.7 and lists no patched release.
-The five npm findings are that package and its build-tool dependants. No audit
-exception, forced Vite downgrade or security-gate change is part of this story.
-This inherited gate blocks integration independently of the passing product
-tests; hosted verification must report its actual result.
+The five npm findings are that package and its build-tool dependants. On
+18 November the owner explicitly approved a temporary, scoped exception after
+the build-only reachability assessment. The advisory still exists; it is not
+described as patched or absent.
+
+`AnalysisScripts/check_frontend_advisories.mjs` evaluates the live npm report.
+Only this precise advisory and findings derived exclusively from it qualify,
+using the exact development package versions recorded in
+`ops/security/npm-advisory-exception.json`. Production dependencies, other
+high/critical advisories, changed dependency scope/versions, malformed reports,
+unresolved provenance and failed network scans still block. A visible warning
+names the exception and its expiry. The exception expires at 00:00 UTC on
+18 December 2026 and also fails if the registry's latest Picomatch release
+changes from 4.0.7, requiring upgrade or renewed assessment. A clean audit passes
+without using the exception; remove the policy when it is no longer needed.
+No dependency downgrade or additional review is requested. Hosted verification
+must report the actual current-head result.
 
 The single opening review at `78518d7` returned **UNABLE TO VERIFY**, including
 two confirmed integrity findings. Failing-before regressions reproduced both.
