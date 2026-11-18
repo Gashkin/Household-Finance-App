@@ -92,7 +92,7 @@ public class BudgetService {
   private Map<String,Long> currentCarry(Period p){return p.correctedRollover()==null?p.rollover():p.correctedRollover().amountsMinor();}
   private CarryPreview carryPreview(Period p){
     if(p.predecessorId()==null||p.rollover().isEmpty())return null;
-    var previous=reportWithoutCarryRecursion(period(p.predecessorId()));var remaining=new HashMap<String,Long>();previous.rows().forEach(r->remaining.put(r.categoryId(),r.remainingMinor()));
+    var previous=reportWithoutCarryRecursion(period(p.predecessorId()));var remaining=new HashMap<String,Long>();previous.rows().forEach(r->remaining.put(r.categoryId(),r.accumulate()?r.remainingMinor():0L));
     var amounts=new LinkedHashMap<String,Long>();p.rollover().keySet().forEach(k->amounts.put(k,remaining.getOrDefault(k,0L)));
     return new CarryPreview(previous.period().revision(),Map.copyOf(amounts),previous.unresolved());
   }
