@@ -1,0 +1,9 @@
+{
+  "work_id": "GBD-31",
+  "page_id": "41cd3419-fef0-8150-90ee-c6d6b80a2ea5",
+  "branch": "story/31-delivery",
+  "token": "claim-token:codex-gbd31-20261118-copilot-guard",
+  "claimed_at": "2026-11-18T08:02:00.000Z",
+  "base_sha": "a03fc41aa255a60de2ea113d9a0ead884a0ffaa2",
+  "history": [{"event":"claim","method":"Create-only GitHub ref succeeded before Notion ownership was written and re-read; explicit owner request to remove the Copilot guard."}]
+}
