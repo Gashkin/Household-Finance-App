@@ -725,3 +725,49 @@ body {
 .member-purchase { border-top: 1px solid #d7e2de; padding: 1rem 0; }
 .member-workspace summary { cursor: pointer; padding: .25rem 0; font-weight: 600; }
 @media (max-width: 480px) { .member-workspace > section, .member-workspace > details { padding: .85rem; } .member-metrics, .member-form-grid { grid-template-columns: minmax(0,1fr); } }
+.budget-workspace { min-width: 0; }
+.budget-workspace fieldset {
+  min-width: 0;
+  margin: 1.25rem 0;
+  padding: 1rem;
+  border: 1px solid #dce3ec;
+  border-radius: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  align-items: end;
+  gap: 1rem;
+}
+.budget-workspace legend { font-weight: 650; padding: 0 .4rem; }
+.budget-workspace label { display: flex; flex-direction: column; gap: .4rem; font-size: .92rem; }
+.budget-workspace label:has(input[type="checkbox"]) { flex-direction: row; align-items: center; align-self: center; }
+.budget-workspace input:not([type="checkbox"]), .budget-workspace select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: .65rem .75rem;
+  border: 1px solid #aebaca;
+  border-radius: 7px;
+  background: white;
+  font: inherit;
+}
+.budget-workspace fieldset > p, .budget-workspace fieldset > fieldset { grid-column: 1 / -1; }
+.budget-workspace fieldset > fieldset { margin: 0; background: #f7f9fc; }
+.budget-workspace button {
+  min-height: 42px;
+  padding: .6rem .85rem;
+  border: 1px solid #b7c5da;
+  border-radius: 7px;
+  background: #eef4ff;
+  color: #183b73;
+  font: inherit;
+  cursor: pointer;
+  white-space: normal;
+}
+.budget-workspace button:hover { background: #dfeaff; }
+.budget-workspace button:focus-visible, .budget-workspace input:focus-visible, .budget-workspace select:focus-visible { outline: 3px solid #2464eb; outline-offset: 2px; }
+.budget-workspace button:disabled { opacity: .6; cursor: wait; }
+.budget-workspace table { border-collapse: collapse; width: 100%; }
+.budget-workspace th, .budget-workspace td { padding: .7rem; text-align: left; border-bottom: 1px solid #dce3ec; }
+.budget-workspace td { white-space: nowrap; }
+.budget-workspace caption { text-align: left; padding: .75rem 0; }
+.budget-workspace details { margin: .75rem 0; padding: .75rem; border: 1px solid #dce3ec; border-radius: 8px; overflow-wrap: anywhere; }
