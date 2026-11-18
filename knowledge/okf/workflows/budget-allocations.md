@@ -11,7 +11,7 @@ timestamp: 2026-11-18T00:00:00Z
 
 Financial editors save reusable regular-income allocation templates and instantiate non-overlapping calendar or pay-day periods. The backend preserves original budgets separately from current allocations and derives actuals from confirmed booked, owned ledger activity. Linked refunds follow their own activity dates and the original purchase category. Allocations never create cash or bank movements.
 
-Changes require an expected revision and reason. Selected/forward template application, accumulating/reset rollovers and explicit income changes preserve historical originals and actor-aware audit evidence. Carry is a creation-time snapshot; subsequent predecessor changes produce warnings. Authenticated owner scope applies to every read, mutation, history and report.
+Changes require an expected revision and reason. Selected/forward template application, accumulating/reset rollovers and explicit income changes preserve historical originals and actor-aware audit evidence. Carry is a creation-time snapshot; subsequent predecessor changes produce warnings. Explicit revision-checked correction adopts reviewed predecessor balances into a separate current-carry snapshot while retaining original carry and audit. Signed income reversals use the authoritative ledger income rules. Authenticated owner scope applies to every read, mutation, history and report.
 
 Templates/periods use the existing ledger review record store, version-7 encrypted backup manifest, transaction-lifetime mutation guard and capacity admission. Restart/restore must retain plans, originals and audit alongside reviewed actuals.
 

@@ -7,6 +7,7 @@
     {"path":"backend/src/main/java/com/householdfinance/ledger/LedgerController.java","contains":["/budgets/templates","/budgets/periods/{id}/history"]},
     {"path":"frontend/src/components/BudgetWorkspace.tsx","contains":["Budgets &amp; allocations","Save period allocations"]},
     {"path":"backend/src/test/java/com/householdfinance/ledger/BudgetTest.java","contains":["sameRevisionConcurrentChangesAdmitOnlyOneAndLeaveOneAudit","rolloverSnapshotsRetainLateCorrectionsAndResetCategoriesStartFresh"]},
+    {"path":"backend/src/test/java/com/householdfinance/ledger/BudgetReviewRegressionTest.java","contains":["signedIncomeReversalsWithinAndAcrossPeriods","explicitRolloverCorrectionPreservesOriginalSnapshotAndBankFacts","concurrentCorrectionsAdmitOnlyOneSameRevisionRequest"]},
     {"path":"backend/src/test/java/com/householdfinance/workspace/BudgetRecoveryTest.java","contains":["originalsReallocationsActualsAndAuditSurviveRestartAndEncryptedRestore"]},
     {"path":"frontend/e2e/budget.spec.ts","contains":["preserve a budget original"]},
     {"path":"product/stories/budgets.md","contains":["GBD-18"]}

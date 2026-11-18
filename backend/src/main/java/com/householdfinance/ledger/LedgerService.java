@@ -548,7 +548,7 @@ public class LedgerService {
     return e.kind.equals("ACTIVITY") ? Math.max(0, -e.amountMinor) : 0;
   }
 
-  private static long incomeContribution(LedgerEntry e) {
+  public static long incomeContribution(LedgerEntry e) {
     if (!e.status.equals("BOOKED") || isTransferRelationship(e)) return 0;
     if (isReversalRelationship(e)) return Math.min(0, e.amountMinor);
     return e.kind.equals("ACTIVITY") ? Math.max(0, e.amountMinor) : 0;

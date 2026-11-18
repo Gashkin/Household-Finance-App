@@ -20,13 +20,19 @@ public class BudgetService {
     public long unallocatedMinor(){return incomeMinor-allocatedMinor();}
   }
   public record Instantiate(Long revision, LocalDate anchor, String reason) {}
+  public record CarrySnapshot(Long predecessorRevision, Map<String,Long> amountsMinor) {}
+  public record CarryPreview(Long predecessorRevision, Map<String,Long> amountsMinor, int unresolved) {}
+  public record CarryCorrection(Long revision, Long predecessorRevision, Map<String,Long> amountsMinor, String reason) {}
   public record Period(String id, long revision, String templateId, long templateRevision, LocalDate start, LocalDate end,
       long originalIncomeMinor, long incomeMinor, List<Line> original, List<Line> lines, Map<String,Long> rollover,
-      String predecessorId, Long predecessorRevision, Instant createdAt) {}
+      String predecessorId, Long predecessorRevision, Instant createdAt, CarrySnapshot correctedRollover) {
+    // Existing version-7 payloads omit correctedRollover; null retains their original carry.
+    public Period(String id,long revision,String templateId,long templateRevision,LocalDate start,LocalDate end,long originalIncomeMinor,long incomeMinor,List<Line> original,List<Line> lines,Map<String,Long> rollover,String predecessorId,Long predecessorRevision,Instant createdAt){this(id,revision,templateId,templateRevision,start,end,originalIncomeMinor,incomeMinor,original,lines,rollover,predecessorId,predecessorRevision,createdAt,null);}
+  }
   public record Change(Long revision, String incomeEuro, List<LineInput> lines, String reason) {}
   public record Apply(Long revision, Long templateRevision, String mode, String reason, Map<String,Long> periodRevisions) {}
-  public record Row(String categoryId, String name, long originalMinor, long allocatedMinor, long rolloverMinor, long actualMinor, long remainingMinor, long varianceMinor, boolean accumulate, LocalDate dueDate) {}
-  public record Report(Period period, List<Row> rows, long allocatedMinor, long unallocatedMinor, long actualMinor, long confirmedIncomeMinor, int unresolved, List<String> warnings) {}
+  public record Row(String categoryId, String name, long originalMinor, long allocatedMinor, long rolloverMinor, long actualMinor, long remainingMinor, long varianceMinor, boolean accumulate, LocalDate dueDate, long originalRolloverMinor) {}
+  public record Report(Period period, List<Row> rows, long allocatedMinor, long unallocatedMinor, long actualMinor, long confirmedIncomeMinor, int unresolved, List<String> warnings, CarryPreview carryPreview) {}
   private final LedgerReviewRepository records;
   private final LedgerEntryRepository entries;
   private final LedgerAccountRepository accounts;
@@ -82,7 +88,21 @@ public class BudgetService {
     persist(p.id(),"BUDGET_PERIOD",0,p,"BUDGET_CREATE",input.reason(),null);return p;
   }
   private Period period(String id){return decode(record(id,"BUDGET_PERIOD"),Period.class);}
-  private Period updated(Period p,long income,List<Line> ls,long templateRevision){return new Period(p.id(),p.revision()+1,p.templateId(),templateRevision,p.start(),p.end(),p.originalIncomeMinor(),income,p.original(),ls,p.rollover(),p.predecessorId(),p.predecessorRevision(),p.createdAt());}
+  private Period updated(Period p,long income,List<Line> ls,long templateRevision){return new Period(p.id(),p.revision()+1,p.templateId(),templateRevision,p.start(),p.end(),p.originalIncomeMinor(),income,p.original(),ls,p.rollover(),p.predecessorId(),p.predecessorRevision(),p.createdAt(),p.correctedRollover());}
+  private Map<String,Long> currentCarry(Period p){return p.correctedRollover()==null?p.rollover():p.correctedRollover().amountsMinor();}
+  private CarryPreview carryPreview(Period p){
+    if(p.predecessorId()==null||p.rollover().isEmpty())return null;
+    var previous=reportWithoutCarryRecursion(period(p.predecessorId()));var remaining=new HashMap<String,Long>();previous.rows().forEach(r->remaining.put(r.categoryId(),r.remainingMinor()));
+    var amounts=new LinkedHashMap<String,Long>();p.rollover().keySet().forEach(k->amounts.put(k,remaining.getOrDefault(k,0L)));
+    return new CarryPreview(previous.period().revision(),Map.copyOf(amounts),previous.unresolved());
+  }
+  @Transactional public Period correctRollover(String id,CarryCorrection input){
+    check(input!=null,"Explicit carried-balance correction required");var p=period(id);revision(p.revision(),input.revision());var preview=carryPreview(p);check(preview!=null,"This period has no carried balances to correct");
+    check(Objects.equals(preview.predecessorRevision(),input.predecessorRevision())&&preview.amountsMinor().equals(input.amountsMinor()),"Earlier period changed; reload and review the carried balances again");
+    check(preview.unresolved()==0,"Resolve earlier period activity before correcting its carried balances");
+    var next=new Period(p.id(),p.revision()+1,p.templateId(),p.templateRevision(),p.start(),p.end(),p.originalIncomeMinor(),p.incomeMinor(),p.original(),p.lines(),p.rollover(),p.predecessorId(),p.predecessorRevision(),p.createdAt(),new CarrySnapshot(preview.predecessorRevision(),preview.amountsMinor()));
+    persist(id,"BUDGET_PERIOD",next.revision(),next,"BUDGET_ROLLOVER",input.reason(),p);return next;
+  }
   @Transactional public Period change(String id,Change input){
     check(input!=null,"Explicit allocations required");var p=period(id);revision(p.revision(),input.revision());long income=amount(input.incomeEuro());var ls=lines(input.lines(),p.start(),p.end(),p.lines().stream().map(Line::categoryId).collect(java.util.stream.Collectors.toSet()));check(total(ls)<=income,"Choose allocations within the revised planned income");
     // Do not silently discard an accumulated balance when changing categories.
@@ -106,27 +126,27 @@ public class BudgetService {
     Map<String,Long> actual=new HashMap<>();int unresolved=0;long income=0;var warnings=new ArrayList<String>();
     for(var e:byId.values())if(!e.date.isBefore(p.start())&&e.date.isBefore(p.end())&&!e.status.equals("VOID")){
       if(!e.status.equals("BOOKED")||!e.reviewState.equals("CONFIRMED")){unresolved++;continue;}
-      if(LedgerService.isTransferRelationship(e)||!e.kind.equals("ACTIVITY"))continue;
+      if(LedgerService.isTransferRelationship(e))continue;
+      income=sum(income,LedgerService.incomeContribution(e));
       boolean refund=Set.of("REFUND","REVERSAL").contains(Objects.toString(e.linkType,""));String cat=e.categoryId;
-      if(refund){var original=byId.get(e.linkedEntryId);if(original==null||!original.reviewState.equals("CONFIRMED")||original.categoryId==null){unresolved++;continue;}cat=original.categoryId;}
+      if(refund&&LedgerService.spendingContribution(e)!=0){var original=byId.get(e.linkedEntryId);if(original==null||!original.reviewState.equals("CONFIRMED")||original.categoryId==null){unresolved++;continue;}cat=original.categoryId;}
       long spend=LedgerService.spendingContribution(e);if(cat!=null)actual.merge(cat,spend,this::sum);else if(spend!=0)unresolved++;
-      if(e.amountMinor>0&&!refund)income=sum(income,e.amountMinor);
     }
     Map<String,Line> original=new LinkedHashMap<>();p.original().forEach(l->original.put(l.categoryId(),l));Map<String,Line> current=new LinkedHashMap<>();p.lines().forEach(l->current.put(l.categoryId(),l));Set<String> keys=new LinkedHashSet<>(current.keySet());keys.addAll(original.keySet());keys.addAll(actual.keySet());
     Map<String,String> names=new HashMap<>();review.categories().forEach(c->names.put(c.id(),c.name()));var rows=new ArrayList<Row>();
-    for(String key:keys){var l=current.get(key);var o=original.get(key);long base=o==null?0:o.amountMinor(),allocated=l==null?0:l.amountMinor(),carry=p.rollover().getOrDefault(key,0L),spent=actual.getOrDefault(key,0L);
-      rows.add(new Row(key,names.getOrDefault(key,l!=null?l.categoryName():o!=null?o.categoryName():"Unallocated category"),base,allocated,carry,spent,sum(sum(allocated,carry),-spent),sum(base,-spent),l!=null&&l.accumulate(),l==null?null:l.dueDate()));}
+    for(String key:keys){var l=current.get(key);var o=original.get(key);long base=o==null?0:o.amountMinor(),allocated=l==null?0:l.amountMinor(),carry=currentCarry(p).getOrDefault(key,0L),spent=actual.getOrDefault(key,0L);
+      rows.add(new Row(key,names.getOrDefault(key,l!=null?l.categoryName():o!=null?o.categoryName():"Unallocated category"),base,allocated,carry,spent,sum(sum(allocated,carry),-spent),sum(base,-spent),l!=null&&l.accumulate(),l==null?null:l.dueDate(),p.rollover().getOrDefault(key,0L)));}
     warnings.add("Planned income and allocations are not cash or bank movements. Actuals use the ledger activity date, not allocation dates. End date is exclusive.");
     if(unresolved>0)warnings.add("Pending, provisional or uncategorised activity is excluded; review before relying on variance.");
-    if(p.predecessorId()!=null){var predecessor=period(p.predecessorId());var fresh=reportWithoutCarryRecursion(predecessor);if(predecessor.revision()!=p.predecessorRevision()||p.rollover().entrySet().stream().anyMatch(e->!Objects.equals(e.getValue(),fresh.get(e.getKey()))))warnings.add("Earlier period changed after rollover; carried amounts remain the recorded snapshot. Adjust this period explicitly with a reason.");}
+    var preview=carryPreview(p);if(preview!=null){var sourceRevision=p.correctedRollover()==null?p.predecessorRevision():p.correctedRollover().predecessorRevision();if(!Objects.equals(preview.predecessorRevision(),sourceRevision)||!currentCarry(p).equals(preview.amountsMinor()))warnings.add("Earlier period changed after rollover. Review and explicitly update carried balances with a reason; the original snapshot will be retained.");if(preview.unresolved()>0)warnings.add("Earlier period has unresolved activity; resolve it before updating carried balances.");}
     if(income<p.incomeMinor())warnings.add("Confirmed income is below planned income; late or uncertain pay is not available cash. Choose revised allocations explicitly.");
     if(income>p.incomeMinor())warnings.add("Confirmed income exceeds plan. Keep surplus unallocated or choose allocations explicitly; no automatic savings or pension instruction.");
-    return new Report(p,List.copyOf(rows),total(p.lines()),p.incomeMinor()-total(p.lines()),actual.values().stream().mapToLong(Long::longValue).reduce(0,this::sum),income,unresolved,List.copyOf(warnings));
+    return new Report(p,List.copyOf(rows),total(p.lines()),p.incomeMinor()-total(p.lines()),actual.values().stream().mapToLong(Long::longValue).reduce(0,this::sum),income,unresolved,List.copyOf(warnings),preview);
   }
-  private Map<String,Long> reportWithoutCarryRecursion(Period p){
+  private Report reportWithoutCarryRecursion(Period p){
     // Only the immediate predecessor matters; omit its predecessor to avoid recursive historical reads.
-    var copy=new Period(p.id(),p.revision(),p.templateId(),p.templateRevision(),p.start(),p.end(),p.originalIncomeMinor(),p.incomeMinor(),p.original(),p.lines(),p.rollover(),null,null,p.createdAt());
-    Map<String,Long> values=new HashMap<>();report(copy).rows().forEach(r->values.put(r.categoryId(),r.remainingMinor()));return values;
+    var copy=new Period(p.id(),p.revision(),p.templateId(),p.templateRevision(),p.start(),p.end(),p.originalIncomeMinor(),p.incomeMinor(),p.original(),p.lines(),p.rollover(),null,null,p.createdAt(),p.correctedRollover());
+    return report(copy);
   }
   @Transactional(readOnly=true) public Report report(String id){AccessContext.requireRead();return report(period(id));}
   private boolean concerns(LedgerAudit h,String id){try{return h.afterJson!=null&&json.readTree(h.afterJson).path("id").asText().equals(id);}catch(Exception e){throw new IllegalStateException("Invalid budget audit evidence",e);}}

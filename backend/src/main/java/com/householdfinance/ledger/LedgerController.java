@@ -24,6 +24,7 @@ public class LedgerController {
   @PostMapping("/budgets/templates/{id}/periods") public Object budgetPeriod(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return budgets.instantiate(id,body(r,BudgetService.Instantiate.class));}
   @GetMapping("/budgets/periods") public Object budgetPeriods(){return budgets.periods();}
   @GetMapping("/budgets/periods/{id}") public Object budgetReport(@PathVariable("id")String id){return budgets.report(id);}
+  @PostMapping("/budgets/periods/{id}/rollover") public Object correctBudgetRollover(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return budgets.correctRollover(id,body(r,BudgetService.CarryCorrection.class));}
   @PutMapping("/budgets/periods/{id}") public Object budgetChange(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return budgets.change(id,body(r,BudgetService.Change.class));}
   @PostMapping("/budgets/periods/{id}/apply") public Object budgetApply(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return budgets.apply(id,body(r,BudgetService.Apply.class));}
   @GetMapping("/budgets/periods/{id}/history") public Object budgetHistory(@PathVariable("id")String id){return budgets.history(id);}
