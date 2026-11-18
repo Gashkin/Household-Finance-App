@@ -1,7 +1,7 @@
 import DecisionPlansWorkspace from './components/DecisionPlansWorkspace';
 import ActivityReviewWorkspace from './components/ActivityReviewWorkspace';
 import BudgetWorkspace from './components/BudgetWorkspace';
-import ForecastWorkspace from "./components/ForecastWorkspace";
+import ForecastWorkspace from "./components/PlanAheadWorkspace";
 import MoneyPositionWorkspace from './components/MoneyPositionWorkspace';
 import WorkspaceRecovery from './components/WorkspaceRecovery';
 import { useState } from 'react';
