@@ -28,6 +28,7 @@ class LedgerJourneyTest {
   @Autowired MockMvc mvc;
   @Autowired ObjectMapper json;
   @Autowired LedgerService service;
+  @Autowired ActivityReviewService review;
   @Autowired JdbcTemplate jdbc;
   @Autowired WorkspaceBackupService backups;
   @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
@@ -312,6 +313,7 @@ class LedgerJourneyTest {
     importRows(a, row("correct-me", "-20", "BOOKED", "ACTIVITY"));
     reconcile(a.id(), "980");
     var entry = service.activity(a.id()).get(0);
+    review.reopen(a.id(),new ActivityReviewService.Reopen(current(a.id()).revision(),"Synthetic receipt correction requires reopening"));
     long revision = current(a.id()).revision();
     var correction =
         new LedgerService.Correction(
@@ -477,7 +479,7 @@ class LedgerJourneyTest {
         json.readValue(
             BackupCrypto.decrypt(encrypted, "synthetic-backup-passphrase-1234"),
             WorkspaceBackupService.Archive.class);
-    assertEquals(6, archive.version());
+    assertEquals(7, archive.version());
     var tables = new ArrayList<>(before.keySet());
     Collections.reverse(tables);
     for (String table : tables) jdbc.update("DELETE FROM " + table);

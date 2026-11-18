@@ -28,6 +28,7 @@ class ForecastJourneyTest {
   @Autowired ForecastService service;
   @Autowired ForecastPlanRepository repository;
   @Autowired LedgerService ledger;
+  @Autowired com.householdfinance.ledger.ActivityReviewService review;
   @Autowired WorkspaceBackupService backups;
   @Autowired JdbcTemplate jdbc;
   @Autowired ObjectMapper json;
@@ -218,6 +219,8 @@ class ForecastJourneyTest {
     assertEquals("REVIEWED", p.evidenceState());
     assertTrue(p.currentDecisionReady());
     assertEquals(95000, p.projection().startingMinor());
+    review.reopen(a.id(),new com.householdfinance.ledger.ActivityReviewService.Reopen(revision,"Synthetic late receipt"));
+    revision = ledger.position(today).accounts().get(0).revision();
     ledger.manual(
         a.id(),
         new LedgerService.Manual(
@@ -398,7 +401,7 @@ class ForecastJourneyTest {
     byte[] plain = BackupCrypto.decrypt(backup, password);
     var archive = json.readValue(plain, WorkspaceBackupService.Archive.class);
     Arrays.fill(plain, (byte) 0);
-    assertEquals(6, archive.version());
+    assertEquals(7, archive.version());
     assertTrue(archive.tables().containsKey("FORECAST_PLANS"));
     clear();
     backups.restore(backup, password, "RESTORE INTO EMPTY WORKSPACE");

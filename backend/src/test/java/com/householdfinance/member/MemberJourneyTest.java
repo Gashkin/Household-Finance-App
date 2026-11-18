@@ -57,6 +57,7 @@ class MemberJourneyTest {
   }
   JsonNode currentAccount()throws Exception{for(var a:call("GET","/api/ledger?asOf="+today,owner,null,200).path("accounts"))if(a.path("id").asText().equals(account))return a;throw new AssertionError();}
   void reconcile(String amount)throws Exception{call("POST","/api/ledger/accounts/"+account+"/reconcile?asOf="+today,owner,Map.of("revision",currentAccount().path("revision").asLong(),"statementEuro",amount,"source","Synthetic statement","commit",true,"acceptAdjustment",false),200);}
+  void reopen()throws Exception{call("POST","/api/ledger/accounts/"+account+"/reopen",owner,Map.of("revision",currentAccount().path("revision").asLong(),"reason","Synthetic new evidence requires explicit reopening"),200);}
   void saveForecastAndPublish()throws Exception{
     var existing=call("GET","/api/forecast",owner,null,200);long revision=existing.path("plan").isNull()?0:existing.path("plan").path("revision").asLong();
     var plan=call("POST","/api/forecast",owner,Map.of("revision",revision,"name","Synthetic shared plan","baseline",Map.of("mode","SHARED_LEDGER","date",today),"endDate",LocalDate.parse(today).plusDays(14).toString(),"reserveEuro","100.00","events",List.of(Map.of("id",UUID.randomUUID().toString(),"date",LocalDate.parse(today).plusDays(3).toString(),"label","Synthetic bill","direction","EXPENSE","certainty","EXPECTED","amountEuro","200.00","source","Synthetic reviewed expectation"),Map.of("id",UUID.randomUUID().toString(),"date",LocalDate.parse(today).plusDays(2).toString(),"label","Synthetic income","direction","INCOME","certainty","EXPECTED","amountEuro","9000.00","source","Synthetic projection")),"acknowledged",true),200);
@@ -124,6 +125,7 @@ class MemberJourneyTest {
   }
   @Test void actualMatchReleasesOnlyItsOverlayAndShowsVarianceWithoutLedgerMutation()throws Exception{
     seed();var p=newPurchase(reader,"80.00",false);String id=p.path("id").asText();
+    reopen();
     call("PUT","/api/member/purchases/"+id,reader,Map.of("revision",1,"action","BOUGHT"),200);
     call("POST","/api/ledger/accounts/"+account+"/activity",owner,Map.of("revision",currentAccount().path("revision").asLong(),"row",Map.of("reference","actual-one","date",today,"description","Synthetic actual purchase","amountEuro","-85.00","status","BOOKED","kind","ACTIVITY"),"source","Synthetic statement","acknowledgedOverlap",true),200);
     assertTrue(call("GET","/api/member/report",reader,null,200).path("spendingRoomMinor").isNull());
@@ -134,11 +136,22 @@ class MemberJourneyTest {
     reconcile("915.00");saveForecastAndPublish();assertEquals(59500,call("GET","/api/member/report",reader,null,200).path("spendingRoomMinor").asLong());
     var second=newPurchase(reader,"20.00",false);call("PUT","/api/member/purchases/"+second.path("id").asText(),reader,Map.of("revision",1,"action","BOUGHT"),200);
     call("PUT","/api/member/purchases/"+second.path("id").asText(),reader,Map.of("revision",2,"action","MATCH","accountId",account,"entryId",entry),400);
-    call("PUT","/api/ledger/accounts/"+account+"/activity/"+entry,owner,Map.of("revision",currentAccount().path("revision").asLong(),"row",Map.of("reference","actual-one","date",today,"description","Corrected actual purchase","amountEuro","-86.00","status","BOOKED","kind","ACTIVITY"),"reason","Synthetic correction"),200);
+    reopen();call("PUT","/api/ledger/accounts/"+account+"/activity/"+entry,owner,Map.of("revision",currentAccount().path("revision").asLong(),"row",Map.of("reference","actual-one","date",today,"description","Corrected actual purchase","amountEuro","-86.00","status","BOOKED","kind","ACTIVITY"),"reason","Synthetic correction"),200);
     var changed=call("GET","/api/member",reader,null,200);JsonNode original=null;for(var item:changed.path("purchases"))if(item.path("id").asText().equals(id))original=item;
     assertNotNull(original);assertFalse(original.path("matchValid").asBoolean());assertTrue(original.path("actualMinor").isNull());assertEquals(10000,changed.path("report").path("purchaseReservationsMinor").asLong());
     call("PUT","/api/member/purchases/"+id,reader,Map.of("revision",3,"action","MATCH","accountId",account,"entryId",entry),200);
     assertEquals(2000,call("GET","/api/member/report",reader,null,200).path("purchaseReservationsMinor").asLong());
+  }
+  @Test void relatedTransfersCannotRemainMatchedAsMemberPurchases()throws Exception{
+    seed();var p=newPurchase(reader,"10.00",false);String id=p.path("id").asText();call("PUT","/api/member/purchases/"+id,reader,Map.of("revision",1,"action","BOUGHT"),200);reopen();
+    call("POST","/api/ledger/accounts/"+account+"/activity",owner,Map.of("revision",currentAccount().path("revision").asLong(),"row",Map.of("reference","related-payment","date",today,"description","Synthetic related debit","amountEuro","-10.00","status","BOOKED","kind","ACTIVITY"),"source","Synthetic source","acknowledgedOverlap",true),200);
+    JsonNode entry=null;for(var e:call("GET","/api/ledger/accounts/"+account+"/activity",owner,null,200))if(e.path("reference").asText().equals("related-payment"))entry=e;assertNotNull(entry);
+    call("PUT","/api/member/purchases/"+id,reader,Map.of("revision",2,"action","MATCH","accountId",account,"entryId",entry.path("id").asText()),200);
+    var counterpart=createAccount("Synthetic private counterpart","100.00",false);String other=counterpart.path("id").asText();call("POST","/api/ledger/accounts/"+other+"/activity",owner,Map.of("revision",0,"row",Map.of("reference","related-credit","date",today,"description","Synthetic private related credit","amountEuro","10.00","status","BOOKED","kind","ACTIVITY"),"source","Synthetic source","acknowledgedOverlap",true),200);
+    var credit=call("GET","/api/ledger/accounts/"+other+"/activity",owner,null,200).get(0);
+    call("POST","/api/ledger/review/activity/"+entry.path("id").asText()+"/link",owner,Map.of("revision",currentAccount().path("revision").asLong(),"otherId",credit.path("id").asText(),"otherRevision",1,"type","TRANSFER","reason","Synthetic source-backed transfer"),200);
+    var result=call("GET","/api/member",reader,null,200).path("purchases").get(0);assertFalse(result.path("matchValid").asBoolean());assertTrue(result.path("actualMinor").isNull());
+    for(var e:call("GET","/api/ledger/accounts/"+account+"/activity",reader,null,200))if(e.path("reference").asText().equals("related-payment")){assertEquals("TRANSFER",e.path("kind").asText());assertTrue(e.path("linkedEntryId").isNull());}
   }
   @Test void withdrawalHidesPublicationRequestsHistoryAndExport()throws Exception{
     seed();var p=newPurchase(reader,"15.00",true);String id=p.path("id").asText();
@@ -172,6 +185,7 @@ class MemberJourneyTest {
   }
   @Test void staleFinancialEvidenceCannotBeUsedForAnOtherwiseCurrentPurchaseAction()throws Exception{
     seed();var p=newPurchase(reader,"10.00",false);String id=p.path("id").asText();String stale=call("GET","/api/member/report",reader,null,200).path("token").asText();
+    reopen();
     call("POST","/api/ledger/accounts/"+account+"/activity",owner,Map.of("revision",currentAccount().path("revision").asLong(),"row",Map.of("reference","new-evidence","date",today,"description","Synthetic changed evidence","amountEuro","-1.00","status","PENDING","kind","ACTIVITY"),"source","Synthetic update","acknowledgedOverlap",true),200);
     call("PUT","/api/member/purchases/"+id,reader,Map.of("revision",1,"action","BOUGHT","reportToken",stale),409);
     var current=call("PUT","/api/member/purchases/"+id,reader,Map.of("revision",1,"action","BOUGHT"),200);assertTrue(current.path("report").path("spendingRoomMinor").isNull());assertEquals("BOUGHT",current.path("purchases").get(0).path("purchase").path("state").asText());

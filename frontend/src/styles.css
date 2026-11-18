@@ -703,6 +703,18 @@ body {
 .member-metrics span { color: #3f5951; }
 .member-warnings { padding-left: 1.25rem; font-size: .94rem; line-height: 1.6; }
 .member-form-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap: 1rem; }
+.activity-review { max-width: 1100px; margin: auto; min-width: 0; overflow-wrap: anywhere; }
+.activity-review fieldset, .activity-review details, .activity-review section { min-width: 0; border: 1px solid #d7e2de; border-radius: 8px; padding: 1rem; margin: 1rem 0; background: white; }
+.activity-review label { display: grid; gap: .4rem; margin: .8rem 0; min-width: 0; }
+.activity-review :is(input,select) { width: 100%; min-width: 0; box-sizing: border-box; padding: .65rem; font: inherit; }
+.activity-review label:has(input[type=checkbox]) { display: flex; gap: .6rem; align-items: start; }
+.activity-review input[type=checkbox] { width: auto; flex: none; margin-top: .3rem; }
+.activity-review button { font: inherit; padding: .65rem .9rem; margin: .4rem .5rem .4rem 0; cursor: pointer; border: 1px solid #94a3b8; border-radius: .5rem; }
+.activity-review button:disabled { opacity: .5; cursor: default; }
+.activity-review .table-scroll { overflow: auto; max-width: 100%; }
+.activity-review table { border-collapse: collapse; min-width: 650px; width: 100%; }
+.activity-review :is(th,td) { text-align: left; vertical-align: top; padding: .75rem; border-bottom: 1px solid #d7e2de; }
+.activity-review :is(input,select,button):focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
 .member-workspace fieldset { min-width: 0; margin-top: 1rem; border: 1px solid #d7e2de; border-radius: 8px; padding: 1rem; }
 .member-workspace label { display: grid; gap: .4rem; margin: .5rem 0; }
 .member-workspace input, .member-workspace select { width: 100%; min-width: 0; box-sizing: border-box; padding: .6rem; }

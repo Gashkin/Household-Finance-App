@@ -1,0 +1,9 @@
+{
+  "work_id": "GBD-20",
+  "page_id": "41ad3419-fef0-81c5-bf9b-e2c1af3bc602",
+  "branch": "story/20-delivery",
+  "token": "claim-token:codex-gbd20-20261117-ledger",
+  "claimed_at": "2026-11-17T18:08:00Z",
+  "base_sha": "ef0c702ebec03d873214953b10f04a9e6426281d",
+  "history": [{"event": "claim", "method": "GitHub create-only refs API succeeded before Notion ownership was written and re-read; isolated worktree based on the same integration revision."}]
+}

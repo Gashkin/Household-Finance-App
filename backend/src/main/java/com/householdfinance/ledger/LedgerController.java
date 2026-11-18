@@ -15,6 +15,20 @@ import org.springframework.web.bind.annotation.*;
 public class LedgerController {
   private final LedgerService service;
   private final ObjectMapper json;
+  @org.springframework.beans.factory.annotation.Autowired private ActivityReviewService review;
+
+  @GetMapping("/review/categories") public Object categories(){return review.categories();}
+  @PostMapping("/review/categories") public Object createCategory(HttpServletRequest r)throws IOException{return review.category(null,body(r,ActivityReviewService.CategoryInput.class));}
+  @PutMapping("/review/categories/{id}") public Object category(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return review.category(id,body(r,ActivityReviewService.CategoryInput.class));}
+  @GetMapping("/review/rules") public Object rules(){return review.rules();}
+  @PutMapping("/review/rules/{id}") public Object rule(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return review.approveRule(id,body(r,ActivityReviewService.RuleApproval.class));}
+  @GetMapping("/review/queue") public Object queue(@RequestParam(value="account",required=false)String account,@RequestParam("from")String from,@RequestParam("to")String to,@RequestParam(value="issue",required=false)String issue,@RequestParam(value="risk",required=false)String risk){return review.queue(account,LocalDate.parse(from),LocalDate.parse(to),issue,risk);}
+  @PutMapping("/review/activity/{id}") public Object classify(@PathVariable("id")String id,HttpServletRequest r)throws IOException{review.classify(id,body(r,ActivityReviewService.Classification.class));return Map.of("saved",true);}
+  @PostMapping("/review/activity/{id}/link") public Object link(@PathVariable("id")String id,HttpServletRequest r)throws IOException{review.link(id,body(r,ActivityReviewService.Link.class));return Map.of("saved",true);}
+  @PostMapping("/review/activity/{id}/unlink") public Object unlink(@PathVariable("id")String id,HttpServletRequest r)throws IOException{review.unlink(id,body(r,ActivityReviewService.Link.class));return Map.of("saved",true);}
+  @PostMapping("/accounts/{id}/reopen") public Object reopen(@PathVariable("id")String id,HttpServletRequest r)throws IOException{review.reopen(id,body(r,ActivityReviewService.Reopen.class));return Map.of("saved",true);}
+  @GetMapping("/review/guide") public Object guide(@RequestParam("through")String date){return Map.of("guide",review.guide(LocalDate.parse(date)),"auditCount",review.visibleAuditCount());}
+  @PostMapping("/review/complete") public Object complete(HttpServletRequest r)throws IOException{return review.complete(body(r,ActivityReviewService.Completion.class));}
 
   public LedgerController(LedgerService service, ObjectMapper mapper) {
     this.service = service;

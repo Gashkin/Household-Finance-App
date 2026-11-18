@@ -84,7 +84,7 @@ public class MemberService {
   private LedgerEntry eligibleActivity(Purchase p){
     if(p.entryId()==null||p.accountId()==null)return null;
     if(accounts.findById(p.accountId()).filter(a->a.shared&&a.kind.equals("CASH")&&AccessContext.reads(a.ownerId,a.shared)).isEmpty())return null;
-    return entries.findById(p.entryId()).filter(e->e.accountId.equals(p.accountId())&&e.status.equals("BOOKED")&&e.kind.equals("ACTIVITY")&&e.amountMinor<0&&!e.date.isAfter(today())).orElse(null);
+    return entries.findById(p.entryId()).filter(e->e.accountId.equals(p.accountId())&&e.status.equals("BOOKED")&&e.kind.equals("ACTIVITY")&&e.linkedEntryId==null&&e.amountMinor<0&&!e.date.isAfter(today())).orElse(null);
   }
   private LedgerEntry match(Purchase p){
     var entry=eligibleActivity(p);

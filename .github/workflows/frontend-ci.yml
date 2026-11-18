@@ -31,8 +31,9 @@ jobs:
         working-directory: frontend
         run: npm ci
       - name: Check frontend dependency advisories
-        working-directory: frontend
-        run: npm audit --audit-level=high
+        run: |
+          node --test AnalysisScripts/test_frontend_advisories.test.mjs
+          node AnalysisScripts/check_frontend_advisories.mjs
       - name: Run frontend domain tests
         working-directory: frontend
         shell: bash

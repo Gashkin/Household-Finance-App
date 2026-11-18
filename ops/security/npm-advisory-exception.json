@@ -1,0 +1,18 @@
+{
+  "advisory": "https://github.com/advisories/GHSA-fc5q-39xc-vjpf",
+  "package": "picomatch",
+  "version": "4.0.7",
+  "severity": "high",
+  "developmentPackages": {
+    "picomatch": "4.0.7",
+    "fdir": "6.5.0",
+    "tinyglobby": "0.2.17",
+    "vite": "8.3.8",
+    "@vitejs/plugin-react": "6.3.0"
+  },
+  "expiresAt": "2026-12-18T00:00:00Z",
+  "approvedOn": "2026-11-18",
+  "approval": "Owner explicitly approved a temporary exception after reviewing build-only reachability in the GBD-20 execution conversation.",
+  "reason": "Vite uses filename patterns from repository source/configuration. No household input path to these patterns was found. The packaged Java application serves built static assets and does not run Picomatch. Only development dependencies and findings derived exclusively from this advisory qualify.",
+  "removal": "Remove when the advisory disappears, Picomatch publishes a different latest version, dependency scope/version changes, or the exception expires. Reassess if untrusted matching patterns are introduced."
+}
