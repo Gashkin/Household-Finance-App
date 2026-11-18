@@ -45,10 +45,13 @@ public class BudgetService {
   private long sum(long a,long b){long n=Math.addExact(a,b);check(n>=-9_007_199_254_740_991L&&n<=9_007_199_254_740_991L,"Budget total exceeds supported range");return n;}
   private long total(List<Line> lines){return lines.stream().mapToLong(Line::amountMinor).reduce(0,this::sum);}
   private List<Line> lines(List<LineInput> input,LocalDate start,LocalDate end){
+    return lines(input,start,end,Set.of());
+  }
+  private List<Line> lines(List<LineInput> input,LocalDate start,LocalDate end,Set<String> retained){
     check(input!=null&&!input.isEmpty()&&input.size()<=100,"Choose 1 to 100 category allocations");
     Map<String,ActivityReviewService.Category> categories=new HashMap<>();review.categories().forEach(c->categories.put(c.id(),c));
     Set<String> seen=new HashSet<>();var result=new ArrayList<Line>();
-    for(var i:input){check(i!=null,"Allocation required");var c=categories.get(i.categoryId());check(c!=null&&!c.retired(),"Choose an active owned category");check(seen.add(c.id()),"Allocate each category once");
+    for(var i:input){check(i!=null,"Allocation required");var c=categories.get(i.categoryId());check(c!=null&&(!c.retired()||retained.contains(c.id())),"Choose an active owned category; existing retired allocations may be retained");check(seen.add(c.id()),"Allocate each category once");
       check(i.dueDate()==null||(start!=null&&!i.dueDate().isBefore(start)&&i.dueDate().isBefore(end)),"Allocation date must lie in the period; templates have no dated allocations");
       result.add(new Line(c.id(),c.name(),amount(i.amountEuro()),i.accumulate(),i.dueDate()));}
     return List.copyOf(result);
@@ -74,14 +77,14 @@ public class BudgetService {
     check(input.anchor().getYear()>=2000&&input.anchor().getYear()<=2200,"Choose a supported period year");YearMonth month=YearMonth.from(input.anchor());LocalDate start=boundary(month,t.payDay());if(input.anchor().isBefore(start))start=boundary(month.minusMonths(1),t.payDay());LocalDate end=boundary(YearMonth.from(start).plusMonths(1),t.payDay());
     var ps=periods();check(ps.size()<600,"Period limit reached");for(var p:ps)check(!start.isBefore(p.end())||!p.start().isBefore(end),"Period overlaps an existing budget; use its allocations instead");
     Period previous=null;for(var p:ps)if(p.end().equals(start)){previous=p;break;}
-    Map<String,Long> rollover=new LinkedHashMap<>();if(previous!=null){var report=report(previous);for(var row:report.rows())if(row.accumulate()&&t.lines().stream().anyMatch(l->l.categoryId().equals(row.categoryId())))rollover.put(row.categoryId(),row.remainingMinor());}
+    Map<String,Long> rollover=new LinkedHashMap<>();if(previous!=null){var report=report(previous);for(var row:report.rows())if(row.accumulate()){boolean included=t.lines().stream().anyMatch(l->l.categoryId().equals(row.categoryId()));check(included||row.remainingMinor()==0,"A carried category is missing; include it or explicitly reset its previous period before creating this period");if(included)rollover.put(row.categoryId(),row.remainingMinor());}}
     var p=new Period(UUID.randomUUID().toString(),0,t.id(),t.revision(),start,end,t.incomeMinor(),t.incomeMinor(),t.lines(),t.lines(),Map.copyOf(rollover),previous==null?null:previous.id(),previous==null?null:previous.revision(),Instant.now());
     persist(p.id(),"BUDGET_PERIOD",0,p,"BUDGET_CREATE",input.reason(),null);return p;
   }
   private Period period(String id){return decode(record(id,"BUDGET_PERIOD"),Period.class);}
   private Period updated(Period p,long income,List<Line> ls,long templateRevision){return new Period(p.id(),p.revision()+1,p.templateId(),templateRevision,p.start(),p.end(),p.originalIncomeMinor(),income,p.original(),ls,p.rollover(),p.predecessorId(),p.predecessorRevision(),p.createdAt());}
   @Transactional public Period change(String id,Change input){
-    check(input!=null,"Explicit allocations required");var p=period(id);revision(p.revision(),input.revision());long income=amount(input.incomeEuro());var ls=lines(input.lines(),p.start(),p.end());check(total(ls)<=income,"Choose allocations within the revised planned income");
+    check(input!=null,"Explicit allocations required");var p=period(id);revision(p.revision(),input.revision());long income=amount(input.incomeEuro());var ls=lines(input.lines(),p.start(),p.end(),p.lines().stream().map(Line::categoryId).collect(java.util.stream.Collectors.toSet()));check(total(ls)<=income,"Choose allocations within the revised planned income");
     // Do not silently discard an accumulated balance when changing categories.
     for(var key:p.rollover().keySet())check(ls.stream().anyMatch(l->l.categoryId().equals(key)),"Keep categories with carried balances in this period");
     var next=updated(p,income,ls,p.templateRevision());persist(id,"BUDGET_PERIOD",next.revision(),next,"BUDGET_REALLOCATE",input.reason(),p);return next;
@@ -127,5 +130,7 @@ public class BudgetService {
   }
   @Transactional(readOnly=true) public Report report(String id){AccessContext.requireRead();return report(period(id));}
   private boolean concerns(LedgerAudit h,String id){try{return h.afterJson!=null&&json.readTree(h.afterJson).path("id").asText().equals(id);}catch(Exception e){throw new IllegalStateException("Invalid budget audit evidence",e);}}
-  @Transactional(readOnly=true) public List<LedgerAudit> history(String id){var p=period(id);return audits.findAll().stream().filter(h->h.actorId.equals(AccessContext.userId())&&h.action.startsWith("BUDGET_")&&concerns(h,p.id())).sorted(Comparator.comparing(h->h.recordedAt)).toList();}
+  private List<LedgerAudit> auditHistory(String id){return audits.findAll().stream().filter(h->h.actorId.equals(AccessContext.userId())&&h.action.startsWith("BUDGET_")&&concerns(h,id)).sorted(Comparator.comparing(h->h.recordedAt)).toList();}
+  @Transactional(readOnly=true) public List<LedgerAudit> history(String id){period(id);return auditHistory(id);}
+  @Transactional(readOnly=true) public List<LedgerAudit> templateHistory(String id){record(id,"BUDGET_TEMPLATE");return auditHistory(id);}
 }

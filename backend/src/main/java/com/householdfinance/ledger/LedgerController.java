@@ -18,6 +18,7 @@ public class LedgerController {
   @org.springframework.beans.factory.annotation.Autowired private ActivityReviewService review;
   @org.springframework.beans.factory.annotation.Autowired private BudgetService budgets;
   @GetMapping("/budgets/templates") public Object budgetTemplates(){return budgets.templates();}
+  @GetMapping("/budgets/templates/{id}/history") public Object budgetTemplateHistory(@PathVariable("id")String id){return budgets.templateHistory(id);}
   @PostMapping("/budgets/templates") public Object createBudgetTemplate(HttpServletRequest r)throws IOException{return budgets.template(null,body(r,BudgetService.TemplateInput.class));}
   @PutMapping("/budgets/templates/{id}") public Object budgetTemplate(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return budgets.template(id,body(r,BudgetService.TemplateInput.class));}
   @PostMapping("/budgets/templates/{id}/periods") public Object budgetPeriod(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return budgets.instantiate(id,body(r,BudgetService.Instantiate.class));}
