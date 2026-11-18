@@ -16,6 +16,16 @@ public class LedgerController {
   private final LedgerService service;
   private final ObjectMapper json;
   @org.springframework.beans.factory.annotation.Autowired private ActivityReviewService review;
+  @org.springframework.beans.factory.annotation.Autowired private BudgetService budgets;
+  @GetMapping("/budgets/templates") public Object budgetTemplates(){return budgets.templates();}
+  @PostMapping("/budgets/templates") public Object createBudgetTemplate(HttpServletRequest r)throws IOException{return budgets.template(null,body(r,BudgetService.TemplateInput.class));}
+  @PutMapping("/budgets/templates/{id}") public Object budgetTemplate(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return budgets.template(id,body(r,BudgetService.TemplateInput.class));}
+  @PostMapping("/budgets/templates/{id}/periods") public Object budgetPeriod(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return budgets.instantiate(id,body(r,BudgetService.Instantiate.class));}
+  @GetMapping("/budgets/periods") public Object budgetPeriods(){return budgets.periods();}
+  @GetMapping("/budgets/periods/{id}") public Object budgetReport(@PathVariable("id")String id){return budgets.report(id);}
+  @PutMapping("/budgets/periods/{id}") public Object budgetChange(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return budgets.change(id,body(r,BudgetService.Change.class));}
+  @PostMapping("/budgets/periods/{id}/apply") public Object budgetApply(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return budgets.apply(id,body(r,BudgetService.Apply.class));}
+  @GetMapping("/budgets/periods/{id}/history") public Object budgetHistory(@PathVariable("id")String id){return budgets.history(id);}
 
   @GetMapping("/review/categories") public Object categories(){return review.categories();}
   @PostMapping("/review/categories") public Object createCategory(HttpServletRequest r)throws IOException{return review.category(null,body(r,ActivityReviewService.CategoryInput.class));}

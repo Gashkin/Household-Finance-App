@@ -1,0 +1,14 @@
+{
+  "work_id": "GBD-18",
+  "page_id": "41ad3419-fef0-812a-9895-ec3efd2f45a3",
+  "branch": "story/18-delivery",
+  "artifacts": [
+    {"path":"backend/src/main/java/com/householdfinance/ledger/BudgetService.java","contains":["class BudgetService","BUDGET_REALLOCATE","BUDGET_APPLY"]},
+    {"path":"backend/src/main/java/com/householdfinance/ledger/LedgerController.java","contains":["/budgets/templates","/budgets/periods/{id}/history"]},
+    {"path":"frontend/src/components/BudgetWorkspace.tsx","contains":["Budgets &amp; allocations","Save period allocations"]},
+    {"path":"backend/src/test/java/com/householdfinance/ledger/BudgetTest.java","contains":["sameRevisionConcurrentChangesAdmitOnlyOneAndLeaveOneAudit","rolloverSnapshotsRetainLateCorrectionsAndResetCategoriesStartFresh"]},
+    {"path":"backend/src/test/java/com/householdfinance/workspace/BudgetRecoveryTest.java","contains":["originalsReallocationsActualsAndAuditSurviveRestartAndEncryptedRestore"]},
+    {"path":"frontend/e2e/budget.spec.ts","contains":["preserve a budget original"]},
+    {"path":"product/stories/budgets.md","contains":["GBD-18"]}
+  ]
+}
