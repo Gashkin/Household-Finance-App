@@ -16,6 +16,12 @@ Goals, operation receipts and audits use the existing version-7 encrypted worksp
 
 An approved matched bill has no remaining reservation, funding gap or active contribution. Its original target and reservation decision stay recorded rather than becoming an extra deduction after payment. Explicit unlinking restores the unpaid reservation and exposes any resulting shortfall. Closing a paid goal retains its matched commitment and actual payment; it does not cancel or erase the booked fact.
 
+Existing owned retired categories may be retained for funding-only edits, so retiring reference data cannot trap a reservation or require rewriting an approved payment. New or changed bill facts still require a valid active category through the commitments validator.
+
+External changes to a linked bill's direction, payment account, category, certainty, recurrence, estimate, date, amount, cancellation or occurrence state produce an explicit conflict warning. Retained goal targets are then illustrative rather than trusted bill/outlook figures; the external edit is preserved. Restore matching bill facts in Plan ahead or retain the historical goal and plan a separate next cost. Refresh the goal after reconciling. Conflicting or ambiguous matches do not release its reservation automatically.
+
+Cancellation retains recorded bill facts. If changing a bill's name, cost, date or account/category, save that change first and then cancel in a separate deliberate save. Combining those detail changes with cancellation is rejected atomically, with the draft retained. An unchanged cancelled future bill can be reactivated into one expectation with matching goal/schedule facts.
+
 ## OKF traceability
 
 - knowledge/okf/index.md
@@ -35,3 +41,5 @@ An approved matched bill has no remaining reservation, funding gap or active con
 - Current base main build and Windows packaging are green. Its inherited trusted delivery audit returned GitHub HTTP 504 while listing PRs; that failure is not a GBD-22 test result. Remote feature-head CI, independent opening review and human merge are separate evidence after publication.
 
 Owner handoff correction: a matched paid bill now has zero remaining reservation, gap and active contribution, while retaining original goal decisions. Unlink restores the unpaid reservation; closing a paid goal preserves its commitment/payment. New match → competing reservation → unlink → rematch → close regression verifies exact cash, capacity, audit and preserved actuals. Related budget/commitment/goal/recovery subset: 44 passed. Final goal/recovery rerun: 10 passed. Frontend rebuild and six desktop/mobile goal/bill/money-position journeys passed; updated screenshot inspected. No second PR or independent review was requested for this correction.
+
+Opening review `5999786580` on `c4bff321a704be9d541ef42714bc560ea33345f3` returned CHANGES REQUESTED. Owner corrections address all three P2 interactions: retained retired categories for funding-only changes, explicit semantic linked-bill conflicts and atomic rejection of cancellation combined with changed bill facts. Twelve goal domain/HTTP/concurrency tests and two goal recovery tests include each finding, unchanged records/audits after rejected writes, six external semantic variants and restored reactivation. The updated desktop/mobile journey verifies conflict warnings and cancellation draft retention. Complete local backend `verify`: 270 discovered, zero failures/errors, 16 existing skips. Complete browser suite after all fixes: 43 passed, one existing intentional skip. Frontend rebuild and OKF validation passed. Original verdict/coverage remain unchanged; owner tests and latest-head CI verify corrections without another independent review.

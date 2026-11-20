@@ -22,7 +22,7 @@ public class GoalService {
       String savingsAccountId,String billAccountId,String categoryId,boolean estimated,boolean cancelled,
       Long commitmentRevision) {}
   public record Row(Goal goal,long gapMinor,long recommendedMonthlyMinor,Long linkedAccountCashMinor,
-      Long actualCostMinor,long remainingReservedMinor,long activeMonthlyMinor,boolean settled,List<String> warnings) {}
+      Long actualCostMinor,long remainingReservedMinor,long activeMonthlyMinor,boolean settled,boolean linkedBillConflict,List<String> warnings) {}
   public record Workspace(LocalDate today,State state,List<Row> rows,List<LedgerService.AccountView> accounts,
       List<ActivityReviewService.Category> categories,long cashMinor,long reservedMinor,long unreservedMinor,
       long monthlyMinor,long recommendedMonthlyMinor,Long budgetUnallocatedMinor,List<String> warnings,
@@ -55,7 +55,15 @@ public class GoalService {
     return commitments.upcoming(from,to).stream().filter(o->o.scheduleId().equals(g.scheduleId())).toList();
   }
   private boolean paid(List<CommitmentService.Occurrence> matches){return matches.size()==1&&matches.getFirst().state().equals("MATCHED");}
-  private boolean settled(Goal g){return paid(linked(g));}
+  private boolean sameFacts(Goal g,CommitmentService.Rule r){return r.direction().equals("EXPENSE")&&r.certainty().equals("EXPECTED")&&r.frequency().equals("ONCE")&&r.name().equals(g.name())&&r.anchor().equals(g.dueDate())&&LedgerService.money(r.amountEuro())==g.targetMinor()&&r.accountId().equals(g.billAccountId())&&r.categoryId().equals(g.categoryId())&&r.amountType().equals(g.estimated()?"ESTIMATED":"FIXED")&&r.end()==null&&r.offsetDays()==0&&r.payrollId()==null&&(r.counterpartId()==null||r.counterpartId().isBlank());}
+  private boolean conflict(Goal g,CommitmentService.State state,List<CommitmentService.Occurrence> matches){
+    if(g.scheduleId()==null)return false;var schedule=state.schedules().stream().filter(s->s.id().equals(g.scheduleId())).findFirst().orElse(null);if(schedule==null)return true;var latest=schedule.versions().getLast();if(!sameFacts(g,latest.rule()))return true;
+    if(latest.cancelled()!=g.cancelled()&&!(g.cancelled()&&paid(matches)))return true;
+    if(g.cancelled()&&latest.cancelled())return !matches.isEmpty();
+    if(matches.size()!=1)return true;var o=matches.getFirst();
+    return !o.direction().equals("EXPENSE")||!o.certainty().equals("EXPECTED")||!o.amountType().equals(g.estimated()?"ESTIMATED":"FIXED")||!o.accountId().equals(g.billAccountId())||!o.categoryId().equals(g.categoryId())||!o.name().equals(g.name())||!o.nominalDate().equals(g.dueDate())||!o.state().equals("MATCHED")&&(!o.date().equals(g.dueDate())||o.amountMinor()!=g.targetMinor()||o.suppressed()||o.entryId()!=null);
+  }
+  private boolean settled(Goal g){var matches=linked(g);return paid(matches)&&!conflict(g,commitments.get().state(),matches);}
   private long reserved(Goal g){return g.cancelled()||settled(g)?0:g.reservedMinor();}
   @Transactional public State change(Change in){
     AccessContext.requireEdit();check(in!=null,"Complete goal required");var old=read();String op=uuid(in.operationId()),hash=digest(in);
@@ -80,6 +88,7 @@ public class GoalService {
       check(review.categories().stream().anyMatch(c->c.id().equals(category)&&(!c.retired()||before!=null&&Objects.equals(before.categoryId(),category))),"Choose an active owned category; an existing retired category may be retained");
       // A single existing commitment is the sole cash expectation, including actual matching.
       var existing=schedule==null?null:commitment.schedules().stream().filter(s->s.id().equals(before.scheduleId())).findFirst().orElseThrow(()->new IllegalArgumentException("Linked bill missing; restore verified goals and commitments together"));
+      if(before!=null&&in.cancelled())check(before.name().equals(name)&&before.targetMinor()==target&&before.dueDate().equals(in.dueDate())&&Objects.equals(before.billAccountId(),bill)&&Objects.equals(before.categoryId(),category)&&before.estimated()==in.estimated(),"Save bill detail changes before cancelling; cancellation retains the recorded bill facts");
       boolean costChanged=before==null||before.cancelled()!=in.cancelled()||!before.name().equals(name)||before.targetMinor()!=target||!before.dueDate().equals(in.dueDate())||!Objects.equals(before.billAccountId(),bill)||!Objects.equals(before.categoryId(),category)||before.estimated()!=in.estimated();
       boolean closePaid=before!=null&&in.cancelled()&&!before.cancelled()&&settled(before)&&before.name().equals(name)&&before.targetMinor()==target&&before.dueDate().equals(in.dueDate())&&Objects.equals(before.billAccountId(),bill)&&Objects.equals(before.categoryId(),category)&&before.estimated()==in.estimated();
       if(costChanged&&!closePaid){
@@ -87,7 +96,7 @@ public class GoalService {
         check(before==null||!before.dueDate().isBefore(today()),"Past bill facts are retained; create a new goal for the next bill");
         check(in.cancelled()||!in.dueDate().isBefore(today()),"Expected bills require a present or future due date");
         if(existing!=null){var v=existing.versions().getLast();var r=v.rule();
-          check(v.cancelled()==before.cancelled()&&r.direction().equals("EXPENSE")&&r.frequency().equals("ONCE")&&r.name().equals(before.name())&&r.anchor().equals(before.dueDate())&&LedgerService.money(r.amountEuro())==before.targetMinor()&&r.accountId().equals(before.billAccountId())&&r.categoryId().equals(before.categoryId())&&r.amountType().equals(before.estimated()?"ESTIMATED":"FIXED"),"Linked bill changed in Plan ahead; retain it and reconcile before editing the goal");
+          check(v.cancelled()==before.cancelled()&&sameFacts(before,r),"Linked bill changed in Plan ahead; retain it and reconcile before editing the goal");
           check(commitment.exceptions().stream().noneMatch(e->e.id().startsWith(existing.id()+"/")),"Matched or overridden bill facts cannot be rewritten from a goal");
           var occurrence=commitments.upcoming(before.dueDate(),before.dueDate()).stream().filter(o->o.scheduleId().equals(existing.id())).findFirst().orElse(null);
           check(occurrence==null||(!occurrence.suppressed()&&occurrence.entryId()==null),"Matched or overridden bill facts cannot be rewritten from a goal");}
@@ -109,19 +118,20 @@ public class GoalService {
   }
   @Transactional(readOnly=true) public Workspace get(){
     var state=read();var as=cash();var warnings=new ArrayList<String>();var rows=new ArrayList<Row>();long reserved=0,monthly=0,recommended=0,cash=as.stream().mapToLong(this::available).sum();
-    var effectiveReserves=new HashMap<String,Long>();var linkedById=new HashMap<String,List<CommitmentService.Occurrence>>();for(var g:state.goals()){var matches=linked(g);linkedById.put(g.id(),matches);effectiveReserves.put(g.id(),g.cancelled()||paid(matches)?0:g.reservedMinor());}
+    var commitmentState=commitments.get().state();var effectiveReserves=new HashMap<String,Long>();var linkedById=new HashMap<String,List<CommitmentService.Occurrence>>();var conflicts=new HashMap<String,Boolean>();for(var g:state.goals()){var matches=linked(g);linkedById.put(g.id(),matches);boolean conflict=conflict(g,commitmentState,matches);conflicts.put(g.id(),conflict);effectiveReserves.put(g.id(),g.cancelled()||paid(matches)&&!conflict?0:g.reservedMinor());}
     for(var g:state.goals()){
-      var matches=linkedById.get(g.id());boolean paid=paid(matches);long remaining=effectiveReserves.get(g.id()),activeMonthly=g.cancelled()||paid?0:g.monthlyMinor();
+      var matches=linkedById.get(g.id());boolean conflict=conflicts.get(g.id()),paid=paid(matches)&&!conflict;long remaining=effectiveReserves.get(g.id()),activeMonthly=g.cancelled()||paid?0:g.monthlyMinor();
       var notes=new ArrayList<String>();long gap=g.cancelled()||paid?0:Math.max(0,g.targetMinor()-remaining);
       long months=Math.max(1,ChronoUnit.MONTHS.between(YearMonth.from(today()),YearMonth.from(g.dueDate()))+1),need=(gap+months-1)/months;
       Long linked=null,actual=null;if(g.savingsAccountId()!=null){linked=available(account(as,g.savingsAccountId()));if(state.goals().stream().filter(x->g.savingsAccountId().equals(x.savingsAccountId())).mapToLong(x->effectiveReserves.get(x.id())).sum()>linked)notes.add("Linked account no longer backs its reservations. Release or reallocate explicitly.");}
       if(paid)notes.add("Approved payment matched: no remaining reservation, funding gap or contribution. The original target and reservation decision remain recorded; plan the next bill separately.");
+      if(conflict){notes.add("Linked bill conflict: its direction, account, category, recurrence, amount, date, estimate or occurrence state differs. Review Plan ahead; these retained goal targets are not trusted bill/outlook figures.");if(!g.cancelled())warnings.add(g.name()+": linked bill conflict; funding figures are illustrative until the bill and goal are explicitly reconciled.");}
       if(!g.cancelled()&&!paid&&g.dueDate().isBefore(today()))notes.add("Target date passed; review funding and actual evidence.");
       if(!g.cancelled()&&g.monthlyMinor()<need)notes.add("Configured monthly contribution is below the amount needed by the target date.");
       if(g.scheduleId()!=null){
         if(matches.size()==1){var o=matches.getFirst();actual=o.actualMinor();notes.addAll(o.warnings());if(o.amountMinor()!=g.targetMinor()||!o.date().equals(g.dueDate())||!o.name().equals(g.name()))notes.add("Linked bill differs from the goal; review Plan ahead before relying on this target.");}
         else if(!g.cancelled())notes.add("Linked bill date or cancellation changed; review Plan ahead.");}
-      rows.add(new Row(g,gap,need,linked,actual,remaining,activeMonthly,paid,List.copyOf(notes)));if(!g.cancelled()){reserved+=remaining;monthly+=activeMonthly;recommended+=need;}
+      rows.add(new Row(g,gap,need,linked,actual,remaining,activeMonthly,paid,conflict,List.copyOf(notes)));if(!g.cancelled()){reserved+=remaining;monthly+=activeMonthly;recommended+=need;}
     }
     rows.sort(Comparator.comparingInt((Row r)->r.goal().priority()).thenComparing(r->r.goal().dueDate()).thenComparing(r->r.goal().name()));
     Long budget=null;var periods=budgets.periods().stream().filter(p->!today().isBefore(p.start())&&today().isBefore(p.end())).toList();if(periods.size()==1)budget=budgets.report(periods.getFirst().id()).unallocatedMinor();

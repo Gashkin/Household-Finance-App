@@ -15,6 +15,8 @@ An annual or irregular bill goal owns one dated commitment expectation. Revision
 
 Goal state, idempotent operation receipts and actor/reason history use the existing ledger review records, transaction-lifetime write admission and version-7 encrypted recovery tables. Unknown response handling checks operation status before any new save. Owner access and account scope follow budgets and commitments; access loss clears private UI state.
 
+Approved matched bills release derived remaining funding without erasing original decisions; explicit unlink restores unpaid reservations. Existing owned retired categories remain usable for funding-only edits. Semantic changes in linked schedules/occurrences flag retained targets as illustrative and preserve the external change. Cancellation combined with changed bill details rejects atomically; unchanged cancellation/reactivation preserves matching goal/schedule facts and one future expectation. These interactions must survive restart and encrypted restore with payments, balances and audits preserved.
+
 ## Linked concepts
 
 - [Budget allocations](budget-allocations.md)
