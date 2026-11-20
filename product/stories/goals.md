@@ -14,6 +14,8 @@ Saved revisions, operation IDs and reasons protect changes. A stale save retains
 
 Goals, operation receipts and audits use the existing version-7 encrypted workspace backup tables. Restart and restore retain them together with commitments and ledger evidence. No schema migration, bank connection, cloud financial-data transmission or real-data release is introduced.
 
+An approved matched bill has no remaining reservation, funding gap or active contribution. Its original target and reservation decision stay recorded rather than becoming an extra deduction after payment. Explicit unlinking restores the unpaid reservation and exposes any resulting shortfall. Closing a paid goal retains its matched commitment and actual payment; it does not cancel or erase the booked fact.
+
 ## OKF traceability
 
 - knowledge/okf/index.md
@@ -26,8 +28,10 @@ Goals, operation receipts and audits use the existing version-7 encrypted worksp
 
 ## Local verification — 20 November 2026
 
-- Complete backend `verify`: 265 discovered, zero failures/errors, 16 existing platform/conditional skips. Includes eight goal HTTP/domain/concurrency cases and one file restart/encrypted restore scenario.
+- Complete backend `verify` at opening head `c4bff32`: 265 discovered, zero failures/errors, 16 existing platform/conditional skips. Includes eight goal HTTP/domain/concurrency cases and one file restart/encrypted restore scenario.
 - Complete desktop/mobile browser suite: 43 passed, one existing intentional mobile restore skip. Goal cases cover an annual bill, holiday and emergency buffer, lost successful response/status recovery, stale draft retention, cancellation, account evidence and access-loss redaction. Both goal screenshots were visually inspected.
 - Frontend build and 20 domain tests; 37 delivery coordination tests; nine advisory tests and current advisory gate; exposure-script test and declared delivery artifact checks passed. OKF: 43 files, zero errors/warnings.
 - Initial sandbox runs could not establish loopback connections; reruns with the required local access passed. Early browser locator/route synchronization defects were corrected. The goal fixture now leaves its independent cash account reconciled; final full browser run passed with all UI edits complete.
 - Current base main build and Windows packaging are green. Its inherited trusted delivery audit returned GitHub HTTP 504 while listing PRs; that failure is not a GBD-22 test result. Remote feature-head CI, independent opening review and human merge are separate evidence after publication.
+
+Owner handoff correction: a matched paid bill now has zero remaining reservation, gap and active contribution, while retaining original goal decisions. Unlink restores the unpaid reservation; closing a paid goal preserves its commitment/payment. New match → competing reservation → unlink → rematch → close regression verifies exact cash, capacity, audit and preserved actuals. Related budget/commitment/goal/recovery subset: 44 passed. Final goal/recovery rerun: 10 passed. Frontend rebuild and six desktop/mobile goal/bill/money-position journeys passed; updated screenshot inspected. No second PR or independent review was requested for this correction.

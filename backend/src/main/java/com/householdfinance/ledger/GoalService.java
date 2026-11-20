@@ -22,7 +22,7 @@ public class GoalService {
       String savingsAccountId,String billAccountId,String categoryId,boolean estimated,boolean cancelled,
       Long commitmentRevision) {}
   public record Row(Goal goal,long gapMinor,long recommendedMonthlyMinor,Long linkedAccountCashMinor,
-      Long actualCostMinor,List<String> warnings) {}
+      Long actualCostMinor,long remainingReservedMinor,long activeMonthlyMinor,boolean settled,List<String> warnings) {}
   public record Workspace(LocalDate today,State state,List<Row> rows,List<LedgerService.AccountView> accounts,
       List<ActivityReviewService.Category> categories,long cashMinor,long reservedMinor,long unreservedMinor,
       long monthlyMinor,long recommendedMonthlyMinor,Long budgetUnallocatedMinor,List<String> warnings,
@@ -50,6 +50,13 @@ public class GoalService {
   private List<LedgerService.AccountView> cash(){return ledger.position(today()).accounts().stream().filter(a->a.owned()&&a.kind().equals("CASH")).toList();}
   private LedgerService.AccountView account(List<LedgerService.AccountView> as,String id){return as.stream().filter(a->a.id().equals(id)).findFirst().orElseThrow(()->new IllegalArgumentException("Choose an owned cash account"));}
   private long available(LedgerService.AccountView a){return Math.subtractExact(a.bookedMinor(),a.pendingDebitMinor());}
+  private List<CommitmentService.Occurrence> linked(Goal g){
+    if(g.scheduleId()==null)return List.of();LocalDate from=g.dueDate().minusDays(124),to=g.dueDate().plusDays(124);if(from.getYear()<2000)from=LocalDate.of(2000,1,1);if(to.getYear()>2200)to=LocalDate.of(2200,12,31);
+    return commitments.upcoming(from,to).stream().filter(o->o.scheduleId().equals(g.scheduleId())).toList();
+  }
+  private boolean paid(List<CommitmentService.Occurrence> matches){return matches.size()==1&&matches.getFirst().state().equals("MATCHED");}
+  private boolean settled(Goal g){return paid(linked(g));}
+  private long reserved(Goal g){return g.cancelled()||settled(g)?0:g.reservedMinor();}
   @Transactional public State change(Change in){
     AccessContext.requireEdit();check(in!=null,"Complete goal required");var old=read();String op=uuid(in.operationId()),hash=digest(in);
     if(old.operations().containsKey(op)){check(old.operations().get(op).equals(hash),"Operation ID already used with different input");return old;}
@@ -70,11 +77,12 @@ public class GoalService {
     String schedule=before==null?null:before.scheduleId();var commitment=commitments.get().state();
     if(kind.equals("BILL")){
       check(bill!=null&&category!=null,"Choose the bill payment account and category");account(as,bill);
-      check(review.categories().stream().anyMatch(c->c.id().equals(category)&&!c.retired()),"Choose an active owned category");
+      check(review.categories().stream().anyMatch(c->c.id().equals(category)&&(!c.retired()||before!=null&&Objects.equals(before.categoryId(),category))),"Choose an active owned category; an existing retired category may be retained");
       // A single existing commitment is the sole cash expectation, including actual matching.
       var existing=schedule==null?null:commitment.schedules().stream().filter(s->s.id().equals(before.scheduleId())).findFirst().orElseThrow(()->new IllegalArgumentException("Linked bill missing; restore verified goals and commitments together"));
       boolean costChanged=before==null||before.cancelled()!=in.cancelled()||!before.name().equals(name)||before.targetMinor()!=target||!before.dueDate().equals(in.dueDate())||!Objects.equals(before.billAccountId(),bill)||!Objects.equals(before.categoryId(),category)||before.estimated()!=in.estimated();
-      if(costChanged){
+      boolean closePaid=before!=null&&in.cancelled()&&!before.cancelled()&&settled(before)&&before.name().equals(name)&&before.targetMinor()==target&&before.dueDate().equals(in.dueDate())&&Objects.equals(before.billAccountId(),bill)&&Objects.equals(before.categoryId(),category)&&before.estimated()==in.estimated();
+      if(costChanged&&!closePaid){
         check(in.commitmentRevision()!=null&&in.commitmentRevision()==commitment.revision(),"Bills changed; reload before changing a linked cost");
         check(before==null||!before.dueDate().isBefore(today()),"Past bill facts are retained; create a new goal for the next bill");
         check(in.cancelled()||!in.dueDate().isBefore(today()),"Expected bills require a present or future due date");
@@ -91,26 +99,29 @@ public class GoalService {
     var goal=new Goal(id,text(in.name(),100),kind,in.dueDate(),in.priority(),target,reserved,monthly,savings,bill,category,in.estimated(),in.cancelled(),schedule);
     var goals=new ArrayList<>(old.goals());goals.removeIf(g->g.id().equals(id));goals.add(goal);
     // Reduced/released reservations remain possible after a balance drop; increases require backing.
-    long previous=old.goals().stream().mapToLong(Goal::reservedMinor).sum(),total=goals.stream().mapToLong(Goal::reservedMinor).sum();
+    long previous=old.goals().stream().mapToLong(this::reserved).sum(),total=goals.stream().mapToLong(this::reserved).sum();
     long cash=as.stream().mapToLong(this::available).sum();
     if(total>previous)check(total<=Math.max(0,cash),"Reservations exceed owned cash after pending debits");
-    for(var a:as){long was=old.goals().stream().filter(g->a.id().equals(g.savingsAccountId())).mapToLong(Goal::reservedMinor).sum();long now=goals.stream().filter(g->a.id().equals(g.savingsAccountId())).mapToLong(Goal::reservedMinor).sum();if(now>was)check(now<=Math.max(0,available(a)),"Linked savings account is already reserved by competing goals");}
+    for(var a:as){long was=old.goals().stream().filter(g->a.id().equals(g.savingsAccountId())).mapToLong(this::reserved).sum();long now=goals.stream().filter(g->a.id().equals(g.savingsAccountId())).mapToLong(this::reserved).sum();if(now>was)check(now<=Math.max(0,available(a)),"Linked savings account is already reserved by competing goals");}
     var ops=new LinkedHashMap<>(old.operations());ops.put(op,hash);var next=new State(old.revision()+1,List.copyOf(goals),Map.copyOf(ops));
     var record=new LedgerReviewRecord();record.id=stateId();record.ownerId=AccessContext.userId();record.kind="GOALS";record.revision=next.revision();record.payload=encode(next);records.save(record);
     var audit=new LedgerAudit();audit.id=UUID.randomUUID().toString();audit.accountId=AccessContext.publicationId();audit.action="GOAL_CHANGE";audit.source=why;audit.recordedAt=Instant.now();audit.beforeJson=encode(before);audit.afterJson=encode(goal);audits.save(audit);return next;
   }
   @Transactional(readOnly=true) public Workspace get(){
     var state=read();var as=cash();var warnings=new ArrayList<String>();var rows=new ArrayList<Row>();long reserved=0,monthly=0,recommended=0,cash=as.stream().mapToLong(this::available).sum();
+    var effectiveReserves=new HashMap<String,Long>();var linkedById=new HashMap<String,List<CommitmentService.Occurrence>>();for(var g:state.goals()){var matches=linked(g);linkedById.put(g.id(),matches);effectiveReserves.put(g.id(),g.cancelled()||paid(matches)?0:g.reservedMinor());}
     for(var g:state.goals()){
-      var notes=new ArrayList<String>();long gap=g.cancelled()?0:Math.max(0,g.targetMinor()-g.reservedMinor());
+      var matches=linkedById.get(g.id());boolean paid=paid(matches);long remaining=effectiveReserves.get(g.id()),activeMonthly=g.cancelled()||paid?0:g.monthlyMinor();
+      var notes=new ArrayList<String>();long gap=g.cancelled()||paid?0:Math.max(0,g.targetMinor()-remaining);
       long months=Math.max(1,ChronoUnit.MONTHS.between(YearMonth.from(today()),YearMonth.from(g.dueDate()))+1),need=(gap+months-1)/months;
-      Long linked=null,actual=null;if(g.savingsAccountId()!=null){linked=available(account(as,g.savingsAccountId()));if(state.goals().stream().filter(x->g.savingsAccountId().equals(x.savingsAccountId())).mapToLong(Goal::reservedMinor).sum()>linked)notes.add("Linked account no longer backs its reservations. Release or reallocate explicitly.");}
-      if(!g.cancelled()&&g.dueDate().isBefore(today()))notes.add("Target date passed; review funding and actual evidence.");
+      Long linked=null,actual=null;if(g.savingsAccountId()!=null){linked=available(account(as,g.savingsAccountId()));if(state.goals().stream().filter(x->g.savingsAccountId().equals(x.savingsAccountId())).mapToLong(x->effectiveReserves.get(x.id())).sum()>linked)notes.add("Linked account no longer backs its reservations. Release or reallocate explicitly.");}
+      if(paid)notes.add("Approved payment matched: no remaining reservation, funding gap or contribution. The original target and reservation decision remain recorded; plan the next bill separately.");
+      if(!g.cancelled()&&!paid&&g.dueDate().isBefore(today()))notes.add("Target date passed; review funding and actual evidence.");
       if(!g.cancelled()&&g.monthlyMinor()<need)notes.add("Configured monthly contribution is below the amount needed by the target date.");
-      if(g.scheduleId()!=null){LocalDate from=g.dueDate().minusDays(124),to=g.dueDate().plusDays(124);if(from.getYear()<2000)from=LocalDate.of(2000,1,1);if(to.getYear()>2200)to=LocalDate.of(2200,12,31);var matches=commitments.upcoming(from,to).stream().filter(o->o.scheduleId().equals(g.scheduleId())).toList();
+      if(g.scheduleId()!=null){
         if(matches.size()==1){var o=matches.getFirst();actual=o.actualMinor();notes.addAll(o.warnings());if(o.amountMinor()!=g.targetMinor()||!o.date().equals(g.dueDate())||!o.name().equals(g.name()))notes.add("Linked bill differs from the goal; review Plan ahead before relying on this target.");}
         else if(!g.cancelled())notes.add("Linked bill date or cancellation changed; review Plan ahead.");}
-      rows.add(new Row(g,gap,need,linked,actual,List.copyOf(notes)));if(!g.cancelled()){reserved+=g.reservedMinor();monthly+=g.monthlyMinor();recommended+=need;}
+      rows.add(new Row(g,gap,need,linked,actual,remaining,activeMonthly,paid,List.copyOf(notes)));if(!g.cancelled()){reserved+=remaining;monthly+=activeMonthly;recommended+=need;}
     }
     rows.sort(Comparator.comparingInt((Row r)->r.goal().priority()).thenComparing(r->r.goal().dueDate()).thenComparing(r->r.goal().name()));
     Long budget=null;var periods=budgets.periods().stream().filter(p->!today().isBefore(p.start())&&today().isBefore(p.end())).toList();if(periods.size()==1)budget=budgets.report(periods.getFirst().id()).unallocatedMinor();
