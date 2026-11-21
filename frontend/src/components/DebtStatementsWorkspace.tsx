@@ -43,6 +43,7 @@ type Workspace = {
     reconciled: boolean;
     remainingPaymentMinor: number;
     paymentCashMinor: number;
+    statementPrincipalMinor: number | null;
     warnings: string[];
   }[];
   accounts: LedgerAccount[];
@@ -380,6 +381,22 @@ export default function DebtStatementsWorkspace({
                     <dd>{s.due}</dd>
                     <dt>Minimum payment</dt>
                     <dd>{s.minimumEuro || "Unknown"} EUR</dd>
+                    {d.terms.kind !== "CARD" && (
+                      <>
+                        <dt>Statement net principal reduction</dt>
+                        <dd>
+                          {r.statementPrincipalMinor === null
+                            ? "Incomplete statement"
+                            : money(r.statementPrincipalMinor)}
+                        </dd>
+                        <dt>Statement interest</dt>
+                        <dd>{s.interestEuro || "Unknown"} EUR</dd>
+                        <dt>Statement fees</dt>
+                        <dd>{s.feesEuro || "Unknown"} EUR</dd>
+                        <dt>Statement repayments</dt>
+                        <dd>{s.paidEuro || "Unknown"} EUR</dd>
+                      </>
+                    )}
                     <dt>Remaining expected repayment</dt>
                     <dd>{money(r.remainingPaymentMinor)}</dd>
                     <dt>Payment account cash after pending debits</dt>
@@ -417,10 +434,34 @@ export default function DebtStatementsWorkspace({
                       </p>
                     ))}
                     {d.statements.map((x) => (
-                      <p key={x.id}>
-                        {x.start} – {x.end}: {x.balanceEuro} EUR ·{" "}
-                        {x.complete ? "Complete" : "Incomplete"} · {x.source}
-                      </p>
+                      <details key={x.id}>
+                        <summary>
+                          {x.start} – {x.end}: {x.balanceEuro} EUR ·{" "}
+                          {x.complete ? "Complete" : "Incomplete"} · {x.source}
+                        </summary>
+                        <dl>
+                          <dt>Opening amount owed</dt>
+                          <dd>{x.openingEuro || "Unknown"} EUR</dd>
+                          <dt>Purchases / drawdown</dt>
+                          <dd>{x.borrowingEuro || "Unknown"} EUR</dd>
+                          <dt>Interest</dt>
+                          <dd>{x.interestEuro || "Unknown"} EUR</dd>
+                          <dt>Fees</dt>
+                          <dd>{x.feesEuro || "Unknown"} EUR</dd>
+                          <dt>Repayments</dt>
+                          <dd>{x.paidEuro || "Unknown"} EUR</dd>
+                          <dt>Minimum</dt>
+                          <dd>{x.minimumEuro || "Unknown"} EUR</dd>
+                          <dt>Due date</dt>
+                          <dd>{x.due}</dd>
+                        </dl>
+                        {x.supersedes && (
+                          <p>
+                            Correction of prior evidence; the earlier cycle
+                            remains recorded.
+                          </p>
+                        )}
+                      </details>
                     ))}
                   </details>
                 </article>

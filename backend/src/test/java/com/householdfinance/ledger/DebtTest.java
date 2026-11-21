@@ -637,4 +637,47 @@ class DebtTest {
     assertFalse(debts.operation(input.operationId()).get("completed"));
     assertEquals(200000, ledger.position(day).cashMinor());
   }
+
+  @Test
+  void statementPrincipalAndChargesAreReportedSeparatelyWithoutInventingLedgerActivity() {
+    debts.change(
+        change(
+            0,
+            terms("LOAN", "6"),
+            statement(true, "1000", "0", "5.01", "1.00", "200.01", "806.00", "10")));
+    var report = debts.report(null);
+    var row = report.statementEvidence().rows().getFirst();
+    assertEquals(19400, row.statementPrincipalMinor());
+    assertEquals("5.01", row.debt().statements().getLast().interestEuro());
+    assertFalse(row.reconciled());
+    assertEquals(200000, ledger.position(day).cashMinor());
+    assertTrue(ledger.activity(debt).isEmpty());
+  }
+
+  @Test
+  void lenderCreditFromLaterRefundDoesNotCreateAFictitiousOverdueMinimum() {
+    var s =
+        new DebtService.Statement(
+            UUID.randomUUID().toString(),
+            day.minusMonths(1),
+            day.minusDays(2),
+            day.minusDays(1),
+            "Synthetic prior card statement",
+            true,
+            "1000",
+            "0",
+            "0",
+            "0",
+            "0",
+            "1000",
+            "25",
+            null);
+    debts.change(change(0, terms("CARD", "18"), s));
+    manual(debt, "1050", "BOOKED");
+    var row = debts.get().rows().getFirst();
+    assertEquals(-5000, row.outstandingMinor());
+    assertEquals(0, row.remainingPaymentMinor());
+    assertTrue(row.warnings().stream().noneMatch(w -> w.contains("Minimum payment overdue")));
+    assertEquals(200000, ledger.position(day).cashMinor());
+  }
 }

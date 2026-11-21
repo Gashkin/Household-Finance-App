@@ -372,6 +372,9 @@ test("dated mortgage rates show principal interest fees payoff and constrained e
   await page
     .getByRole("button", { name: "Cards, loans & mortgages", exact: true })
     .click();
+  await expect(
+    page.getByText("Statement net principal reduction", { exact: true }).last(),
+  ).toBeVisible();
   await page
     .getByRole("combobox", { name: "Debt to compare", exact: true })
     .selectOption(id);

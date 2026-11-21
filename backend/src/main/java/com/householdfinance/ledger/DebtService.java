@@ -65,7 +65,8 @@ public class DebtService {
       boolean reconciled,
       long remainingPaymentMinor,
       Long paymentCashMinor,
-      List<String> warnings) {}
+      List<String> warnings,
+      Long statementPrincipalMinor) {}
 
   public record Workspace(
       LocalDate today,
@@ -437,6 +438,7 @@ public class DebtService {
           "Repayment shortfall on the payment account (after pending debits); overdraft capacity"
               + " and credit limits are not cash.");
     if (d.terms().kind().equals("CARD")
+        && remaining > 0
         && s.minimumEuro() != null
         && !s.minimumEuro().isBlank()
         && paid(d, s.end(), today()) < amount(s.minimumEuro())
@@ -450,7 +452,17 @@ public class DebtService {
         "Purchases count as spending; linked settlements count once as transfers. Record and link"
             + " both actual legs in Review & reconcile. Do not also enter these repayments as"
             + " separate bills.");
-    return new Row(d, -a.bookedMinor(), diff, ok, remaining, liquid, List.copyOf(notes));
+    return new Row(
+        d,
+        -a.bookedMinor(),
+        diff,
+        ok,
+        remaining,
+        liquid,
+        List.copyOf(notes),
+        s.complete() && !d.terms().kind().equals("CARD")
+            ? amount(s.paidEuro()) - amount(s.interestEuro()) - amount(s.feesEuro())
+            : null);
   }
 
   @Transactional(readOnly = true)
