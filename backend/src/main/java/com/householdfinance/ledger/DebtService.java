@@ -381,6 +381,11 @@ public class DebtService {
   }
 
   private long paid(Debt d, LocalDate after, LocalDate through) {
+    var cashIds =
+        ledger.position(through).accounts().stream()
+            .filter(a -> a.owned() && a.kind().equals("CASH"))
+            .map(LedgerService.AccountView::id)
+            .collect(java.util.stream.Collectors.toSet());
     long paid = 0;
     for (var e : ledger.activity(d.terms().accountId()))
       if (e.date.isAfter(after)
@@ -392,7 +397,7 @@ public class DebtService {
           && e.linkedEntryId != null) {
         var peer = entries.findById(e.linkedEntryId).orElse(null);
         if (peer != null
-            && peer.accountId.equals(d.terms().paymentAccountId())
+            && cashIds.contains(peer.accountId)
             && peer.status.equals("BOOKED")
             && peer.reviewState.equals("CONFIRMED")
             && Objects.equals(peer.linkedEntryId, e.id)
@@ -430,7 +435,16 @@ public class DebtService {
             ? Math.max(0, LedgerService.money(s.balanceEuro()))
             : amount(d.terms().monthlyPaymentEuro());
     long remaining = Math.max(0, planned - paid(d, s.end(), today()));
-    remaining = Math.min(remaining, Math.max(0, -a.bookedMinor()));
+    long repaymentCap = Math.max(0, -a.bookedMinor());
+    if (repaymentCap > 0 && !d.terms().kind().equals("CARD"))
+      repaymentCap +=
+          DebtScenarioService.monthlyInterest(
+                  repaymentCap,
+                  new BigDecimal(
+                      effective(d.terms(), s.due().isBefore(today()) ? today() : s.due())
+                          .annualPercent()))
+              + amount(d.terms().monthlyFeeEuro());
+    remaining = Math.min(remaining, repaymentCap);
     var cash = account(d.terms().paymentAccountId(), today(), "CASH");
     long liquid = cash.bookedMinor() - cash.pendingDebitMinor();
     if (remaining > Math.max(0, liquid))

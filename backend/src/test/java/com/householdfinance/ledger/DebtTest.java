@@ -680,4 +680,85 @@ class DebtTest {
     assertTrue(row.warnings().stream().noneMatch(w -> w.contains("Minimum payment overdue")));
     assertEquals(200000, ledger.position(day).cashMinor());
   }
+
+  @Test
+  void settlementFromAnotherOwnedCashAccountStillReducesStatementDespiteLaterPurchases() {
+    debts.change(change(0, terms("CARD", "18"), standard()));
+    String planned = cash;
+    cash =
+        ledger
+            .create(
+                new LedgerService.AccountInput(
+                    "Synthetic alternate repayment cash",
+                    "CASH",
+                    day.minusMonths(3),
+                    "500",
+                    "Synthetic statement"))
+            .id();
+    settlement("200.00");
+    cash = planned;
+    manual(debt, "-500.00", "BOOKED");
+    var row = debts.get().rows().getFirst();
+    assertEquals(130000, row.outstandingMinor());
+    assertEquals(80000, row.remainingPaymentMinor());
+    assertEquals(200000, row.paymentCashMinor());
+    assertEquals(230000, ledger.position(day).cashMinor());
+    assertEquals(
+        150000,
+        commitments.outlook(day, day.plusMonths(1), false, true).household().closingMinor());
+    assertEquals(50000, ledger.position(day).spendingMinor());
+    assertEquals(1, debts.history().size());
+  }
+
+  @Test
+  void finalLoanRepaymentIncludesInterestAndFeesInAccountShortfallRatherThanPrincipalOnly() {
+    debt =
+        ledger
+            .create(
+                new LedgerService.AccountInput(
+                    "Synthetic small final loan",
+                    "DEBT",
+                    day.minusMonths(3),
+                    "-10",
+                    "Synthetic statement"))
+            .id();
+    cash =
+        ledger
+            .create(
+                new LedgerService.AccountInput(
+                    "Synthetic final payment cash",
+                    "CASH",
+                    day.minusMonths(3),
+                    "12",
+                    "Synthetic statement"))
+            .id();
+    var t = terms("LOAN", "6");
+    var fees =
+        new DebtService.Terms(
+            debt,
+            t.name(),
+            t.kind(),
+            cash,
+            "0",
+            "100",
+            "5",
+            t.maturity(),
+            "10",
+            "0",
+            t.lenderAssumptions(),
+            t.rates());
+    debts.change(change(0, fees, statement(true, "10", "0", "0", "0", "0", "10", "1")));
+    var row = debts.get().rows().getFirst();
+    assertEquals(1505, row.remainingPaymentMinor());
+    assertTrue(row.warnings().stream().anyMatch(w -> w.contains("Repayment shortfall")));
+    var outlook = commitments.outlook(day, day.plusDays(15), false, true);
+    assertEquals(
+        -305,
+        outlook.accounts().stream()
+            .filter(a -> a.id().equals(cash))
+            .findFirst()
+            .orElseThrow()
+            .closingMinor());
+    assertEquals(1200, row.paymentCashMinor());
+  }
 }
