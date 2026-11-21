@@ -798,3 +798,13 @@ body {
 .goals-workspace button:focus-visible,.goals-workspace input:focus-visible,.goals-workspace select:focus-visible {outline:3px solid #2563eb;outline-offset:2px}
 .goals-workspace article {overflow-wrap:anywhere}
 .goals-workspace details {margin-top:.6rem}
+
+.debt-statements fieldset { display:grid; gap:0.8rem; margin:1rem 0; min-width:0; }
+.debt-statements label { display:grid; gap:0.3rem; }
+.debt-statements label:has(input[type=checkbox]) { display:flex; align-items:center; }
+.debt-statements input,.debt-statements select,.debt-statements textarea { max-width:100%; min-width:0; padding:0.5rem; }
+.debt-statements article { overflow-wrap:anywhere; }
+.debt-statements pre { white-space:pre-wrap; overflow-wrap:anywhere; }
+.debt-table { overflow-x:auto; max-width:100%; }
+.debt-table table { width:100%; border-collapse:collapse; }
+.debt-table td,.debt-table th { padding:0.5rem; text-align:right; white-space:nowrap; }

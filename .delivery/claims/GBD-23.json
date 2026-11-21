@@ -1,0 +1,14 @@
+{
+  "work_id": "GBD-23",
+  "page_id": "41ad3419-fef0-81ef-9ad8-f917640c5af7",
+  "branch": "story/23-delivery",
+  "token": "claim-token:codex-gbd23-20261121-3cd5d146",
+  "claimed_at": "2026-11-21T11:32:00Z",
+  "base_sha": "d890371942c8e1a9ec91bc311c10acf9b7bc8713",
+  "history": [
+    {
+      "event": "claim",
+      "method": "Create-only GitHub create_branch succeeded before Notion ownership write/readback. Generated claim token; not a platform session ID."
+    }
+  ]
+}
