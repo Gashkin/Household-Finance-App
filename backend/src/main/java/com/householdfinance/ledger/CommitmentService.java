@@ -55,6 +55,7 @@ public class CommitmentService {
       long closingMinor,LocalDate shortfallDate,List<Point> days) {}
   public record Outlook(LocalDate baseline,LocalDate end,boolean currentEvidence,List<String> warnings,
       List<Occurrence> occurrences,CashLine household,List<CashLine> accounts) {}
+  @org.springframework.beans.factory.annotation.Autowired private DebtService debts;
   private final LedgerReviewRepository records;
   private final LedgerAccountRepository accounts;
   private final LedgerEntryRepository entries;
@@ -251,7 +252,7 @@ public class CommitmentService {
     if(in.delayedIncomeId()!=null&&!in.delayedIncomeId().isBlank()){
       var original=rows.stream().filter(o->o.id().equals(in.delayedIncomeId())&&o.direction().equals("INCOME")&&o.certainty().equals("EXPECTED")&&!o.suppressed()&&!o.state().equals("MATCHED")).findFirst().orElseThrow(()->new IllegalArgumentException("Choose an unmatched expected income"));
       check(in.delayedUntil()!=null&&!in.delayedUntil().isBefore(original.date())&&!in.delayedUntil().isAfter(in.end()),"Choose a later income date inside the horizon");long delay=ChronoUnit.DAYS.between(original.date(),in.delayedUntil());Rule incomeRule=ruleFor(s,original);
-      for(int i=0;i<rows.size();i++){var o=rows.get(i);Rule r=ruleFor(s,o);boolean linked=incomeRule.frequency().equals("INCOME_LINKED")&&r.frequency().equals("INCOME_LINKED")&&Objects.equals(incomeRule.payrollId(),r.payrollId())&&YearMonth.from(o.nominalDate()).equals(YearMonth.from(original.nominalDate()))&&s.exceptions().stream().noneMatch(e->e.id().equals(o.id()));if(o.id().equals(original.id())||linked){var date=o.date().plusDays(delay);check(!date.isAfter(in.end()),"Delayed linked bill falls outside the horizon; extend the outlook");rows.set(i,new Occurrence(o.id(),o.scheduleId(),o.nominalDate(),date,o.name(),o.accountId(),o.categoryId(),o.direction(),o.certainty(),o.amountType(),o.amountMinor(),o.counterpartId(),o.state(),o.entryId(),o.actualMinor(),o.suppressed(),o.warnings()));}}
+      for(int i=0;i<rows.size();i++){var o=rows.get(i);if(o.scheduleId().startsWith("debt:"))continue;Rule r=ruleFor(s,o);boolean linked=incomeRule.frequency().equals("INCOME_LINKED")&&r.frequency().equals("INCOME_LINKED")&&Objects.equals(incomeRule.payrollId(),r.payrollId())&&YearMonth.from(o.nominalDate()).equals(YearMonth.from(original.nominalDate()))&&s.exceptions().stream().noneMatch(e->e.id().equals(o.id()));if(o.id().equals(original.id())||linked){var date=o.date().plusDays(delay);check(!date.isAfter(in.end()),"Delayed linked bill falls outside the horizon; extend the outlook");rows.set(i,new Occurrence(o.id(),o.scheduleId(),o.nominalDate(),date,o.name(),o.accountId(),o.categoryId(),o.direction(),o.certainty(),o.amountType(),o.amountMinor(),o.counterpartId(),o.state(),o.entryId(),o.actualMinor(),o.suppressed(),o.warnings()));}}
     }else check(in.delayedUntil()==null,"Select the income to delay");
     if(in.transferEuro()!=null&&!in.transferEuro().isBlank()){
       long amount=money(in.transferEuro());account(in.sourceAccount());account(in.destinationAccount());check(!Objects.equals(in.sourceAccount(),in.destinationAccount()),"Transfer accounts must differ");check(base.accounts().stream().anyMatch(a->a.id().equals(in.sourceAccount()))&&base.accounts().stream().anyMatch(a->a.id().equals(in.destinationAccount())),"Transfer accounts must exist at the baseline");check(in.transferDate()!=null&&in.transferDate().isAfter(in.baseline())&&!in.transferDate().isAfter(in.end()),"Transfer date must lie after baseline and inside horizon");rows.add(new Occurrence("what-if-transfer","what-if",in.transferDate(),in.transferDate(),"Unsaved planned transfer",in.sourceAccount(),null,"TRANSFER","EXPECTED","FIXED",amount,in.destinationAccount(),"UPCOMING",null,null,false,List.of()));
@@ -271,9 +272,10 @@ public class CommitmentService {
     // Monthly anchor/calendar day difference (30), calendar movement (31), and
     // offset (31) fit within 124 days; linked income overrides can move 62 days
     // plus the two linked offsets (62). Keep all supported pre-anchor obligations.
-    var all=occurrences(state,resolvedStart(state,baseline),end,baseline);var warnings=new ArrayList<String>();
+    var all=new ArrayList<>(occurrences(state,resolvedStart(state,baseline),end,baseline));all.addAll(debts.obligations(LocalDate.of(2000,1,1),end,baseline));var warnings=new ArrayList<String>(debts.forecastWarnings(baseline));
     check(all.stream().noneMatch(o->o.state().equals("MATCH_NEEDS_REVIEW")),"Linked activity changed or settled; review its match in Upcoming before calculating a new outlook");
     check(state.schedules().stream().flatMap(x->x.versions().stream()).allMatch(v->ids.contains(v.rule().accountId())&&(v.rule().counterpartId()==null||v.rule().counterpartId().isBlank()||ids.contains(v.rule().counterpartId()))),"Starting evidence excludes a scheduled account; choose a later baseline");
+    check(all.stream().allMatch(o->ids.contains(o.accountId())),"Starting evidence excludes a debt payment account; choose a later baseline");
     for(var o:all){warnings.addAll(o.warnings());if(o.state().equals("OVERDUE")||o.state().equals("DATA_UNCONFIRMED"))warnings.add(o.name()+": "+o.state()+"; unpaid expenses stay reserved and overdue income is not assumed received.");}
     boolean ready=!cash.isEmpty()&&cash.stream().allMatch(LedgerService.AccountView::reconciled)&&baseline.equals(today())&&warnings.isEmpty()&&!uncertain;
     if(cash.isEmpty())warnings.add("No owned cash accounts. Create and review account evidence in Money position. Existing dated/manual plans remain available in Starting evidence & saved plan.");
