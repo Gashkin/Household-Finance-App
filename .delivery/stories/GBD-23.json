@@ -1,0 +1,43 @@
+{
+  "work_id": "GBD-23",
+  "page_id": "41ad3419-fef0-81ef-9ad8-f917640c5af7",
+  "branch": "story/23-delivery",
+  "artifacts": [
+    {
+      "path": "backend/src/main/java/com/householdfinance/ledger/DebtService.java",
+      "contains": [
+        "class DebtService"
+      ]
+    },
+    {
+      "path": "frontend/src/components/DebtStatementsWorkspace.tsx",
+      "contains": [
+        "Cards, loans &amp; mortgages"
+      ]
+    },
+    {
+      "path": "backend/src/test/java/com/householdfinance/ledger/DebtTest.java",
+      "contains": [
+        "pairedSettlementsAndPurchasesAffectSpendingAndCashOnlyOnceAndUnlinkRestoresReservation"
+      ]
+    },
+    {
+      "path": "backend/src/test/java/com/householdfinance/workspace/DebtRecoveryTest.java",
+      "contains": [
+        "statementsDatedRatesReplaysReportsAndForecastSurviveRestartAndEncryptedRestore"
+      ]
+    },
+    {
+      "path": "frontend/e2e/debt-statements.spec.ts",
+      "contains": [
+        "statement corrections"
+      ]
+    },
+    {
+      "path": "product/stories/debt-statements.md",
+      "contains": [
+        "GBD-23"
+      ]
+    }
+  ]
+}

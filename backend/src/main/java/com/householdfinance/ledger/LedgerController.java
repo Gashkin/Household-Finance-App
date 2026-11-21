@@ -18,6 +18,14 @@ public class LedgerController {
   @org.springframework.beans.factory.annotation.Autowired private ActivityReviewService review;
   @org.springframework.beans.factory.annotation.Autowired private BudgetService budgets;
   @org.springframework.beans.factory.annotation.Autowired private GoalService goals;
+  @org.springframework.beans.factory.annotation.Autowired private DebtService debts;
+  @GetMapping("/debts") public Object debts(){return debts.get();}
+  @PostMapping("/debts") public Object debtChange(HttpServletRequest r)throws IOException{return debts.change(body(r,DebtService.Change.class));}
+  @PostMapping("/debts/compare") public Object debtCompare(HttpServletRequest r)throws IOException{return debts.compare(body(r,DebtService.Compare.class));}
+  @GetMapping("/debts/report") public Object debtReport(){return debts.report(null);}
+  @PostMapping("/debts/report") public Object debtComparisonReport(HttpServletRequest r)throws IOException{return debts.report(body(r,DebtService.Compare.class));}
+  @GetMapping("/debts/history") public Object debtHistory(){return debts.history();}
+  @GetMapping("/debts/operations/{id}") public Object debtOperation(@PathVariable("id")String id){return debts.operation(id);}
   @GetMapping("/goals") public Object goals(){return goals.get();}
   @PostMapping("/goals") public Object goalChange(HttpServletRequest r)throws IOException{return goals.change(body(r,GoalService.Change.class));}
   @GetMapping("/goals/history") public Object goalHistory(){return goals.history();}

@@ -21,3 +21,5 @@ timestamp: 2026-07-27T00:00:00Z
 - spec/zachman.md
 - ops/pass1/domain-rules.md
 - backend/src/main/java/com/householdfinance/entity/
+
+- [Debt statement evidence](debt-statements.md)
