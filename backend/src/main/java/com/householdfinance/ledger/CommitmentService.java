@@ -272,7 +272,7 @@ public class CommitmentService {
     // Monthly anchor/calendar day difference (30), calendar movement (31), and
     // offset (31) fit within 124 days; linked income overrides can move 62 days
     // plus the two linked offsets (62). Keep all supported pre-anchor obligations.
-    var all=new ArrayList<>(occurrences(state,resolvedStart(state,baseline),end,baseline));all.addAll(debts.obligations(LocalDate.of(2000,1,1),end,baseline));var warnings=new ArrayList<String>();
+    var all=new ArrayList<>(occurrences(state,resolvedStart(state,baseline),end,baseline));all.addAll(debts.obligations(LocalDate.of(2000,1,1),end,baseline));var warnings=new ArrayList<String>(debts.forecastWarnings(baseline));
     check(all.stream().noneMatch(o->o.state().equals("MATCH_NEEDS_REVIEW")),"Linked activity changed or settled; review its match in Upcoming before calculating a new outlook");
     check(state.schedules().stream().flatMap(x->x.versions().stream()).allMatch(v->ids.contains(v.rule().accountId())&&(v.rule().counterpartId()==null||v.rule().counterpartId().isBlank()||ids.contains(v.rule().counterpartId()))),"Starting evidence excludes a scheduled account; choose a later baseline");
     check(all.stream().allMatch(o->ids.contains(o.accountId())),"Starting evidence excludes a debt payment account; choose a later baseline");

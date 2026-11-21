@@ -387,7 +387,7 @@ public class DebtService {
             .map(LedgerService.AccountView::id)
             .collect(java.util.stream.Collectors.toSet());
     long paid = 0;
-    for (var e : ledger.activity(d.terms().accountId()))
+    for (var e : entries.findByAccountIdOrderByDateAscReferenceAsc(d.terms().accountId()))
       if (e.date.isAfter(after)
           && !e.date.isAfter(through)
           && e.amountMinor > 0
@@ -505,19 +505,34 @@ public class DebtService {
   }
 
   private Schedule schedule(Debt d, LocalDate first, long balance, long extra) {
+    return schedule(d, first, 0, balance, extra, null, false);
+  }
+
+  private Schedule schedule(
+      Debt d,
+      LocalDate anchor,
+      int startIndex,
+      long balance,
+      long extra,
+      Long firstCap,
+      boolean catchup) {
     var t = d.terms();
     var rows = new ArrayList<Payment>();
     long remaining = Math.max(0, balance - extra), interestTotal = 0, feesTotal = 0, total = 0;
     for (int i = 0; i < 1200 && remaining > 0; i++) {
-      LocalDate date = first.plusMonths(i);
+      LocalDate date = i == 0 && catchup ? today() : anchor.plusMonths(startIndex + i);
       if (date.isAfter(t.maturity())) break;
       var rate = effective(t, date);
       long
           interest =
-              DebtScenarioService.monthlyInterest(remaining, new BigDecimal(rate.annualPercent())),
-          fees = amount(t.monthlyFeeEuro()),
+              i == 0 && catchup
+                  ? 0
+                  : DebtScenarioService.monthlyInterest(
+                      remaining, new BigDecimal(rate.annualPercent())),
+          fees = i == 0 && catchup ? 0 : amount(t.monthlyFeeEuro()),
           due = remaining + interest + fees,
-          payment = Math.min(amount(t.monthlyPaymentEuro()), due);
+          payment =
+              Math.min(i == 0 && firstCap != null ? firstCap : amount(t.monthlyPaymentEuro()), due);
       long principal = payment - interest - fees, closing = remaining - principal;
       check(
           closing <= 9_007_199_254_740_991L
@@ -561,18 +576,37 @@ public class DebtService {
         "Extra payment exceeds current debt or the stated lender allowance");
     long cash = Math.max(0, row.paymentCashMinor());
     check(extra + fee <= cash, "Extra payment and lender fee exceed cash after pending debits");
-    int skipped = 0;
-    while (s.due().plusMonths(skipped).isBefore(today())) skipped++;
-    LocalDate first = s.due().plusMonths(skipped);
+    var unpaid = remainingContract(d, s, today());
     check(
-        !first.isAfter(d.terms().maturity()),
+        !unpaid.isEmpty(),
+        "Reviewed settlements cover the recorded installments; add a current lender statement"
+            + " before comparing remaining debt");
+    long firstCap = 0;
+    int firstIndex = unpaid.getFirst().index();
+    boolean catchup = !unpaid.getFirst().date().isAfter(today());
+    if (catchup) {
+      for (var payment : unpaid) {
+        if (payment.date().isAfter(today())) break;
+        firstCap = Math.addExact(firstCap, payment.amountMinor());
+        firstIndex = payment.index();
+      }
+    } else firstCap = unpaid.getFirst().amountMinor();
+    LocalDate calendarAnchor = unpaid.getFirst().balloon() ? unpaid.getFirst().date() : s.due();
+    if (unpaid.getFirst().balloon()) firstIndex = 0;
+    check(
+        !today().isAfter(d.terms().maturity())
+            && !calendarAnchor.plusMonths(firstIndex).isAfter(d.terms().maturity()),
         "Review maturity and overdue contractual payments before comparing");
-    var base = schedule(d, first, balance, 0);
-    var alt = schedule(d, first, balance, extra);
+    var base = schedule(d, calendarAnchor, firstIndex, balance, 0, firstCap, catchup);
+    var alt = schedule(d, calendarAnchor, firstIndex, balance, extra, firstCap, catchup);
     DebtScenarioService.Result fixed = null;
     var t = d.terms();
     boolean constant = t.rates().stream().noneMatch(x -> x.from().isAfter(today()));
-    if (constant && amount(t.monthlyFeeEuro()) == 0 && base.paidOff()) {
+    if (constant
+        && amount(t.monthlyFeeEuro()) == 0
+        && base.paidOff()
+        && !catchup
+        && firstCap == amount(t.monthlyPaymentEuro())) {
       fixed =
           scenarios.compare(
               new DebtScenarioService.Input(
@@ -604,6 +638,15 @@ public class DebtService {
               true);
     }
     var warnings = new ArrayList<>(row.warnings());
+    if (catchup)
+      warnings.add(
+          "Unpaid installments due by today are combined into a catch-up payment today. Current"
+              + " booked debt already includes recorded charges; no additional elapsed-period"
+              + " interest or fees are forecast on this catch-up. Obtain a lender arrears quote.");
+    if (firstCap != amount(t.monthlyPaymentEuro()))
+      warnings.add(
+          "The first unpaid contractual amount reflects reviewed settlement credits; subsequent"
+              + " installments retain the original calendar anchor.");
     if (base.payments().stream().anyMatch(p -> p.principalMinor() <= 0))
       warnings.add("Contractual payment does not reduce principal at a dated rate; debt can grow.");
     if (!base.paidOff() || !alt.paidOff())
@@ -642,6 +685,80 @@ public class DebtService {
         fee);
   }
 
+  private record Unpaid(LocalDate date, long amountMinor, boolean balloon, int index) {}
+
+  private List<Unpaid> remainingContract(Debt d, Statement s, LocalDate baseline) {
+    long credits = paid(d, s.end(), baseline),
+        balance = Math.max(0, LedgerService.money(s.balanceEuro()));
+    var all = new ArrayList<Unpaid>();
+    var t = d.terms();
+    if (t.kind().equals("CARD")) all.add(new Unpaid(s.due(), balance, false, 0));
+    else {
+      var contract = schedule(d, s.due(), balance, 0);
+      for (int i = 0; i < contract.payments().size(); i++) {
+        var p = contract.payments().get(i);
+        all.add(new Unpaid(p.date(), p.paymentMinor(), false, i));
+      }
+      if (!contract.paidOff())
+        all.add(
+            new Unpaid(t.maturity(), contract.remainingMinor(), true, contract.payments().size()));
+    }
+    var result = new ArrayList<Unpaid>();
+    for (var payment : all) {
+      long used = Math.min(payment.amountMinor(), credits);
+      credits -= used;
+      long remaining = payment.amountMinor() - used;
+      if (remaining > 0)
+        result.add(new Unpaid(payment.date(), remaining, payment.balloon(), payment.index()));
+    }
+    return List.copyOf(result);
+  }
+
+  @Transactional(readOnly = true)
+  public List<String> forecastWarnings(LocalDate baseline) {
+    var warnings = new ArrayList<String>();
+    var accounts =
+        ledger.position(baseline).accounts().stream()
+            .filter(LedgerService.AccountView::owned)
+            .map(LedgerService.AccountView::id)
+            .collect(java.util.stream.Collectors.toSet());
+    for (var d : read().debts()) {
+      if (!accounts.contains(d.terms().accountId())) continue;
+      var s =
+          d.statements().stream()
+              .filter(x -> !x.end().isAfter(baseline))
+              .reduce((a, b) -> b)
+              .orElse(null);
+      if (s == null) {
+        warnings.add(
+            d.terms().name()
+                + ": no debt statement covers this baseline; outlook is illustrative.");
+        continue;
+      }
+      var a = account(d.terms().accountId(), s.end(), "DEBT");
+      if (!s.complete())
+        warnings.add(
+            d.terms().name()
+                + ": incomplete debt statement; outlook is illustrative even when no payment is"
+                + " expected.");
+      if (a.bookedMinor() + LedgerService.money(s.balanceEuro()) != 0)
+        warnings.add(
+            d.terms().name()
+                + ": debt statement differs from ledger; reconcile conflicting evidence before"
+                + " relying on outlook.");
+      if (!a.reconciled() || a.pendingEntries() > 0)
+        warnings.add(
+            d.terms().name()
+                + ": debt statement date/revision is not reconciled or has pending activity;"
+                + " outlook is illustrative.");
+      if (s.end().isBefore(baseline.minusDays(45)))
+        warnings.add(
+            d.terms().name()
+                + ": debt statement evidence is more than 45 days old; outlook is illustrative.");
+    }
+    return List.copyOf(warnings);
+  }
+
   /** Source-only cash debit: no fictional cash credit at the lender and no purchase spending. */
   @Transactional(readOnly = true)
   public List<CommitmentService.Occurrence> obligations(
@@ -657,33 +774,10 @@ public class DebtService {
       var t = d.terms();
       var a = account(t.accountId(), baseline, "DEBT");
       if (a.bookedMinor() >= 0) continue;
-      long credits = paid(d, s.end(), baseline),
-          balance = Math.max(0, LedgerService.money(s.balanceEuro()));
-      var payments = new ArrayList<Payment>();
-      if (t.kind().equals("CARD"))
-        payments.add(new Payment(s.due(), balance, "0", balance, 0, 0, balance, 0));
-      else {
-        var contract = schedule(d, s.due(), balance, 0);
-        payments.addAll(contract.payments());
-        if (!contract.paidOff())
-          payments.add(
-              new Payment(
-                  t.maturity(),
-                  contract.remainingMinor(),
-                  "BALLOON",
-                  contract.remainingMinor(),
-                  0,
-                  0,
-                  contract.remainingMinor(),
-                  0));
-      }
-      for (var payment : payments) {
+      for (var payment : remainingContract(d, s, baseline)) {
         LocalDate date = payment.date();
         if (date.isAfter(end)) break;
-        long amount = payment.paymentMinor();
-        long used = Math.min(amount, credits);
-        credits -= used;
-        amount -= used;
+        long amount = payment.amountMinor();
         if (t.kind().equals("CARD")) amount = Math.min(amount, -a.bookedMinor());
         if (amount == 0 || date.isBefore(from)) continue;
         var warnings = new ArrayList<String>();
@@ -704,11 +798,7 @@ public class DebtService {
                   + " outlook.");
         out.add(
             new CommitmentService.Occurrence(
-                "debt:"
-                    + d.id()
-                    + "/"
-                    + date
-                    + (payment.annualPercent().equals("BALLOON") ? "/balloon" : ""),
+                "debt:" + d.id() + "/" + date + (payment.balloon() ? "/balloon" : ""),
                 "debt:" + d.id(),
                 date,
                 date,

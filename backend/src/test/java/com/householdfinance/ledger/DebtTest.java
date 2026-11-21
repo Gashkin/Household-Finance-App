@@ -761,4 +761,308 @@ class DebtTest {
             .closingMinor());
     assertEquals(1200, row.paymentCashMinor());
   }
+
+  void importPurchases(int start, int count) {
+    var csv = new StringBuilder("reference,date,description,amount,status,kind\n");
+    for (int i = start; i < start + count; i++)
+      csv.append("synthetic-boundary-")
+          .append(i)
+          .append(',')
+          .append(day)
+          .append(",Synthetic later purchase,-1.00,BOOKED,ACTIVITY\n");
+    var preview =
+        ledger.preview(
+            debt, new LedgerService.PreviewInput(csv.toString(), "Synthetic boundary import"));
+    var approval =
+        new LedgerService.Approval(
+            preview.revision(),
+            preview.proposals().stream().map(LedgerService.Proposal::row).toList(),
+            true);
+    var saved = ledger.approve(debt, preview.id(), approval);
+    long audit = jdbc.queryForObject("SELECT COUNT(*) FROM LEDGER_AUDIT", Long.class);
+    assertEquals(saved, ledger.approve(debt, preview.id(), approval));
+    assertEquals(audit, jdbc.queryForObject("SELECT COUNT(*) FROM LEDGER_AUDIT", Long.class));
+  }
+
+  @Test
+  void retainedSettlementsSurviveTheFiveHundredRowDisplayBoundaryAndImportReplay() {
+    var statement =
+        new DebtService.Statement(
+            UUID.randomUUID().toString(),
+            day.minusMonths(1),
+            day.minusDays(2),
+            day.plusDays(10),
+            "Synthetic boundary statement",
+            true,
+            "1000",
+            "0",
+            "0",
+            "0",
+            "0",
+            "1000",
+            "25",
+            null);
+    var input = change(0, terms("CARD", "18"), statement);
+    debts.change(input);
+    for (var pair : List.of(new String[] {cash, "-200.00"}, new String[] {debt, "200.00"}))
+      ledger.manual(
+          pair[0],
+          new LedgerService.Manual(
+              revision(pair[0]),
+              new LedgerService.Row(
+                  "old-settlement-" + pair[0],
+                  day.minusDays(1),
+                  "Synthetic retained settlement",
+                  pair[1],
+                  "BOOKED",
+                  "ACTIVITY"),
+              "Synthetic statement",
+              true));
+    var debit = ledger.activity(cash).getFirst();
+    var credit = ledger.activity(debt).getFirst();
+    review.link(
+        debit.id,
+        new ActivityReviewService.Link(
+            revision(cash),
+            credit.id,
+            revision(debt),
+            "CARD_SETTLEMENT",
+            "Synthetic retained link"));
+    importPurchases(0, 499);
+    assertEquals(500, ledger.activity(debt).size());
+    assertTrue(ledger.activity(debt).stream().anyMatch(e -> e.id.equals(credit.id)));
+    assertEquals(80000, debts.get().rows().getFirst().remainingPaymentMinor());
+    importPurchases(499, 1);
+    assertEquals(500, ledger.activity(debt).size());
+    assertTrue(ledger.activity(debt).stream().noneMatch(e -> e.id.equals(credit.id)));
+    long audit = jdbc.queryForObject("SELECT COUNT(*) FROM LEDGER_AUDIT", Long.class);
+    var state = debts.get().state();
+    assertEquals(80000, debts.get().rows().getFirst().remainingPaymentMinor());
+    assertEquals(130000, debts.get().rows().getFirst().outstandingMinor());
+    assertEquals(180000, ledger.position(day).cashMinor());
+    assertEquals(
+        100000,
+        commitments.outlook(day, day.plusMonths(1), false, true).household().closingMinor());
+    assertEquals(
+        "CARD_SETTLEMENT",
+        jdbc.queryForObject(
+            "SELECT LINK_TYPE FROM LEDGER_ENTRIES WHERE ID=?", String.class, credit.id));
+    assertEquals(state, debts.change(input));
+    assertEquals(audit, jdbc.queryForObject("SELECT COUNT(*) FROM LEDGER_AUDIT", Long.class));
+    assertEquals(1, debts.history().size());
+  }
+
+  void reconcileCash() {
+    ledger.reconcile(
+        cash,
+        day,
+        new LedgerService.Reconcile(
+            revision(cash), "2000", "Synthetic current cash evidence", true, false));
+  }
+
+  @Test
+  void conflictingCreditAndIncompleteZeroStatementsRemainIllustrativeWithoutCashOccurrences() {
+    reconcileCash();
+    ledger.reconcile(
+        debt,
+        day,
+        new LedgerService.Reconcile(
+            revision(debt), "-1000", "Synthetic current debt evidence", true, false));
+    var credit =
+        new DebtService.Statement(
+            UUID.randomUUID().toString(),
+            day.minusMonths(1),
+            day,
+            day.plusDays(10),
+            "Synthetic mismatched credit",
+            true,
+            "-25",
+            "0",
+            "0",
+            "0",
+            "0",
+            "-25",
+            "0",
+            null);
+    debts.change(change(0, terms("CARD", "0"), credit));
+    var before = debts.get();
+    long audit = jdbc.queryForObject("SELECT COUNT(*) FROM LEDGER_AUDIT", Long.class);
+    var outlook = commitments.outlook(day, day.plusMonths(1), false, true);
+    assertFalse(outlook.currentEvidence());
+    assertTrue(outlook.occurrences().isEmpty());
+    assertTrue(outlook.warnings().stream().anyMatch(w -> w.contains("debt statement differs")));
+    assertEquals(before, debts.get());
+    assertEquals(audit, jdbc.queryForObject("SELECT COUNT(*) FROM LEDGER_AUDIT", Long.class));
+    var zero =
+        new DebtService.Statement(
+            UUID.randomUUID().toString(),
+            credit.start(),
+            credit.end(),
+            credit.due(),
+            "Synthetic incomplete zero correction",
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "0",
+            null,
+            credit.id());
+    debts.change(change(1, terms("CARD", "0"), zero));
+    before = debts.get();
+    audit = jdbc.queryForObject("SELECT COUNT(*) FROM LEDGER_AUDIT", Long.class);
+    outlook = commitments.outlook(day, day.plusMonths(1), false, true);
+    assertFalse(outlook.currentEvidence());
+    assertTrue(outlook.occurrences().isEmpty());
+    assertTrue(outlook.warnings().stream().anyMatch(w -> w.contains("incomplete debt statement")));
+    assertEquals(before, debts.get());
+    assertEquals(audit, jdbc.queryForObject("SELECT COUNT(*) FROM LEDGER_AUDIT", Long.class));
+  }
+
+  @Test
+  void reconciledLenderCreditDoesNotCreateAPaymentOrFalseDebtEvidenceWarning() {
+    reconcileCash();
+    debt =
+        ledger
+            .create(
+                new LedgerService.AccountInput(
+                    "Synthetic reconciled credit",
+                    "DEBT",
+                    day.minusMonths(2),
+                    "25",
+                    "Synthetic statement"))
+            .id();
+    ledger.reconcile(
+        debt,
+        day,
+        new LedgerService.Reconcile(0L, "25", "Synthetic lender closing credit", true, false));
+    var statement =
+        new DebtService.Statement(
+            UUID.randomUUID().toString(),
+            day.minusMonths(1),
+            day,
+            day.plusDays(10),
+            "Synthetic legitimate credit",
+            true,
+            "-25",
+            "0",
+            "0",
+            "0",
+            "0",
+            "-25",
+            "0",
+            null);
+    debts.change(change(0, terms("CARD", "0"), statement));
+    var before = debts.get();
+    long audit = jdbc.queryForObject("SELECT COUNT(*) FROM LEDGER_AUDIT", Long.class);
+    var outlook = commitments.outlook(day, day.plusMonths(1), false, true);
+    assertTrue(outlook.currentEvidence());
+    assertTrue(outlook.occurrences().isEmpty());
+    assertEquals(200000, outlook.household().closingMinor());
+    assertEquals(before, debts.get());
+    assertEquals(audit, jdbc.queryForObject("SELECT COUNT(*) FROM LEDGER_AUDIT", Long.class));
+  }
+
+  DebtService.Statement due(LocalDate due) {
+    return new DebtService.Statement(
+        UUID.randomUUID().toString(),
+        day.minusMonths(2),
+        due.isAfter(day) ? day.minusDays(1) : due.minusDays(1),
+        due,
+        "Synthetic contractual statement",
+        true,
+        "1000",
+        "0",
+        "0",
+        "0",
+        "0",
+        "1000",
+        "25",
+        null);
+  }
+
+  DebtService.Comparison compareUnchanged() {
+    var state = debts.get().state();
+    var position = ledger.position(day);
+    long audit = jdbc.queryForObject("SELECT COUNT(*) FROM LEDGER_AUDIT", Long.class);
+    var result = debts.compare(new DebtService.Compare(state.revision(), id, "0", "0"));
+    assertEquals(state, debts.get().state());
+    assertEquals(position, ledger.position(day));
+    assertEquals(audit, jdbc.queryForObject("SELECT COUNT(*) FROM LEDGER_AUDIT", Long.class));
+    return result;
+  }
+
+  @Test
+  void fullyPaidTodaysInstallmentStartsComparisonAtTheNextUnpaidDate() {
+    debts.change(change(0, terms("LOAN", "0"), due(day)));
+    settlement("100.00");
+    var comparison = compareUnchanged();
+    var forecast = debts.obligations(day, day.plusYears(1), day);
+    assertEquals(90000, debts.get().rows().getFirst().outstandingMinor());
+    assertEquals(0, debts.get().rows().getFirst().remainingPaymentMinor());
+    assertEquals(day.plusMonths(1), comparison.baseline().payments().getFirst().date());
+    assertEquals(forecast.getFirst().date(), comparison.baseline().payments().getFirst().date());
+    assertEquals(10000, comparison.baseline().payments().getFirst().paymentMinor());
+    assertEquals(day.plusMonths(9), comparison.baseline().payments().getLast().date());
+    assertEquals(9, comparison.baseline().payments().size());
+    assertNotNull(comparison.fixedRateComparison());
+  }
+
+  @Test
+  void partlyPaidTodaysInstallmentRetainsOnlyItsRemainingAmountThenOriginalDates() {
+    debts.change(change(0, terms("LOAN", "0"), due(day)));
+    settlement("50.00");
+    var comparison = compareUnchanged();
+    var forecast = debts.obligations(day, day.plusYears(1), day);
+    assertEquals(95000, debts.get().rows().getFirst().outstandingMinor());
+    assertEquals(day, comparison.baseline().payments().getFirst().date());
+    assertEquals(5000, comparison.baseline().payments().getFirst().paymentMinor());
+    assertEquals(
+        forecast.getFirst().amountMinor(),
+        comparison.baseline().payments().getFirst().paymentMinor());
+    assertEquals(day.plusMonths(1), comparison.baseline().payments().get(1).date());
+    assertEquals(day.plusMonths(9), comparison.baseline().payments().getLast().date());
+    assertEquals(95000, comparison.baseline().totalPaidMinor());
+    assertNull(comparison.fixedRateComparison());
+  }
+
+  @Test
+  void prepaymentAdvancesCoveredInstallmentsWithoutMovingTheContractualCalendar() {
+    var anchor = LocalDate.of(day.getYear() + 1, 1, 31);
+    debts.change(change(0, terms("LOAN", "0"), due(anchor)));
+    settlement("100.00");
+    var comparison = compareUnchanged();
+    var forecast = debts.obligations(day, anchor.plusMonths(12), day);
+    assertEquals(anchor.plusMonths(1), comparison.baseline().payments().getFirst().date());
+    assertEquals(anchor.plusMonths(2), comparison.baseline().payments().get(1).date());
+    assertEquals(anchor.plusMonths(3), comparison.baseline().payments().get(2).date());
+    assertEquals(forecast.getFirst().date(), comparison.baseline().payments().getFirst().date());
+    assertEquals(anchor.plusMonths(9), comparison.baseline().payments().getLast().date());
+  }
+
+  @Test
+  void overdueInstallmentsAreExplicitCatchupTodayAndPartialCreditsRemainConsistentWithOutlook() {
+    var anchor = day.minusMonths(1);
+    debts.change(change(0, terms("LOAN", "0"), due(anchor)));
+    var comparison = compareUnchanged();
+    var forecast = debts.obligations(day.minusMonths(2), day.plusYears(1), day);
+    long overdue =
+        forecast.stream()
+            .filter(o -> !o.date().isAfter(day))
+            .mapToLong(CommitmentService.Occurrence::amountMinor)
+            .sum();
+    assertEquals(20000, overdue);
+    assertEquals(day, comparison.baseline().payments().getFirst().date());
+    assertEquals(overdue, comparison.baseline().payments().getFirst().paymentMinor());
+    assertEquals(anchor.plusMonths(2), comparison.baseline().payments().get(1).date());
+    assertTrue(comparison.warnings().stream().anyMatch(w -> w.contains("catch-up")));
+    settlement("150.00");
+    comparison = compareUnchanged();
+    assertEquals(85000, debts.get().rows().getFirst().outstandingMinor());
+    assertEquals(5000, comparison.baseline().payments().getFirst().paymentMinor());
+    assertEquals(day, comparison.baseline().payments().getFirst().date());
+    assertEquals(anchor.plusMonths(2), comparison.baseline().payments().get(1).date());
+    assertEquals(85000, comparison.baseline().totalPaidMinor());
+  }
 }
