@@ -17,6 +17,11 @@ public class LedgerController {
   private final ObjectMapper json;
   @org.springframework.beans.factory.annotation.Autowired private ActivityReviewService review;
   @org.springframework.beans.factory.annotation.Autowired private BudgetService budgets;
+  @org.springframework.beans.factory.annotation.Autowired private GoalService goals;
+  @GetMapping("/goals") public Object goals(){return goals.get();}
+  @PostMapping("/goals") public Object goalChange(HttpServletRequest r)throws IOException{return goals.change(body(r,GoalService.Change.class));}
+  @GetMapping("/goals/history") public Object goalHistory(){return goals.history();}
+  @GetMapping("/goals/operations/{id}") public Object goalOperation(@PathVariable("id")String id){return goals.operation(id);}
   @GetMapping("/budgets/templates") public Object budgetTemplates(){return budgets.templates();}
   @GetMapping("/budgets/templates/{id}/history") public Object budgetTemplateHistory(@PathVariable("id")String id){return budgets.templateHistory(id);}
   @PostMapping("/budgets/templates") public Object createBudgetTemplate(HttpServletRequest r)throws IOException{return budgets.template(null,body(r,BudgetService.TemplateInput.class));}

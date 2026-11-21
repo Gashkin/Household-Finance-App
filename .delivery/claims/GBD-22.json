@@ -1,0 +1,9 @@
+{
+  "work_id":"GBD-22",
+  "page_id":"41ad3419-fef0-810e-98f9-d9acb7677e1c",
+  "branch":"story/22-delivery",
+  "token":"claim-token:codex-gbd22-20261120-729fab25",
+  "claimed_at":"2026-11-20T19:14:23Z",
+  "base_sha":"2e730545e48f8783ec3f3c8172ad53da1d3951c5",
+  "history":[{"event":"claim","method":"Create-only GitHub refs API succeeded before Notion ownership write/readback. Token is generated execution provenance, not a platform session ID."}]
+}

@@ -1,0 +1,13 @@
+{
+  "work_id":"GBD-22",
+  "page_id":"41ad3419-fef0-810e-98f9-d9acb7677e1c",
+  "branch":"story/22-delivery",
+  "artifacts":[
+    {"path":"backend/src/main/java/com/householdfinance/ledger/GoalService.java","contains":["class GoalService","Reservations are decisions"]},
+    {"path":"frontend/src/components/GoalsWorkspace.tsx","contains":["Goals &amp; irregular costs","Check save status"]},
+    {"path":"backend/src/test/java/com/householdfinance/ledger/GoalTest.java","contains":["failedReservationRollsBackLinkedBillCommitmentAndBothAudits"]},
+    {"path":"backend/src/test/java/com/householdfinance/workspace/GoalRecoveryTest.java","contains":["partialGoalLinkedBillReplaysAndHistorySurviveRestartAndEncryptedRestore"]},
+    {"path":"frontend/e2e/goals.spec.ts","contains":["annual bill and competing savings"]},
+    {"path":"product/stories/goals.md","contains":["GBD-22"]}
+  ]
+}
