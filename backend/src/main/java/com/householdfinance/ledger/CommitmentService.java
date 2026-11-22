@@ -218,6 +218,25 @@ public class CommitmentService {
     check(rows.size()<=10000,"Too many occurrences; shorten the selected range");return rows.values().stream().sorted(Comparator.comparing(Occurrence::date).thenComparing(Occurrence::id)).toList();
   }
   @Transactional(readOnly=true) public List<Occurrence> upcoming(LocalDate from,LocalDate to){date(from);date(to);check(ChronoUnit.DAYS.between(from,to)<=1096,"Upcoming range is limited to three years");return occurrences(read(),from,to,today());}
+  public record DatedOccurrence(Occurrence occurrence,LocalDate dueDate,LocalDate paymentDate) {}
+  /** Preserve contractual timing when matching changes the effective cash date. */
+  @Transactional(readOnly=true) public List<DatedOccurrence> financialPeriod(LocalDate from,LocalDate end){
+    check(from!=null&&end!=null&&end.isAfter(from)&&ChronoUnit.DAYS.between(from,end)<=35,"Bounded financial period required");
+    var s=visible(read());var rows=new LinkedHashMap<String,Occurrence>();
+    occurrences(s,from,end.minusDays(1),today()).forEach(o->rows.put(o.id(),o));
+    // A settlement can move arbitrarily far from its nominal date. Saved matches
+    // are bounded by the existing state limits and must be tested independently.
+    for(var edit:s.exceptions()){var o=find(s,edit.id());rows.put(o.id(),o);}
+    var result=new ArrayList<DatedOccurrence>();
+    for(var o:rows.values()){
+      var r=ruleFor(s,o);var edit=s.exceptions().stream().filter(e->e.id().equals(o.id())).findFirst().orElse(null);
+      LocalDate due=r.frequency().equals("INCOME_LINKED")?payDate(s,r.payrollId(),o.nominalDate()).plusDays(r.offsetDays()):o.nominalDate();
+      if(edit!=null&&edit.date()!=null)due=edit.date();
+      LocalDate paid=o.state().equals("MATCHED")?o.date():null;
+      if((!due.isBefore(from)&&due.isBefore(end))||(paid!=null&&!paid.isBefore(from)&&paid.isBefore(end)))result.add(new DatedOccurrence(o,due,paid));
+    }
+    return result.stream().sorted(Comparator.comparing(DatedOccurrence::dueDate).thenComparing(x->x.occurrence().id())).toList();
+  }
   @Transactional(readOnly=true) public List<Candidate> candidates(String occurrenceId){
     var s=visible(read());var o=find(s,occurrenceId);var r=ruleFor(s,o);var a=account(r.accountId());
     return entries.findByAccountIdOrderByDateAscReferenceAsc(a.id).stream().filter(e->usableActual(r,e,false)||usableActual(r,e,true)).map(e->new Candidate(e.id,e.accountId,e.date,e.description,e.amountMinor,e.status,a.revision)).toList();
@@ -242,7 +261,7 @@ public class CommitmentService {
     var edits=new ArrayList<>(s.exceptions());var previous=edits.stream().filter(x->x.id().equals(o.id())).findFirst().orElse(null);edits.removeIf(x->x.id().equals(o.id()));
     if(e.action().equals("UNLINK")){check(previous!=null,"No saved occurrence change");edits.add(new OccurrenceEdit(o.id(),previous.date(),previous.amountMinor(),previous.skip(),null,null,"OVERRIDE",rule));}
     else if(e.action().equals("OVERRIDE")){check((!o.date().isBefore(today())||o.direction().equals("INCOME"))&&!o.state().equals("MATCHED")&&!o.state().equals("PENDING_RESERVED"),"Past expenses or linked occurrences cannot be overridden; unlink explicitly first");if(e.date()!=null){date(e.date());check(!e.date().isBefore(today())&&Math.abs(ChronoUnit.DAYS.between(o.nominalDate(),e.date()))<=62,"Override date must be future and within 62 days of nominal date");}check(!o.date().isBefore(today())||e.date()!=null,"Retiming overdue income requires an explicit future date");edits.add(new OccurrenceEdit(o.id(),e.date(),e.amountEuro()==null?null:money(e.amountEuro()),e.skip(),null,null,e.action(),rule));}
-    else{var a=account(o.accountId());check(e.accountRevision()!=null&&e.accountRevision()==a.revision,"Account changed; reload candidates");check(e.entryId()!=null,"Choose reviewed activity");var entry=entries.findById(e.entryId()).orElse(null);check(usableActual(rule,entry,e.action().equals("RESERVE")),"Choose an approved booked actual or matching pending debit; transfers require approved reciprocal booked legs on the same date");check(!entry.date.isAfter(today()),"Future actuals are not supported");check(s.exceptions().stream().noneMatch(x->!x.id().equals(o.id())&&(Objects.equals(x.entryId(),entry.id)||Objects.equals(x.entryId(),entry.linkedEntryId))),"Activity is already linked to another occurrence");edits.add(new OccurrenceEdit(o.id(),previous==null?null:previous.date(),previous==null?null:previous.amountMinor(),false,entry.id,fingerprint(entry),e.action(),rule));}
+    else{var a=account(o.accountId());check(e.accountRevision()!=null&&e.accountRevision()==a.revision,"Account changed; reload candidates");check(e.entryId()!=null,"Choose reviewed activity");var entry=entries.findById(e.entryId()).orElse(null);check(usableActual(rule,entry,e.action().equals("RESERVE")),"Choose an approved booked actual or matching pending debit; transfers require approved reciprocal booked legs on the same date");check(!entry.date.isAfter(today()),"Future actuals are not supported");check(s.exceptions().stream().noneMatch(x->x.entryId()!=null&&!x.id().equals(o.id())&&(Objects.equals(x.entryId(),entry.id)||Objects.equals(x.entryId(),entry.linkedEntryId))),"Activity is already linked to another occurrence");edits.add(new OccurrenceEdit(o.id(),previous==null?null:previous.date(),previous==null?null:previous.amountMinor(),false,entry.id,fingerprint(entry),e.action(),rule));}
     return save(s,s.schedules(),s.payrolls(),edits,e.operationId(),e.reason(),e);
   }
   private long add(long a,long b){long n=Math.addExact(a,b);check(n>=-9_007_199_254_740_991L&&n<=9_007_199_254_740_991L,"Projection exceeds safe money range");return n;}
@@ -287,6 +306,16 @@ public class CommitmentService {
     long starting=0;for(var a:lines)starting=add(starting,a.startingMinor());var household=project(null,"Permitted owned household cash",starting,baseline,end,all,uncertain,cashOnly);
     return new Outlook(baseline,end,ready,List.copyOf(new LinkedHashSet<>(warnings)),all,household,List.copyOf(lines));
   }
+  private boolean appliesIncome(Occurrence o,boolean uncertain,boolean cashOnly){return o.state().equals("MATCHED")||(!cashOnly&&!o.date().isBefore(today())&&(o.certainty().equals("EXPECTED")||uncertain));}
+  /** Shared with the snapshot: certainty of receipt is independent of amount/date precision. */
+  public String baselineTreatment(Occurrence o){
+    AccessContext.requireRead();
+    if(o.state().equals("SKIPPED"))return "CANCELLED";
+    if(o.state().equals("MATCH_NEEDS_REVIEW"))return "REVIEW_REQUIRED";
+    if(o.suppressed())return o.state().equals("MATCHED")?"INCORPORATED":o.state().equals("PENDING_RESERVED")?"RESERVED":"SUPPRESSED";
+    if(o.direction().equals("INCOME")&&!appliesIncome(o,false,false))return o.date().isBefore(today())?"OVERDUE_INCOME_EXCLUDED":"UPSIDE_ONLY";
+    return "OUTSTANDING";
+  }
   private CashLine project(String account,String name,long starting,LocalDate baseline,LocalDate end,List<Occurrence> rows,boolean uncertain,boolean cashOnly){
     long balance=starting,low=starting;LocalDate lowDate=baseline,shortfall=balance<0?baseline:null;List<Point> days=new ArrayList<>();
     for(LocalDate date=baseline.plusDays(1);!date.isAfter(end);date=date.plusDays(1)){
@@ -299,7 +328,7 @@ public class CommitmentService {
           if(account==null&&paired)continue;
           if(own)out=add(out,amount);if(account!=null&&paired&&account.equals(o.counterpartId()))in=add(in,amount);
         }else if(own&&o.direction().equals("EXPENSE"))out=add(out,amount);
-        else if(own&&(o.state().equals("MATCHED")||(!cashOnly&&!o.date().isBefore(today())&&(o.certainty().equals("EXPECTED")||uncertain))))in=add(in,amount);
+        else if(own&&appliesIncome(o,uncertain,cashOnly))in=add(in,amount);
         if(own||Objects.equals(account,o.counterpartId()))source.add(o.id());
       }
       long dailyLow=add(balance,-out),closing=add(dailyLow,in);if(dailyLow<low){low=dailyLow;lowDate=date;}if(shortfall==null&&dailyLow<0)shortfall=date;days.add(new Point(date,balance,out,in,dailyLow,closing,List.copyOf(source)));balance=closing;

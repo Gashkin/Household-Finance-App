@@ -603,11 +603,13 @@ public class LedgerService {
 
   @Transactional(readOnly = true)
   public Position position(LocalDate asOf) {
-    return position(asOf,false);
+    return position(asOf,false,false);
   }
   @Transactional(readOnly=true)
-  public Position sharedPosition(LocalDate asOf){return position(asOf,true);}
-  private Position position(LocalDate asOf,boolean sharedOnly){
+  public Position sharedPosition(LocalDate asOf){return position(asOf,true,false);}
+  @Transactional(readOnly=true)
+  public Position ownedPosition(LocalDate asOf){return position(asOf,false,true);}
+  private Position position(LocalDate asOf,boolean sharedOnly,boolean ownedOnly){
     AccessContext.requireRead();
     check(asOf != null && !asOf.isAfter(today()), "Position date must be today or earlier");
     List<AccountView> rows = new ArrayList<>();
@@ -615,7 +617,7 @@ public class LedgerService {
     long cashTotal = 0, debt = 0, income = 0, spent = 0, pendingDebits = 0;
     if (asOf.isBefore(today().minusDays(30)))
       warnings.add("Historical position: more than 30 days old; not current spending evidence");
-    for (var a : accounts.findAll().stream().filter(a -> AccessContext.reads(a.ownerId,a.shared)&&(!sharedOnly||a.shared)).sorted(Comparator.comparing(a -> a.name)).toList()) {
+    for (var a : accounts.findAll().stream().filter(a -> AccessContext.reads(a.ownerId,a.shared)&&(!sharedOnly||a.shared)&&(!ownedOnly||AccessContext.owns(a.ownerId))).sorted(Comparator.comparing(a -> a.name)).toList()) {
       if (a.openingDate.isAfter(asOf)) {
         warnings.add(a.name + " opened after this date and is excluded");
         continue;

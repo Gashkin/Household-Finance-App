@@ -124,6 +124,11 @@ public class WorkspaceFilter extends OncePerRequestFilter {
         var s=sessions.get(token(request));sessions.put(token(request),new Session(s.created(),s.seen(),s.userId(),s.revision(),clock.instant()));return true;
     }
     public synchronized void revokeAll(){sessions.clear();}
+    /** MCP shares the same admission lock as local edits, restore and recovery. */
+    public <T> T readSnapshot(java.util.function.Supplier<T> action) {
+        var guard=lock.readLock();guard.lock();
+        try{return action.get();}finally{guard.unlock();}
+    }
     private void cookie(HttpServletResponse response, String token, boolean secure, int maxAge) {
         response.addHeader("Set-Cookie", "workspace_session=" + token + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=" + maxAge + (secure ? "; Secure" : ""));
     }

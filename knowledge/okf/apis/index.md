@@ -10,6 +10,7 @@ timestamp: 2026-07-27T00:00:00Z
 # API Concepts
 
 ## Concepts
+- [Current Financial Month MCP](current-financial-month-mcp.md)
 - [Planned Endpoints and Transition Contract](planned-endpoints-and-transition.md)
 - [Events Catalog](events-catalog.md)
 
