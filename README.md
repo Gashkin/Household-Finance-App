@@ -63,3 +63,8 @@ Open **Plan ahead** to save a dated cash plan, see bill/payday shortfalls and co
 ## Persistent Windows instance and optional AIB production
 
 [GBD-14 setup, update, recovery, provider evidence and security-readiness gates](product/stories/persistent-aib-instance.md). The Windows release bundles the app and Java runtime, persists records outside the checkout, and preserves configuration across updates. Real-bank linking is an owner-only action after synthetic verification, independent security review and actual Windows readiness. Production is disabled by default; no successful live AIB connection is claimed.
+
+
+## Read-only ChatGPT connection
+
+GBD-33 adds an optional, disabled-by-default current-financial-period MCP connection with OAuth validation and one-use local approval for each read. See [setup and security](ops/mcp-connection.md) and [tool contract](product/stories/current-financial-month-mcp.md). The actual GBD-30 installation and owner ChatGPT acceptance remain required before claiming operational delivery.

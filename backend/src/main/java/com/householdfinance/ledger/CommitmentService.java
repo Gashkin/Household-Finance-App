@@ -218,6 +218,25 @@ public class CommitmentService {
     check(rows.size()<=10000,"Too many occurrences; shorten the selected range");return rows.values().stream().sorted(Comparator.comparing(Occurrence::date).thenComparing(Occurrence::id)).toList();
   }
   @Transactional(readOnly=true) public List<Occurrence> upcoming(LocalDate from,LocalDate to){date(from);date(to);check(ChronoUnit.DAYS.between(from,to)<=1096,"Upcoming range is limited to three years");return occurrences(read(),from,to,today());}
+  public record DatedOccurrence(Occurrence occurrence,LocalDate dueDate,LocalDate paymentDate) {}
+  /** Preserve contractual timing when matching changes the effective cash date. */
+  @Transactional(readOnly=true) public List<DatedOccurrence> financialPeriod(LocalDate from,LocalDate end){
+    check(from!=null&&end!=null&&end.isAfter(from)&&ChronoUnit.DAYS.between(from,end)<=35,"Bounded financial period required");
+    var s=visible(read());var rows=new LinkedHashMap<String,Occurrence>();
+    occurrences(s,from,end.minusDays(1),today()).forEach(o->rows.put(o.id(),o));
+    // A settlement can move arbitrarily far from its nominal date. Saved matches
+    // are bounded by the existing state limits and must be tested independently.
+    for(var edit:s.exceptions()){var o=find(s,edit.id());rows.put(o.id(),o);}
+    var result=new ArrayList<DatedOccurrence>();
+    for(var o:rows.values()){
+      var r=ruleFor(s,o);var edit=s.exceptions().stream().filter(e->e.id().equals(o.id())).findFirst().orElse(null);
+      LocalDate due=r.frequency().equals("INCOME_LINKED")?payDate(s,r.payrollId(),o.nominalDate()).plusDays(r.offsetDays()):o.nominalDate();
+      if(edit!=null&&edit.date()!=null)due=edit.date();
+      LocalDate paid=o.state().equals("MATCHED")?o.date():null;
+      if((!due.isBefore(from)&&due.isBefore(end))||(paid!=null&&!paid.isBefore(from)&&paid.isBefore(end)))result.add(new DatedOccurrence(o,due,paid));
+    }
+    return result.stream().sorted(Comparator.comparing(DatedOccurrence::dueDate).thenComparing(x->x.occurrence().id())).toList();
+  }
   @Transactional(readOnly=true) public List<Candidate> candidates(String occurrenceId){
     var s=visible(read());var o=find(s,occurrenceId);var r=ruleFor(s,o);var a=account(r.accountId());
     return entries.findByAccountIdOrderByDateAscReferenceAsc(a.id).stream().filter(e->usableActual(r,e,false)||usableActual(r,e,true)).map(e->new Candidate(e.id,e.accountId,e.date,e.description,e.amountMinor,e.status,a.revision)).toList();

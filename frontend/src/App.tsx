@@ -1,3 +1,4 @@
+import McpConnection from './components/McpConnection';
 import DecisionPlansWorkspace from './components/DecisionPlansWorkspace';
 import ActivityReviewWorkspace from './components/ActivityReviewWorkspace';
 import BudgetWorkspace from './components/BudgetWorkspace';
@@ -19,7 +20,7 @@ import { useIdentity } from './api/access';
 function App() {
   const identity=useIdentity();
   const read=identity?.canRead??false,edit=identity?.canEdit??false,custodian=identity?.custodian??false;
-  const [role, setRole] = useState<'debts'|'goals'|'budget'|'review'|'member'|'access'|'decision' | 'planner' | 'migrater' | 'consumer' | 'recovery' | 'money' | 'forecast' | 'plans'>(!edit?(read?'money':'access'):location.pathname === '/bank/callback' ? 'money' : 'decision');
+  const [role, setRole] = useState<'mcp'|'debts'|'goals'|'budget'|'review'|'member'|'access'|'decision' | 'planner' | 'migrater' | 'consumer' | 'recovery' | 'money' | 'forecast' | 'plans'>(!edit?(read?'money':'access'):location.pathname === '/bank/callback' ? 'money' : 'decision');
 
   const [planId, setPlanId] = useState<string | null>(null);
 
@@ -41,6 +42,7 @@ function App() {
           <button onClick={() => setRole('decision')} className={role === 'decision' ? 'active' : ''}>Debt decision</button>
           </>}
           {!edit&&read&&<button onClick={()=>setRole('money')}>Money position</button>}
+          {custodian&&<button onClick={()=>setRole('mcp')} className={role==='mcp'?'active':''}>ChatGPT connection</button>}
           {custodian&&edit&&<>
           <button onClick={() => setRole('planner')} className={role === 'planner' ? 'active' : ''}>
             Planner
@@ -55,6 +57,7 @@ function App() {
       </header>
 
       <main className="app-main">
+        {role==='mcp'&&custodian?<McpConnection/>:null}
         {role==='debts'&&edit?<DebtStatementsWorkspace openMoney={()=>setRole('money')} openReview={()=>setRole('review')} openForecast={()=>setRole('forecast')}/>:null}
         {role==='budget'&&edit?<BudgetWorkspace/>:null}
         {role==='goals'&&edit?<GoalsWorkspace openBills={()=>setRole('forecast')}/>:null}
