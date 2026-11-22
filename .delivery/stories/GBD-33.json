@@ -50,6 +50,12 @@
         "one-use approval denial disable"
       ],
       "path": "frontend/e2e/mcp-connection.spec.ts"
+    },
+    {
+      "contains": [
+        "jdk.httpserver"
+      ],
+      "path": "windows/Build-Release.ps1"
     }
   ],
   "branch": "story/33-delivery"

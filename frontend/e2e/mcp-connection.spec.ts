@@ -1,6 +1,11 @@
 import { test, expect } from "@playwright/test";
 import { unlockFixture } from "./workspace-helper";
 test.beforeEach(unlockFixture);
+test.afterEach(async ({ page }) => {
+  await page.request.post("/api/workspace/lock", {
+    headers: { "X-Workspace-Request": "1" },
+  });
+});
 test("owner sees disabled connection and cannot enable missing OAuth configuration", async ({
   page,
 }) => {
