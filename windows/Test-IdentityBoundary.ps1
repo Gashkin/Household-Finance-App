@@ -7,9 +7,11 @@ param(
 # Excluded mode in each ACTUAL development/agent and runner Windows logon.
 # Never supply credentials on the command line. No bank requests or file output.
 . "$PSScriptRoot\Common.ps1"
-$sid = Assert-StandardRuntimeIdentity
+$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$sid = $identity.User.Value
 if ($RuntimeSid -notmatch '^S-1-5-21-[0-9-]+$') { throw 'A local runtime user SID is required.' }
 if ($Mode -eq 'Runtime') {
+    $sid = Assert-StandardRuntimeIdentity
     if ($sid -ne $RuntimeSid) { throw 'Wrong runtime identity.' }
     Assert-PrivatePath $InstanceRoot
     $count=0
@@ -28,6 +30,15 @@ if ($Mode -eq 'Runtime') {
     Test-EncryptedDevice $InstanceRoot
     [PSCustomObject]@{Version=1;Mode=$Mode;RuntimeIdentityMatches=$true;PrivateObjectsChecked=$count;DeviceEncryptionVerified=$true;BankAccessPerformed=$false}
 } else {
+    # The owner's main development account is an administrator, but Codex and
+    # CI normally run with its UAC-filtered, non-elevated token. Test that token
+    # directly instead of treating the account's admin-group membership as
+    # proof that its ordinary file opens can bypass the runtime DACL. An
+    # elevated administrator or SYSTEM token is not a valid denial probe.
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    if ($identity.IsSystem -or $sid -notlike 'S-1-5-21-*' -or $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        throw 'Run the excluded-identity probe as a distinct local user with a non-elevated token; elevated administrator/SYSTEM access is outside the DACL boundary.'
+    }
     if ($sid -eq $RuntimeSid) { throw 'Development/runner and runtime are the same identity: isolation FAILED.' }
     # Count only actual access-denied results. Missing paths/other errors are
     # not evidence of isolation. Owner must first verify installation exists.
@@ -47,5 +58,5 @@ if ($Mode -eq 'Runtime') {
         catch { throw 'Probe inconclusive: protected directory must exist and deny enumeration.' }
         throw 'Excluded identity can enumerate a protected production directory: isolation FAILED.'
     }
-    [PSCustomObject]@{Version=1;Mode=$Mode;DistinctStandardIdentity=$true;AccessDeniedChecks=$denied;BankAccessPerformed=$false}
+    [PSCustomObject]@{Version=2;Mode=$Mode;DistinctLocalIdentity=$true;NonElevatedToken=$true;AdministratorSidPresent=(@($identity.Groups | ForEach-Object {$_.Value}) -contains 'S-1-5-32-544');AccessDeniedChecks=$denied;ElevatedAdministratorOverridePossible=$true;BankAccessPerformed=$false}
 }

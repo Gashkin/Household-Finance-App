@@ -25,40 +25,10 @@
       ]
     },
     {
-      "path": "product/stories/production-commissioning.md",
+      "path": "windows/Test-IdentityBoundary.ps1",
       "contains": [
-        "Both unconditional Windows and direct-Java production holds remain in place.",
-        "Provider evidence request"
-      ]
-    },
-    {
-      "path": "backend/src/main/java/com/householdfinance/bank/SandboxService.java",
-      "contains": [
-        "count == 0 ? null"
-      ]
-    },
-    {
-      "path": "backend/src/test/java/com/householdfinance/bank/SandboxProtocolTest.java",
-      "contains": [
-        "emptyActivityRetainsBalancesWithoutCreatingAnImport"
-      ]
-    },
-    {
-      "path": "backend/src/test/java/com/householdfinance/bank/ProductionProtocolTest.java",
-      "contains": [
-        "emptyProductionIntervalKeepsBalancesAndNoImplicitLedgerMutation"
-      ]
-    },
-    {
-      "path": "frontend/src/api/bankSandbox.ts",
-      "contains": [
-        "preview: Preview | null"
-      ]
-    },
-    {
-      "path": "frontend/e2e/production-connection.spec.ts",
-      "contains": [
-        "empty bank refresh keeps balance evidence and clears an older activity review"
+        "NonElevatedToken=$true",
+        "ElevatedAdministratorOverridePossible=$true"
       ]
     },
     {
@@ -100,6 +70,8 @@
       "contains": [
         "This release is a local-only finance workspace",
         "Dev Server One",
+        "Fast User Switching",
+        "An elevated administrator or SYSTEM",
         "Import a statement CSV",
         "Backup & recovery"
       ]

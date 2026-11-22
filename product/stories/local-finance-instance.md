@@ -6,7 +6,7 @@ disabled and remains outside this release.
 
 ## Where the application keeps data
 
-Install and run the app only while signed in as the separate, standard Windows
+Install and start the app while signed in as the separate, standard Windows
 account **Dev Server One**. The app stores its private files under:
 
 ```text
@@ -21,12 +21,22 @@ Do not put the instance or exported backups in Git, OneDrive, Downloads, a share
 folder or another user's profile.
 
 Development, Codex, build tools and CI stay in the main Windows account. Do not
-install development tools, an agent or a CI runner in Dev Server One. Account
-ACLs do not protect against a machine administrator or SYSTEM. Do not use the
-instance for real records until `Test-IdentityBoundary.ps1` has passed for the
-actual runtime account and denied access for the actual development and runner
-logons, and the device-encryption state is verified. If the development or
-runner identity is an administrator, the denial requirement has not passed.
+install development tools, an agent or a CI runner in Dev Server One. After
+starting the app in Dev Server One, use Fast User Switching to return to the
+main account without signing out of the runtime session; the app continues to
+run under Dev Server One while development continues in the main account.
+
+Run Codex and CI with their normal non-elevated Windows tokens. The owner uses
+an administrator account for development, so the excluded-identity probe
+accepts that account only when the tested process is not elevated and is
+distinct from Dev Server One. It verifies ordinary file access is denied by the
+runtime DACL. An elevated administrator or SYSTEM can take ownership or
+otherwise override these permissions; this local account arrangement does not
+protect against a privileged administrator or a compromised host. Do not use
+the instance for real records until `Test-IdentityBoundary.ps1` passes under
+the actual runtime identity, the actual non-elevated development/Codex token and
+the actual CI runner token, and the device-encryption state is verified. If a
+runner executes with an elevated token, it cannot pass this boundary.
 
 ## Install, launch, stop and update
 
@@ -43,7 +53,11 @@ runner identity is an administrator, the denial requirement has not passed.
    does not copy or replace the database on update.
 5. Open **Household Finance**. Keep the launcher window open while using the app;
    closing it or pressing Ctrl+C stops the local server. The app is available at
-   `http://127.0.0.1:8080` on this computer only.
+   `http://127.0.0.1:8080` on this computer only. You can then switch back to
+   the main account without signing out of Dev Server One and continue
+   development there. The runtime stops when Dev Server One is signed out or
+   Windows shuts down; after a restart, sign in to Dev Server One and launch it
+   again.
 6. For an update, first create and verify an encrypted recovery backup. Run the
    new release's `Install.ps1` while the application is stopped and confirm the
    backup prompt. The previous version is retained for rollback; never run an
@@ -117,8 +131,8 @@ version and data in place. A corrupted database must be restored from a verified
 backup into an empty, version-compatible workspace.
 
 Loopback binding prevents direct network access from other devices, but it does
-not isolate the app from another process already running as Dev Server One, a
-machine administrator, SYSTEM, malware or a compromised host. There is no
+not isolate the app from another process already running as Dev Server One, an
+elevated main-account administrator, SYSTEM, malware or a compromised host. There is no
 automatic bank sync, no provider credential, and no automatic transmission of
 financial records to ChatGPT. GBD-33's bounded read-only MCP support remains a
 separate, disabled-by-default local feature and requires its own owner setup and
