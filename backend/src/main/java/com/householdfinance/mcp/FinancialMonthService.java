@@ -62,7 +62,9 @@ public class FinancialMonthService {
       boolean incorporatedInAnchor,
       boolean outstanding,
       String relatedEventId,
-      String cashImpact) {}
+      String cashImpact,
+      String expectationCertainty,
+      String baselineTreatment) {}
 
   public record Undated(
       String id, String kind, Long amountMinor, String currency, String reason, boolean cashFlow) {}
@@ -242,9 +244,7 @@ public class FinancialMonthService {
         warnings.add("MISSING_COMMITMENT_ACCOUNT");
         continue;
       }
-      boolean paid = o.state().equals("MATCHED"),
-          reserved = o.state().equals("PENDING_RESERVED"),
-          cancelled = o.state().equals("SKIPPED");
+      boolean paid = o.state().equals("MATCHED"), cancelled = o.state().equals("SKIPPED");
       var e = paid ? byId.get(o.entryId()) : null;
       if (paid && e == null) {
         warnings.add("MISSING_SETTLEMENT");
@@ -273,6 +273,7 @@ public class FinancialMonthService {
       if (o.state().equals("MATCH_NEEDS_REVIEW") || o.state().equals("DATA_UNCONFIRMED"))
         warnings.add("COMMITMENT_REQUIRES_REVIEW");
       String target = ids.contains(o.counterpartId()) ? o.counterpartId() : null;
+      String treatment = commitments.baselineTreatment(o);
       events.add(
           new Event(
               o.id(),
@@ -295,9 +296,13 @@ public class FinancialMonthService {
               "RECURRING_COMMITMENT",
               null,
               incorporated,
-              !paid && !cancelled && !reserved && !reviewNeeded,
+              treatment.equals("OUTSTANDING"),
               e == null ? null : e.id,
-              "SOURCE_CASH"));
+              o.direction().equals("TRANSFER") && cashIds.contains(target)
+                  ? "BETWEEN_CASH_ACCOUNTS"
+                  : "SOURCE_CASH",
+              o.certainty(),
+              treatment));
     }
     for (var e : actuals) {
       if (!in(e.date, p)
@@ -369,7 +374,9 @@ public class FinancialMonthService {
                   ? !paired && transfer && e.amountMinor > 0
                       ? "DESTINATION_CASH"
                       : destinationCash ? "BETWEEN_CASH_ACCOUNTS" : "SOURCE_CASH"
-                  : destinationCash ? "DESTINATION_CASH" : "NO_CASH"));
+                  : destinationCash ? "DESTINATION_CASH" : "NO_CASH",
+              "NOT_APPLICABLE",
+              "INCORPORATED"));
     }
     try {
       for (var o : optional.debtObligations(p.start(), p.end().minusDays(1), today))
@@ -396,7 +403,9 @@ public class FinancialMonthService {
                   false,
                   true,
                   null,
-                  "SOURCE_CASH"));
+                  "SOURCE_CASH",
+                  o.certainty(),
+                  "OUTSTANDING"));
     } catch (IllegalArgumentException ex) {
       warnings.add("DEBT_EXPECTATIONS_UNAVAILABLE");
     }
@@ -429,6 +438,8 @@ public class FinancialMonthService {
                     false,
                     false,
                     null,
+                    "UNVERIFIED_ALTERNATIVE",
+                    e.certainty(),
                     "UNVERIFIED_ALTERNATIVE"));
             warnings.add("SAVED_PLAN_MAY_OVERLAP_COMMITMENTS_OR_ACTUALS");
           }

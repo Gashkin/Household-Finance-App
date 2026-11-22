@@ -171,6 +171,18 @@ class McpServerTest {
   }
 
   @Test
+  void initializationAdvertisesTheStructuredResultProtocol() throws Exception {
+    var response =
+        send(
+            "/mcp",
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"synthetic-client\",\"version\":\"1\"}}}",
+            false);
+    assertEquals(
+        "2025-06-18", json.readTree(response.body()).at("/result/protocolVersion").asText());
+    verifyNoInteractions(snapshots);
+  }
+
+  @Test
   void occupiedConnectorPortDisablesOnlyTheConnector() throws Exception {
     var duplicate =
         new McpServer(

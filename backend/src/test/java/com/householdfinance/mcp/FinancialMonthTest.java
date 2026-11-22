@@ -60,6 +60,10 @@ class FinancialMonthTest {
   }
 
   BudgetService.Period period() {
+    return period(20);
+  }
+
+  BudgetService.Period period(int payDay) {
     var t =
         budgets.template(
             null,
@@ -68,7 +72,7 @@ class FinancialMonthTest {
                 "PRIVATE-BUDGET",
                 "1000.00",
                 "PAY_DAY",
-                20,
+                payDay,
                 List.of(new BudgetService.LineInput(category, "500.00", false, null)),
                 "Synthetic period"));
     return budgets.instantiate(
@@ -85,6 +89,16 @@ class FinancialMonthTest {
 
   CommitmentService.Occurrence commitment(
       LocalDate date, String amount, String direction, String target) {
+    return commitment(date, amount, direction, target, "EXPECTED", "FIXED");
+  }
+
+  CommitmentService.Occurrence commitment(
+      LocalDate date,
+      String amount,
+      String direction,
+      String target,
+      String certainty,
+      String amountType) {
     var s = commitments.get().state();
     String id = UUID.randomUUID().toString();
     commitments.batch(
@@ -103,8 +117,8 @@ class FinancialMonthTest {
                         account,
                         category,
                         direction,
-                        "EXPECTED",
-                        "FIXED",
+                        certainty,
+                        amountType,
                         amount,
                         "ONCE",
                         date,
@@ -601,5 +615,183 @@ class FinancialMonthTest {
         "EVENT_LIMIT",
         assertThrows(IllegalArgumentException.class, () -> snapshot.current()).getMessage());
     assertEquals(before, backups.counts());
+  }
+
+  @Test
+  void receiptCertaintyAndBaselineTreatmentMatchForecastThroughSettlementAndCancellation() {
+    var p = period(today.getDayOfMonth());
+    var due = today.plusDays(1);
+    var expectedFixed = commitment(due, "100.00", "INCOME", null, "EXPECTED", "FIXED");
+    var uncertainFixed = commitment(due, "100.00", "INCOME", null, "UNCERTAIN", "FIXED");
+    var expectedEstimate = commitment(due, "100.00", "INCOME", null, "EXPECTED", "ESTIMATED");
+    var uncertainEstimate = commitment(due, "100.00", "INCOME", null, "UNCERTAIN", "ESTIMATED");
+    var before = backups.counts();
+    var balance = ledger.position(today).cashMinor();
+    var s = snapshot.current();
+    for (var id : List.of(expectedFixed.id(), expectedEstimate.id())) {
+      var e = s.events().stream().filter(x -> x.id().equals(id)).findFirst().orElseThrow();
+      assertEquals("EXPECTED", e.expectationCertainty());
+      assertEquals("OUTSTANDING", e.baselineTreatment());
+      assertTrue(e.outstanding());
+    }
+    for (var id : List.of(uncertainFixed.id(), uncertainEstimate.id())) {
+      var e = s.events().stream().filter(x -> x.id().equals(id)).findFirst().orElseThrow();
+      assertEquals("UNCERTAIN", e.expectationCertainty());
+      assertEquals("UPSIDE_ONLY", e.baselineTreatment());
+      assertFalse(e.outstanding());
+    }
+    assertEquals(
+        "CONFIRMED",
+        s.events().stream()
+            .filter(e -> e.id().equals(uncertainFixed.id()))
+            .findFirst()
+            .orElseThrow()
+            .amountCertainty());
+    assertEquals(
+        "ESTIMATED",
+        s.events().stream()
+            .filter(e -> e.id().equals(uncertainEstimate.id()))
+            .findFirst()
+            .orElseThrow()
+            .amountCertainty());
+    assertEquals(
+        20000,
+        commitments
+            .outlook(today, p.end().minusDays(1), false, false)
+            .household()
+            .days()
+            .getFirst()
+            .incomeMinor());
+    assertEquals(before, backups.counts());
+    assertEquals(balance, ledger.position(today).cashMinor());
+    commitments.exception(
+        new CommitmentService.ExceptionInput(
+            commitments.get().state().revision(),
+            UUID.randomUUID().toString(),
+            "Synthetic cancelled uncertain receipt",
+            uncertainEstimate.id(),
+            null,
+            null,
+            true,
+            null,
+            "OVERRIDE",
+            null));
+    var posted = actual("uncertain-received", today, "100.00", "BOOKED");
+    commitments.exception(
+        new CommitmentService.ExceptionInput(
+            commitments.get().state().revision(),
+            UUID.randomUUID().toString(),
+            "Synthetic actual uncertain receipt",
+            uncertainFixed.id(),
+            null,
+            null,
+            false,
+            posted.id,
+            "MATCH",
+            rev()));
+    before = backups.counts();
+    s = snapshot.current();
+    var paid =
+        s.events().stream()
+            .filter(e -> e.id().equals(uncertainFixed.id()))
+            .findFirst()
+            .orElseThrow();
+    assertEquals("UNCERTAIN", paid.expectationCertainty());
+    assertEquals("INCORPORATED", paid.baselineTreatment());
+    assertEquals("PAID", paid.status());
+    assertTrue(paid.incorporatedInAnchor());
+    assertFalse(paid.outstanding());
+    assertEquals(
+        "CANCELLED",
+        s.events().stream()
+            .filter(e -> e.id().equals(uncertainEstimate.id()))
+            .findFirst()
+            .orElseThrow()
+            .baselineTreatment());
+    assertTrue(s.events().stream().noneMatch(e -> e.id().equals("posted:" + posted.id)));
+    assertEquals(
+        20000,
+        commitments
+            .outlook(today, p.end().minusDays(1), false, false)
+            .household()
+            .days()
+            .getFirst()
+            .incomeMinor());
+    assertEquals(before, backups.counts());
+    assertEquals(110000, ledger.position(today).cashMinor());
+  }
+
+  @Test
+  void plannedMatchedAndPostedCashTransfersShareOneTwoAccountCashImpact() {
+    var p = period(today.getDayOfMonth());
+    String target =
+        ledger
+            .create(
+                new LedgerService.AccountInput(
+                    "PRIVATE-TARGET", "CASH", today.minusMonths(1), "50.00", "PRIVATE-SOURCE"))
+            .id();
+    var due = today.plusDays(1);
+    var transfer = commitment(due, "100.00", "TRANSFER", target);
+    var before = backups.counts();
+    var s = snapshot.current();
+    var planned =
+        s.events().stream().filter(e -> e.id().equals(transfer.id())).findFirst().orElseThrow();
+    assertEquals("BETWEEN_CASH_ACCOUNTS", planned.cashImpact());
+    assertEquals(target, planned.destinationAccountId());
+    assertEquals("OUTSTANDING", planned.baselineTreatment());
+    var backend = commitments.outlook(today, p.end().minusDays(1), false, false);
+    assertEquals(0, backend.household().days().getFirst().expensesMinor());
+    assertEquals(0, backend.household().days().getFirst().incomeMinor());
+    assertEquals(before, backups.counts());
+    var debit = actual("transfer-debit", today, "-100.00", "BOOKED");
+    ledger.manual(
+        target,
+        new LedgerService.Manual(
+            0L,
+            new LedgerService.Row(
+                "transfer-credit", today, "PRIVATE-NARRATIVE", "100.00", "BOOKED", "ACTIVITY"),
+            "PRIVATE-SOURCE",
+            true));
+    var credit = ledger.activity(target).getFirst();
+    review.link(
+        debit.id,
+        new ActivityReviewService.Link(
+            rev(), credit.id, 1L, "TRANSFER", "Synthetic reciprocal transfer"));
+    s = snapshot.current();
+    assertEquals(
+        "BETWEEN_CASH_ACCOUNTS",
+        s.events().stream()
+            .filter(e -> e.id().equals("posted:" + debit.id))
+            .findFirst()
+            .orElseThrow()
+            .cashImpact());
+    commitments.exception(
+        new CommitmentService.ExceptionInput(
+            commitments.get().state().revision(),
+            UUID.randomUUID().toString(),
+            "Synthetic transfer match",
+            transfer.id(),
+            null,
+            null,
+            false,
+            debit.id,
+            "MATCH",
+            rev()));
+    before = backups.counts();
+    s = snapshot.current();
+    assertEquals(1, s.events().size());
+    var matched = s.events().getFirst();
+    assertEquals("BETWEEN_CASH_ACCOUNTS", matched.cashImpact());
+    assertEquals("INCORPORATED", matched.baselineTreatment());
+    assertFalse(matched.outstanding());
+    assertEquals(105000, ledger.position(today).cashMinor());
+    assertEquals(before, backups.counts());
+    var unknown = commitment(due, "5.00", "TRANSFER", null);
+    s = snapshot.current();
+    var missing =
+        s.events().stream().filter(e -> e.id().equals(unknown.id())).findFirst().orElseThrow();
+    assertNull(missing.destinationAccountId());
+    assertEquals("SOURCE_CASH", missing.cashImpact());
+    assertEquals("UNKNOWN_DESTINATION", missing.allocation());
   }
 }
