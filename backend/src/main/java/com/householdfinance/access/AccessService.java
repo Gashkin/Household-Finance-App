@@ -152,10 +152,14 @@ public class AccessService {
   public List<Map<String,Object>> audit(){admin();return jdbc.queryForList("SELECT ACTOR_ID,TARGET_ID,ACTION,OUTCOME,RECORDED_AT FROM ACCESS_AUDIT ORDER BY RECORDED_AT DESC LIMIT 200");}
   public void scopeChanged(){jdbc.update("UPDATE HOUSEHOLD_USERS SET REVISION=REVISION+1 WHERE ID<>? AND STATE='ACTIVE'",AccessContext.userId());}
   public boolean permits(String path,String method,AccessContext.Actor a){
+    if(path.equals("/api/mcp")||path.startsWith("/api/mcp/"))return a.custodian();
     if(path.equals("/api/access/me")||path.equals("/api/access/reauth")||path.equals("/api/access/recovery-code")||path.equals("/api/workspace/lock")||path.equals("/api/workspace/status")||path.equals("/auth/me"))return true;
     if(path.startsWith("/api/access/"))return a.roles().contains("ADMIN");
     if(path.startsWith("/api/workspace/"))return a.custodian();
     boolean get=method.equals("GET")||method.equals("HEAD");
+    // Members may maintain personal decisions and submit requests without ledger edit rights.
+    // Domain methods enforce ownership, publication and receiving-editor decisions.
+    if(path.equals("/api/member")||path.startsWith("/api/member/"))return a.reads();
     if(path.startsWith("/api/ledger")||path.startsWith("/api/cash-position")||path.startsWith("/api/forecast")||path.startsWith("/api/plans")||path.startsWith("/api/debt-scenarios")){
       boolean calculation=Set.of("/api/debt-scenarios/compare","/api/debt-scenarios/report","/api/forecast/compare").contains(path);
       return (get||calculation)?a.reads():a.edits();

@@ -1,0 +1,62 @@
+{
+  "page_id": "41fd3419-fef0-810f-8d86-fb75173f17fc",
+  "work_id": "GBD-33",
+  "artifacts": [
+    {
+      "contains": [
+        "get_current_financial_month"
+      ],
+      "path": "backend/src/main/java/com/householdfinance/mcp/McpServer.java"
+    },
+    {
+      "contains": [
+        "class FinancialMonthService"
+      ],
+      "path": "backend/src/main/java/com/householdfinance/mcp/FinancialMonthService.java"
+    },
+    {
+      "contains": [
+        "financialReadNeedsSeparateOwnerApprovalEveryTimeIncludingRepeatCallsAndDeniedPrompts"
+      ],
+      "path": "backend/src/test/java/com/householdfinance/mcp/McpServerTest.java"
+    },
+    {
+      "contains": [
+        "Approve this one read"
+      ],
+      "path": "frontend/src/components/McpConnection.tsx"
+    },
+    {
+      "contains": [
+        "GBD-33"
+      ],
+      "path": "ops/mcp-connection.md"
+    },
+    {
+      "contains": [
+        "class McpAccess",
+        "finance.current-month.read"
+      ],
+      "path": "backend/src/main/java/com/householdfinance/mcp/McpAccess.java"
+    },
+    {
+      "contains": [
+        "cardChargesAndRepaymentHaveDistinctAccountAndCashSemantics"
+      ],
+      "path": "backend/src/test/java/com/householdfinance/mcp/FinancialMonthTest.java"
+    },
+    {
+      "contains": [
+        "one-use approval denial disable"
+      ],
+      "path": "frontend/e2e/mcp-connection.spec.ts"
+    },
+    {
+      "contains": [
+        "jdk.httpserver"
+      ],
+      "path": "windows/Build-Release.ps1"
+    }
+  ],
+  "branch": "story/33-delivery"
+}

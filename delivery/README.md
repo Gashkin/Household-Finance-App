@@ -11,7 +11,7 @@ python -m delivery.demo
 python -m unittest discover -s delivery/tests -v
 ```
 
-The demo is explicitly a stateful **simulation**, including a simulated human merge. Two actual worker threads race; only one claims the story, one PR exists, and Done appears only after main/artifact/CI/review verification. The suite also runs two workers through separate real HTTP clients against a local GitHub/Notion protocol simulator. It covers interrupted Notion writes, recovery, handoff CAS, stale owners, concurrent publication, deleted branches, review count/thread state, failed CI, missing artifacts, event routing and the PR #16 wrong-base failure.
+The demo is explicitly a stateful **simulation**, including a simulated human merge. Two actual worker threads race; only one claims the story, one PR exists, and Done appears only after main/artifact/CI/thread verification. The suite also runs two workers through separate real HTTP clients against a local GitHub/Notion protocol simulator. It covers interrupted Notion writes, recovery, handoff CAS, stale owners, concurrent publication, deleted branches, resolved threads, failed CI, missing artifacts, event routing and the PR #16 wrong-base failure. Provider review history is not queried by readiness or integration gates.
 
 ## Live setup
 
@@ -54,7 +54,7 @@ The body gains exactly one `<!-- gbd:GBD-N -->` marker and its Notion link. Exis
 
 Main is the default target. Intentional stacking needs `--base canonical-parent-branch --parent-pr NUMBER`; the parent must still be open and own that branch. Once a parent merges, retarget the child to main **before** human merge. Do not assume GitHub will retarget a child after a merge into a still-existing parent branch.
 
-Reviewer orchestration is outside this CLI; retrieve its current sequence and activation state from the Notion authority linked in AGENTS.md. The CLI has no review-request API. Its executable gate counts completed Copilot reviews and unresolved threads; ordinary definitions require one Copilot review, while GBD-10 carries an explicit historical two-review exception. Independent Work-review receipts are currently inspected by the owning execution and are not automatically validated by this CLI. Do not interpret the CLI gate alone as evidence that the current independent-review sequence ran.
+Reviewer orchestration is outside this CLI; retrieve its current policy and activation state from the Notion authority linked in AGENTS.md. The CLI has no review-request API. It checks unresolved conversations, but does not query or count provider reviews, require a reviewed commit SHA, or interpret old owner-delta receipts. Independent opening-review evidence remains owner-verified under the live authority. A green readiness/integration check does not assert that an independent review ran.
 
 ## Verify actual delivery
 
@@ -64,14 +64,14 @@ python -m delivery.coordinator verify --definition .delivery/stories/GBD-N.json 
 python -m delivery.coordinator finish --definition .delivery/stories/GBD-N.json --pr NUMBER
 ```
 
-`verify` is read-only. It requires the canonical PR identity, exactly one story marker, a main-targeted human merge, merge-commit reachability from **current main**, the configured completed Copilot review count, resolved threads, the successful GitHub Actions `build-and-test` check on that exact main SHA, and declared source/test artifacts on main. It hashes artifact contents into the receipt and checks main did not move during verification. Squash/rebase integration uses GitHub's actual `merge_commit_sha`, not an assumption that every original feature commit survives. Missing, pending or failed evidence blocks Done with an actionable message. Artifact markers are evidence of integration, not semantic proof; meaningful tests/browser verification remain necessary.
+`verify` is read-only. It requires the canonical PR identity, exactly one story marker, a main-targeted human merge, merge-commit reachability from **current main**, resolved threads, the successful GitHub Actions `build-and-test` check on that exact main SHA, and declared source/test artifacts on main. It hashes artifact contents into the receipt and checks main did not move during verification. Squash/rebase integration uses GitHub's actual `merge_commit_sha`, not an assumption that every original feature commit survives. Missing, pending or failed evidence blocks Done with an actionable message. Artifact markers are evidence of integration, not semantic proof; meaningful tests/browser verification remain necessary. New receipts contain `review_threads_resolved: true`, not a provider review ID.
 
 `finish` additionally checks original claim ownership and Notion's canonical PR link before setting Done with the receipt. It can read the preserved PR-head claim after automatic branch deletion. An executor with connected app tools can instead inspect the read-only receipt and update the same Notion story; preserve its provenance. Neither route bypasses human-controlled merging.
 
 ## CI operation and boundaries
 
 - Required CI runs coordinator/protocol tests alongside product tests. It does not expose an API audit token to PR-controlled code. The new trusted-main workflow cannot execute this newly introduced coordinator until GBD-8 is human-merged; that bootstrap activation is explicit. After merge, the main Required CI completion performs the first live integration audit. Standalone verification can also run with an operator's scoped token.
-- `Story delivery integrity` checks PR identity, exclusivity and review readiness through supported `pull_request_target` and PR `issue_comment` events, or a `workflow_dispatch` PR-number refresh. It always checks out trusted main; never the PR head/merge code. Drafts and missing/pending reviews remain explicitly pending in the separate `Story merge readiness` check; they do not fail evidence collection. Invalid identity, excessive reviews and failed CI remain failures. `ready_for_review`, conversion to draft and current-head PR CI completion refresh that check. The workflow writes check receipts using trusted-main code only. This named check does not verify the GPT receipt or reviewer ordering, and has not been added to branch protection by this change. After resolving review threads, update the PR description with the evidence, add the normal disposition comment, or dispatch a refresh. GitHub's review-thread webhook is not assumed to be an Actions trigger. This read-only feedback is separate from `build-and-test`; no branch ruleset was modified or mandatory head-check enforcement claimed.
+- `Story delivery integrity` checks PR identity, exclusivity, current-head CI and thread resolution through supported `pull_request_target` and PR `issue_comment` events, or a `workflow_dispatch` PR-number refresh. It always checks out trusted main; never the PR head/merge code. Drafts, unresolved threads and missing/pending CI remain explicitly pending in the separate `Story merge readiness` check. Invalid identity and failed CI remain failures. `ready_for_review`, conversion to draft and current-head PR CI completion refresh that check; these are check refreshes, not reviewer launches. This named check does not verify the independent opening-review receipt or assert that it ran, and has not been added to branch protection by this change. After resolving threads, update the PR description with evidence or dispatch a refresh. GitHub's review-thread webhook is not assumed to be an Actions trigger. This read-only feedback is separate from `build-and-test`; no branch ruleset was modified.
 - A merged/closed event checks integration; a pending main check may initially block it. The subsequent **main push Required CI completion** runs the authoritative audit again and produces `delivery-receipt.json` plus a job summary. Merges to feature branches cannot masquerade as main deliveries. The receipt is deliberately retained even on failure.
 - Workflow-run handling checks out reviewed main, accepts only main push CI events and uses read-only permissions. PR-provided metadata is parsed as data; no story-provided shell command runs and no Notion/other long-lived secret enters public PR CI.
 - The canonical marker/definition/claim gates cover managed GBD stories. Historic PR #18 is explicitly mapped as GBD-7's migration baseline. Other historical technical PRs are not retroactively represented as completed new stories.
@@ -81,10 +81,11 @@ GBD-8's own initial claim was bootstrapped with connected GitHub/Notion tools be
 API contracts: https://docs.github.com/en/rest/git/refs · https://docs.github.com/en/graphql/reference/git#updaterefs · https://developers.notion.com/reference/patch-page
 
 
-For `Story merge readiness`, a Copilot review on an older SHA cannot silently carry forward. After correcting its findings, the owner records the actual final-head tests and dispositions in the PR, then adds exactly one PR-description receipt using this shape (with real values):
-
-```text
-<!-- gbd-owned-verification {"head_sha":"<final head>","base_sha":"<current base>","review_id":123,"reviewed_sha":"<Copilot reviewed head>"} -->
-```
-
-The check binds all four fields to the current GitHub PR and actual completed Copilot review, and still requires current-head CI and resolved threads. A missing/stale/ambiguous receipt leaves readiness pending. Moving the head or base invalidates the receipt. This records the already-required owner's verification of post-review changes; it is not a second independent review or permission to request Copilot again. It trusts the same PR writers as the existing story metadata/claim protocol, not a new authentication boundary. Independent GPT coverage/order and high-risk exceptions remain owner-verified under the live Notion authority. Existing `pr-check`/post-merge historical receipts keep their documented review-count semantics; this new binding belongs to the named readiness check.
+Historical `copilot_review_exception` story metadata and `gbd-owned-verification`
+comments may remain as provenance. They are not interpreted by any gate. Zero,
+one or several historical provider reviews, stale review SHAs, and absent or
+malformed old delta receipts do not affect readiness or integration eligibility.
+Actual current-head CI and thread resolution still do. Existing historical
+receipts retain their original recorded fields; they are not rewritten as new
+assurance. The updated trusted-main logic activates only after human integration;
+a green PR test alone does not deploy the guard change.

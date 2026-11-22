@@ -184,10 +184,10 @@ public class ForecastService {
           b.date() != null
               && value.endDate() != null
               && value.endDate().isAfter(b.date())
-              && ChronoUnit.DAYS.between(b.date(), value.endDate()) <= 90,
+              && !value.endDate().isAfter(b.date().plusMonths(12)),
           "Invalid saved horizon");
       check(
-          Set.of("LEDGER", "MANUAL").contains(Objects.toString(b.mode(), ""))
+          Set.of("LEDGER", "SHARED_LEDGER", "MANUAL").contains(Objects.toString(b.mode(), ""))
               && b.cashMinor() >= -SAFE
               && b.cashMinor() <= SAFE
               && b.pendingMinor() >= 0
@@ -234,11 +234,11 @@ public class ForecastService {
             && !input.date().isAfter(today())
             && !input.date().isBefore(today().minusDays(365)),
         "Choose a starting evidence date within the past year");
-    if ("LEDGER".equals(input.mode())) {
+    if (Set.of("LEDGER","SHARED_LEDGER").contains(Objects.toString(input.mode(),""))) {
       check(
           input.cashEuro() == null && input.pendingEuro() == null && input.source() == null,
           "Ledger amounts and sources are read by the server");
-      var position = ledger.position(input.date());
+      var position = "SHARED_LEDGER".equals(input.mode())?ledger.sharedPosition(input.date()):ledger.position(input.date());
       var cash = position.accounts().stream().filter(a -> a.kind().equals("CASH")).toList();
       check(
           !cash.isEmpty() && cash.stream().allMatch(LedgerService.AccountView::reconciled),
@@ -246,11 +246,11 @@ public class ForecastService {
       Map<String, Long> revisions = new TreeMap<>();
       cash.forEach(a -> revisions.put(a.id(), a.revision()));
       return new Baseline(
-          "LEDGER",
+          input.mode(),
           input.date(),
           position.cashMinor(),
           position.cashPendingDebitMinor(),
-          "Reconciled cash ledger as of " + input.date(),
+          ("SHARED_LEDGER".equals(input.mode())?"Reconciled shared cash ledger as of ":"Reconciled cash ledger as of ") + input.date(),
           clock.instant(),
           Map.copyOf(revisions));
     }
@@ -332,12 +332,12 @@ public class ForecastService {
             ? capture(input.baseline())
             : plan == null ? null : read(plan).baseline();
     check(baseline != null, "Choose explicit starting evidence");
-    check(!baseline.mode().equals("LEDGER")||ledger.sourcesVisible(baseline.revisions().keySet()),"Access to starting evidence changed; choose new evidence");
+    check(visibleSources(baseline),"Access to starting evidence changed; choose new evidence");
     check(
         input.endDate() != null
             && input.endDate().isAfter(baseline.date())
-            && ChronoUnit.DAYS.between(baseline.date(), input.endDate()) <= 90,
-        "Choose a horizon of 1–90 days after the starting evidence date");
+            && !input.endDate().isAfter(baseline.date().plusMonths(12)),
+        "Choose a horizon of up to 12 calendar months after the starting evidence date");
     long reserve = amount(input.reserveEuro(), false);
     var stored =
         new Stored(
@@ -385,8 +385,14 @@ public class ForecastService {
     return workspace(repository.findById(com.householdfinance.access.AccessContext.forecastId()).orElse(null));
   }
 
+  private boolean visibleSources(Baseline b){
+    if(b.mode().equals("MANUAL"))return true;
+    if(!ledger.sourcesVisible(b.revisions().keySet()))return false;
+    return !b.mode().equals("SHARED_LEDGER")||ledger.sharedPosition(today()).accounts().stream().map(LedgerService.AccountView::id).collect(java.util.stream.Collectors.toSet()).containsAll(b.revisions().keySet());
+  }
+  private LedgerService.Position sourcePosition(Baseline b,LocalDate date){return b.mode().equals("SHARED_LEDGER")?ledger.sharedPosition(date):ledger.position(date);}
   private Workspace workspace(ForecastPlan plan) {
-    if(plan!=null){var b=read(plan).baseline();if(b.mode().equals("LEDGER")&&!ledger.sourcesVisible(b.revisions().keySet()))return new Workspace(today(),suggestedLedgerDate(),null,plan.version+1);}
+    if(plan!=null){var b=read(plan).baseline();if(!visibleSources(b))return new Workspace(today(),suggestedLedgerDate(),null,plan.version+1);}
     return new Workspace(today(), suggestedLedgerDate(), plan == null ? null : view(plan),null);
   }
 
@@ -394,16 +400,16 @@ public class ForecastService {
     var stored = read(plan);
     List<String> warnings = new ArrayList<>();
     Baseline b = stored.baseline();
-    check(!b.mode().equals("LEDGER")||ledger.sourcesVisible(b.revisions().keySet()),"Access to starting evidence changed; choose new evidence");
+    check(visibleSources(b),"Access to starting evidence changed; choose new evidence");
     String state = "REVIEWED";
     if (b.mode().equals("MANUAL")) {
       state = "ESTIMATED";
       warnings.add(
           "Manual starting cash is an estimate. This projection does not verify bank funds.");
     } else {
-      var p = ledger.position(b.date());
+      var p = sourcePosition(b,b.date());
       Map<String, Long> current = new TreeMap<>();
-      ledger.position(today()).accounts().stream()
+      sourcePosition(b,today()).accounts().stream()
           .filter(a -> a.kind().equals("CASH"))
           .forEach(a -> current.put(a.id(), a.revision()));
       if (current.isEmpty()

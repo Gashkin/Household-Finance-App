@@ -15,6 +15,45 @@ import org.springframework.web.bind.annotation.*;
 public class LedgerController {
   private final LedgerService service;
   private final ObjectMapper json;
+  @org.springframework.beans.factory.annotation.Autowired private ActivityReviewService review;
+  @org.springframework.beans.factory.annotation.Autowired private BudgetService budgets;
+  @org.springframework.beans.factory.annotation.Autowired private GoalService goals;
+  @org.springframework.beans.factory.annotation.Autowired private DebtService debts;
+  @GetMapping("/debts") public Object debts(){return debts.get();}
+  @PostMapping("/debts") public Object debtChange(HttpServletRequest r)throws IOException{return debts.change(body(r,DebtService.Change.class));}
+  @PostMapping("/debts/compare") public Object debtCompare(HttpServletRequest r)throws IOException{return debts.compare(body(r,DebtService.Compare.class));}
+  @GetMapping("/debts/report") public Object debtReport(){return debts.report(null);}
+  @PostMapping("/debts/report") public Object debtComparisonReport(HttpServletRequest r)throws IOException{return debts.report(body(r,DebtService.Compare.class));}
+  @GetMapping("/debts/history") public Object debtHistory(){return debts.history();}
+  @GetMapping("/debts/operations/{id}") public Object debtOperation(@PathVariable("id")String id){return debts.operation(id);}
+  @GetMapping("/goals") public Object goals(){return goals.get();}
+  @PostMapping("/goals") public Object goalChange(HttpServletRequest r)throws IOException{return goals.change(body(r,GoalService.Change.class));}
+  @GetMapping("/goals/history") public Object goalHistory(){return goals.history();}
+  @GetMapping("/goals/operations/{id}") public Object goalOperation(@PathVariable("id")String id){return goals.operation(id);}
+  @GetMapping("/budgets/templates") public Object budgetTemplates(){return budgets.templates();}
+  @GetMapping("/budgets/templates/{id}/history") public Object budgetTemplateHistory(@PathVariable("id")String id){return budgets.templateHistory(id);}
+  @PostMapping("/budgets/templates") public Object createBudgetTemplate(HttpServletRequest r)throws IOException{return budgets.template(null,body(r,BudgetService.TemplateInput.class));}
+  @PutMapping("/budgets/templates/{id}") public Object budgetTemplate(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return budgets.template(id,body(r,BudgetService.TemplateInput.class));}
+  @PostMapping("/budgets/templates/{id}/periods") public Object budgetPeriod(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return budgets.instantiate(id,body(r,BudgetService.Instantiate.class));}
+  @GetMapping("/budgets/periods") public Object budgetPeriods(){return budgets.periods();}
+  @GetMapping("/budgets/periods/{id}") public Object budgetReport(@PathVariable("id")String id){return budgets.report(id);}
+  @PostMapping("/budgets/periods/{id}/rollover") public Object correctBudgetRollover(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return budgets.correctRollover(id,body(r,BudgetService.CarryCorrection.class));}
+  @PutMapping("/budgets/periods/{id}") public Object budgetChange(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return budgets.change(id,body(r,BudgetService.Change.class));}
+  @PostMapping("/budgets/periods/{id}/apply") public Object budgetApply(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return budgets.apply(id,body(r,BudgetService.Apply.class));}
+  @GetMapping("/budgets/periods/{id}/history") public Object budgetHistory(@PathVariable("id")String id){return budgets.history(id);}
+
+  @GetMapping("/review/categories") public Object categories(){return review.categories();}
+  @PostMapping("/review/categories") public Object createCategory(HttpServletRequest r)throws IOException{return review.category(null,body(r,ActivityReviewService.CategoryInput.class));}
+  @PutMapping("/review/categories/{id}") public Object category(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return review.category(id,body(r,ActivityReviewService.CategoryInput.class));}
+  @GetMapping("/review/rules") public Object rules(){return review.rules();}
+  @PutMapping("/review/rules/{id}") public Object rule(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return review.approveRule(id,body(r,ActivityReviewService.RuleApproval.class));}
+  @GetMapping("/review/queue") public Object queue(@RequestParam(value="account",required=false)String account,@RequestParam("from")String from,@RequestParam("to")String to,@RequestParam(value="issue",required=false)String issue,@RequestParam(value="risk",required=false)String risk){return review.queue(account,LocalDate.parse(from),LocalDate.parse(to),issue,risk);}
+  @PutMapping("/review/activity/{id}") public Object classify(@PathVariable("id")String id,HttpServletRequest r)throws IOException{review.classify(id,body(r,ActivityReviewService.Classification.class));return Map.of("saved",true);}
+  @PostMapping("/review/activity/{id}/link") public Object link(@PathVariable("id")String id,HttpServletRequest r)throws IOException{review.link(id,body(r,ActivityReviewService.Link.class));return Map.of("saved",true);}
+  @PostMapping("/review/activity/{id}/unlink") public Object unlink(@PathVariable("id")String id,HttpServletRequest r)throws IOException{review.unlink(id,body(r,ActivityReviewService.Link.class));return Map.of("saved",true);}
+  @PostMapping("/accounts/{id}/reopen") public Object reopen(@PathVariable("id")String id,HttpServletRequest r)throws IOException{review.reopen(id,body(r,ActivityReviewService.Reopen.class));return Map.of("saved",true);}
+  @GetMapping("/review/guide") public Object guide(@RequestParam("through")String date){return Map.of("guide",review.guide(LocalDate.parse(date)),"auditCount",review.visibleAuditCount());}
+  @PostMapping("/review/complete") public Object complete(HttpServletRequest r)throws IOException{return review.complete(body(r,ActivityReviewService.Completion.class));}
 
   public LedgerController(LedgerService service, ObjectMapper mapper) {
     this.service = service;

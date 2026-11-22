@@ -124,6 +124,11 @@ public class WorkspaceFilter extends OncePerRequestFilter {
         var s=sessions.get(token(request));sessions.put(token(request),new Session(s.created(),s.seen(),s.userId(),s.revision(),clock.instant()));return true;
     }
     public synchronized void revokeAll(){sessions.clear();}
+    /** MCP shares the same admission lock as local edits, restore and recovery. */
+    public <T> T readSnapshot(java.util.function.Supplier<T> action) {
+        var guard=lock.readLock();guard.lock();
+        try{return action.get();}finally{guard.unlock();}
+    }
     private void cookie(HttpServletResponse response, String token, boolean secure, int maxAge) {
         response.addHeader("Set-Cookie", "workspace_session=" + token + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=" + maxAge + (secure ? "; Secure" : ""));
     }
@@ -157,7 +162,7 @@ public class WorkspaceFilter extends OncePerRequestFilter {
             if(!publicRoute && users!=null){
                 var actor=actor(request);
                 if(actor==null||!users.permits(path,request.getMethod(),actor)){deny(response,403,"Capability not granted");return;}
-                boolean sensitive=!safe&&(path.startsWith("/api/access/")&&!path.equals("/api/access/reauth")||path.equals("/api/workspace/backup")||path.equals("/api/workspace/restore")||path.endsWith("/sharing"));
+                boolean sensitive=!safe&&(path.startsWith("/api/access/")&&!path.equals("/api/access/reauth")||path.equals("/api/workspace/backup")||path.equals("/api/workspace/restore")||path.endsWith("/sharing")||path.endsWith("/reopen"));
                 if(sensitive&&!recent(request)){deny(response,403,"Confirm your password in Household access before this sensitive change");return;}
                 AccessContext.enter(actor);
             }

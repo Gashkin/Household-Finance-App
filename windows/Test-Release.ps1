@@ -97,6 +97,7 @@ try {
     $first=(Get-Content -LiteralPath (Join-Path $installed 'active.txt') -Raw).Trim()
     $versionsPath=Join-Path $installed 'versions'
     Assert-PrivatePath $versionsPath
+    foreach($name in @('backups','secrets')) { $privatePath=Join-Path $installed $name; if(-not (Test-Path -LiteralPath $privatePath)){throw "Installer did not create the protected $name directory."}; Assert-PrivatePath $privatePath }
     # A weak versions ACL must prevent reinstalling even if the root stays private.
     Set-SyntheticWeakDirectoryAcl $versionsPath
     try { Assert-Rejected { & (Join-Path $Package 'Install.ps1') -ShortcutDirectory $shortcutDirectory } }
@@ -229,17 +230,63 @@ try {
     if(-not (Test-Path -LiteralPath (Join-Path $installed 'data\household-finance.mv.db'))) { throw 'Launcher did not use the persistent private data directory.' }
     $today=[DateTime]::UtcNow.ToString('yyyy-MM-dd')
     $account=@{name='Synthetic Windows recovery account';kind='CASH';openingDate=$today;openingEuro='123.45';source='Synthetic Windows opening'}
-    Invoke-RestMethod "${baseUrl}/api/ledger/accounts" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($account | ConvertTo-Json) -WebSession $session | Out-Null
+    $created=Invoke-RestMethod "${baseUrl}/api/ledger/accounts" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($account | ConvertTo-Json) -WebSession $session
+    if(-not $created.id){throw 'Synthetic account creation failed.'}
+    $csv="reference,date,description,amount,status,kind`nsynthetic-statement-row,$today,Synthetic statement purchase,-20.00,BOOKED,ACTIVITY`n"
+    $badCsv="reference,date,description,amount,status,kind`nsynthetic-invalid-row,not-a-date,Synthetic invalid row,-1.00,BOOKED,ACTIVITY`n"
+    $badPreview=$false
+    try {
+        Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($created.id)/preview" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body (@{csv=$badCsv;source='Synthetic malformed statement'} | ConvertTo-Json) -WebSession $session | Out-Null
+    } catch { if($_.Exception.Response.StatusCode.value__ -eq 400){$badPreview=$true}else{throw} }
+    if(-not $badPreview){throw 'Malformed statement CSV was not rejected during preview.'}
+    $afterRejected=Invoke-RestMethod ("${baseUrl}/api/ledger?asOf="+$today) -WebSession $session
+    $unchangedAccount=@($afterRejected.accounts | Where-Object {$_.id -eq $created.id}) | Select-Object -First 1
+    if(-not $unchangedAccount -or $unchangedAccount.entries -ne 0 -or $unchangedAccount.bookedMinor -ne 12345){throw 'Rejected statement preview partially changed the account.'}
+    $wrongMappingRejected=$false
+    try {
+        Invoke-RestMethod "${baseUrl}/api/ledger/accounts/00000000-0000-0000-0000-000000000000/preview" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body (@{csv=$csv;source='Synthetic wrong account mapping'} | ConvertTo-Json) -WebSession $session | Out-Null
+    } catch { if($_.Exception.Response.StatusCode.value__ -eq 400){$wrongMappingRejected=$true}else{throw} }
+    if(-not $wrongMappingRejected){throw 'Unknown statement account mapping was not rejected.'}
+    $preview=Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($created.id)/preview" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body (@{csv=$csv;source='Synthetic statement CSV'} | ConvertTo-Json) -WebSession $session
+    if($preview.proposals.Count -ne 1 -or $preview.proposals[0].disposition -ne 'NEW'){throw 'Statement CSV preview/account mapping was not explicit or clean.'}
+    $approval=@{revision=$preview.revision;rows=@($preview.proposals[0].row);acknowledgedOverlap=$true}
+    Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($created.id)/previews/$($preview.id)/approve" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($approval | ConvertTo-Json -Depth 6) -WebSession $session | Out-Null
+    $duplicate=Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($created.id)/preview" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body (@{csv=$csv;source='Synthetic repeated statement CSV'} | ConvertTo-Json) -WebSession $session
+    if($duplicate.proposals.Count -ne 1 -or $duplicate.proposals[0].disposition -ne 'DUPLICATE'){throw 'Repeated statement row was not detected as a duplicate.'}
+    $closing=@{revision=$created.revision+1;statementEuro='103.45';source='Synthetic statement closing balance';commit=$true;acceptAdjustment=$false}
+    Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($created.id)/reconcile?asOf=$today" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($closing | ConvertTo-Json) -WebSession $session | Out-Null
     $backupFile=Join-Path $instance 'synthetic.hfb'
     Invoke-WebRequest "${baseUrl}/api/workspace/backup" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body '{"password":"synthetic-recovery-passphrase"}' -WebSession $session -UseBasicParsing -OutFile $backupFile | Out-Null
     $bytes=[IO.File]::ReadAllBytes($backupFile)
     if($bytes.Length -lt 45 -or [Text.Encoding]::UTF8.GetString($bytes).Contains('Synthetic Windows recovery account')){throw 'Encrypted backup failed.'}
     $beforeRestart=Invoke-RestMethod ("${baseUrl}/api/ledger?asOf="+$today) -WebSession $session
-    if($beforeRestart.cashMinor -ne 12345){throw 'Synthetic opening position was not committed before restart.'}
+    $beforeAccount=@($beforeRestart.accounts | Where-Object {$_.id -eq $created.id}) | Select-Object -First 1
+    if($beforeRestart.cashMinor -ne 10345 -or -not $beforeAccount -or $beforeAccount.entries -ne 1 -or -not $beforeAccount.reconciled){throw 'Imported synthetic statement, balance or reconciliation was incorrect before restart.'}
     $process=Restart-SyntheticInstance $process
     $session=Unlock-SyntheticInstance
     $position=Invoke-RestMethod ("${baseUrl}/api/ledger?asOf="+$today) -WebSession $session
-    if($position.cashMinor -ne 12345){throw ('Synthetic records lost after actual Windows restart: observed '+$position.cashMinor+' minor units.')}
+    $afterAccount=@($position.accounts | Where-Object {$_.id -eq $created.id}) | Select-Object -First 1
+    if($position.cashMinor -ne 10345 -or -not $afterAccount -or $afterAccount.entries -ne 1 -or -not $afterAccount.reconciled){throw ('Imported synthetic statement or reconciliation changed after actual Windows restart: observed '+$position.cashMinor+' minor units.')}
+    Stop-SyntheticInstance $process
+    # Exercise the real installer update path after committed statement data.
+    # The ZIP contents are unchanged; a distinct version identity verifies that
+    # activation leaves the persistent data tree untouched.
+    Stop-SyntheticInstance $process
+    $upgradeOriginal=Get-Content -LiteralPath (Join-Path $Package 'manifest.json') -Raw
+    $upgradeManifest=$upgradeOriginal | ConvertFrom-Json
+    $upgradeManifest.commit='cccccccccccccccccccccccccccccccccccccccc'
+    $upgradeManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $Package 'manifest.json') -Encoding UTF8
+    function Read-Host { param([string]$Prompt,[switch]$AsSecureString) 'BACKUP VERIFIED' }
+    try { & (Join-Path $Package 'Install.ps1') -ShortcutDirectory $shortcutDirectory }
+    finally { $upgradeOriginal | Set-Content -LiteralPath (Join-Path $Package 'manifest.json') -Encoding UTF8; Remove-Item Function:\Read-Host }
+    $activeVersion=(Get-Content -LiteralPath (Join-Path $installed 'active.txt') -Raw).Trim()
+    if($activeVersion -ne $upgradeManifest.commit){throw 'Post-import update did not activate the new version.'}
+    $startScript=Join-Path $installed ('versions\'+$activeVersion+'\Start.ps1')
+    $process=Restart-SyntheticInstance $process
+    $session=Unlock-SyntheticInstance
+    $position=Invoke-RestMethod ("${baseUrl}/api/ledger?asOf="+$today) -WebSession $session
+    $upgradeAccount=@($position.accounts | Where-Object {$_.id -eq $created.id}) | Select-Object -First 1
+    if($position.cashMinor -ne 10345 -or -not $upgradeAccount -or $upgradeAccount.entries -ne 1 -or -not $upgradeAccount.reconciled){throw 'Installed update changed the reviewed synthetic statement or reconciliation.'}
     Stop-SyntheticInstance $process
     $originalData=Join-Path $installed 'data'
     $recoveryData=Join-Path $installed 'original-synthetic-data'
@@ -252,9 +299,10 @@ try {
     Assert-Rejected { Invoke-RestMethod ("${baseUrl}/api/ledger?asOf="+$today) -WebSession $session | Out-Null }
     $session=Unlock-SyntheticInstance
     $position=Invoke-RestMethod ("${baseUrl}/api/ledger?asOf="+$today) -WebSession $session
-    if($position.cashMinor -ne 12345){throw 'Packaged Windows encrypted restore changed synthetic records.'}
+    $restoredAccount=@($position.accounts | Where-Object {$_.id -eq $created.id}) | Select-Object -First 1
+    if($position.cashMinor -ne 10345 -or -not $restoredAccount -or $restoredAccount.entries -ne 1 -or -not $restoredAccount.reconciled){throw 'Packaged Windows encrypted restore changed imported synthetic statement data.'}
     [Array]::Clear($bytes,0,$bytes.Length)
-    Write-Host 'Packaged Windows runtime, actual launcher/restart/encrypted restore, static app, callback, private ACLs, DPAPI and authenticated banking checks passed using synthetic data.'
+    Write-Host 'Packaged Windows runtime, statement CSV preview/import/deduplication/reconciliation, actual restart/encrypted restore, static app, private ACLs and DPAPI checks passed using synthetic data. Banking remained disabled.'
 } finally {
     $env:WORKBOOK_IMPORT_ENABLED=$originalWorkbookImportEnabled
     $env:LOCALAPPDATA=$originalLocalAppData

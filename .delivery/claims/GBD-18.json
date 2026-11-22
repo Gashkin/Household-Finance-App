@@ -1,0 +1,9 @@
+{
+  "work_id": "GBD-18",
+  "page_id": "41ad3419-fef0-812a-9895-ec3efd2f45a3",
+  "branch": "story/18-delivery",
+  "token": "claim-token:codex-gbd18-20261118-budget",
+  "claimed_at": "2026-11-18T06:48:00Z",
+  "base_sha": "a03fc41aa255a60de2ea113d9a0ead884a0ffaa2",
+  "history": [{"event":"claim","method":"Create-only GitHub refs API succeeded on current main before Notion claim write and read-back; isolated worktree. GBD-20 dependency is integrated in main via PR #29."}]
+}

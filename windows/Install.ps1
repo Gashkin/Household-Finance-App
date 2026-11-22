@@ -18,6 +18,13 @@ try {
     }
     # The root ACL alone cannot protect a replaced/junctioned versions directory.
     Assert-PrivatePath $versions
+    # These protected destinations are part of the local identity-boundary
+    # contract. Backups are independently passphrase-encrypted by the app.
+    foreach($name in @('backups','secrets')) {
+        $privateDirectory=Join-Path $root $name
+        if(-not (Test-Path -LiteralPath $privateDirectory)) { New-Item -ItemType Directory -Path $privateDirectory | Out-Null; Set-PrivatePath $privateDirectory $true }
+        Assert-PrivatePath $privateDirectory
+    }
     $target = Join-Path $versions $manifest.commit
     if (Test-Path -LiteralPath $target) {
         Assert-PrivatePath $target
@@ -75,5 +82,5 @@ try {
     $shortcut.TargetPath = $launcher
     $shortcut.WorkingDirectory = $root
     $shortcut.Save()
-    Write-Host 'Installed. Use Household Finance on your desktop. Production remains gated by readiness for this exact version.'
+    Write-Host 'Installed for local statement review. Use Household Finance on your desktop. Live banking remains disabled.'
 } finally { $mutex.ReleaseMutex(); $mutex.Dispose() }

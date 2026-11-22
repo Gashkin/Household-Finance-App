@@ -86,6 +86,30 @@
       "contains": [
         "Installed workbook intake was enabled by an inherited setting."
       ]
+    },
+    {
+      "path": "windows/Test-Release.ps1",
+      "contains": [
+        "Statement CSV preview/account mapping",
+        "Repeated statement row was not detected as a duplicate.",
+        "Imported synthetic statement or reconciliation changed after actual Windows restart"
+      ]
+    },
+    {
+      "path": "product/stories/local-finance-instance.md",
+      "contains": [
+        "This release is a local-only finance workspace",
+        "Dev Server One",
+        "Import a statement CSV",
+        "Backup & recovery"
+      ]
+    },
+    {
+      "path": "windows/Install.ps1",
+      "contains": [
+        "protected destinations are part of the local identity-boundary",
+        "backups','secrets"
+      ]
     }
   ]
 }

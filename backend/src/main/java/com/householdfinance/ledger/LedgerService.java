@@ -177,6 +177,11 @@ public class LedgerService {
     check(revision != null && a.revision == revision, "Account changed; reload and review again");
   }
 
+  private void unprotected(LedgerAccount a, LocalDate date) {
+    check(a.reconciledDate == null || date.isAfter(a.reconciledDate),
+        "Activity is protected through the statement date; reopen reconciliation with a reason first");
+  }
+
   private Row normalize(Row r, LedgerAccount a) {
     return normalize(r, a, false);
   }
@@ -397,6 +402,7 @@ public class LedgerService {
     e.status = row.status();
     e.kind = row.kind();
     e.source = source;
+    e.reviewState = "PROVISIONAL";
     return entries.save(e);
   }
 
@@ -446,15 +452,14 @@ public class LedgerService {
         duplicates++;
         continue;
       }
+      unprotected(a, r.date());
+      if (old != null) unprotected(a, old.date);
       if (type.equals("SETTLE_PENDING")) settled++;
       else added++;
-      audit(
-          id,
-          old == null ? "IMPORT" : "SETTLE_PENDING",
-          d.source,
-          old == null ? null : row(old),
-          r);
-      put(a, r, d.source, old);
+      var before = old == null ? null : Map.of("row", row(old), "review", json.valueToTree(old));
+      var saved = put(a, r, d.source, old);
+      audit(id, old == null ? "IMPORT" : "SETTLE_PENDING", d.source,
+          before, Map.of("row", r, "review", json.valueToTree(saved)));
     }
     if (added + settled > 0) {
       a.revision++;
@@ -494,6 +499,7 @@ public class LedgerService {
     check(
         entries.findByAccountIdOrderByDateAscReferenceAsc(id).size() < 50_000,
         "Account activity limit reached");
+    unprotected(a, r.date());
     put(a, r, source, null);
     a.revision++;
     accounts.saveAndFlush(a);
@@ -512,14 +518,40 @@ public class LedgerService {
             .orElseThrow(() -> new IllegalArgumentException("Unknown activity"));
     check(e.accountId.equals(id), "Activity belongs to another account");
     check(!e.kind.equals("ADJUSTMENT"), "Correct adjustments with a new sourced reconciliation");
+    check(e.linkedEntryId == null && entries.findAll().stream().noneMatch(other -> e.id.equals(other.linkedEntryId)),
+        "Unlink related activity with a reason before correcting its facts");
+    unprotected(a, e.date);
     Row r = normalize(input.row(), a, true);
+    unprotected(a, r.date());
     check(r.reference().equals(e.reference), "Stable references cannot be changed");
     String reason = text(input.reason(), 200, "Correction reason/source");
-    audit(id, "CORRECTION", reason, row(e), r);
+    var before = Map.of("row", row(e), "review", json.valueToTree(e));
     put(a, r, reason, e);
+    e.reviewState = "PROVISIONAL";
+    audit(id, "CORRECTION", reason, before, Map.of("row", r, "review", json.valueToTree(e)));
     a.revision++;
     accounts.saveAndFlush(a);
     return view(a, today());
+  }
+
+  public static boolean isTransferRelationship(LedgerEntry e) {
+    return Set.of("TRANSFER", "CARD_SETTLEMENT").contains(Objects.toString(e.linkType, ""));
+  }
+
+  private static boolean isReversalRelationship(LedgerEntry e) {
+    return Set.of("REFUND", "REVERSAL").contains(Objects.toString(e.linkType, ""));
+  }
+
+  public static long spendingContribution(LedgerEntry e) {
+    if (!e.status.equals("BOOKED") || isTransferRelationship(e)) return 0;
+    if (isReversalRelationship(e)) return e.amountMinor > 0 ? -e.amountMinor : 0;
+    return e.kind.equals("ACTIVITY") ? Math.max(0, -e.amountMinor) : 0;
+  }
+
+  public static long incomeContribution(LedgerEntry e) {
+    if (!e.status.equals("BOOKED") || isTransferRelationship(e)) return 0;
+    if (isReversalRelationship(e)) return Math.min(0, e.amountMinor);
+    return e.kind.equals("ACTIVITY") ? Math.max(0, e.amountMinor) : 0;
   }
 
   private AccountView view(LedgerAccount a, LocalDate asOf) {
@@ -537,10 +569,8 @@ public class LedgerService {
         continue;
       }
       balance = sum(balance, e.amountMinor);
-      if (e.kind.equals("ACTIVITY")) {
-        if (e.amountMinor > 0) income = sum(income, e.amountMinor);
-        else spent = sum(spent, -e.amountMinor);
-      }
+      income = sum(income, incomeContribution(e));
+      spent = sum(spent, spendingContribution(e));
     }
     boolean reconciled =
         asOf.equals(a.reconciledDate)
@@ -573,11 +603,13 @@ public class LedgerService {
 
   @Transactional(readOnly = true)
   public Position position(LocalDate asOf) {
-    return position(asOf,false);
+    return position(asOf,false,false);
   }
   @Transactional(readOnly=true)
-  public Position sharedPosition(LocalDate asOf){return position(asOf,true);}
-  private Position position(LocalDate asOf,boolean sharedOnly){
+  public Position sharedPosition(LocalDate asOf){return position(asOf,true,false);}
+  @Transactional(readOnly=true)
+  public Position ownedPosition(LocalDate asOf){return position(asOf,false,true);}
+  private Position position(LocalDate asOf,boolean sharedOnly,boolean ownedOnly){
     AccessContext.requireRead();
     check(asOf != null && !asOf.isAfter(today()), "Position date must be today or earlier");
     List<AccountView> rows = new ArrayList<>();
@@ -585,7 +617,7 @@ public class LedgerService {
     long cashTotal = 0, debt = 0, income = 0, spent = 0, pendingDebits = 0;
     if (asOf.isBefore(today().minusDays(30)))
       warnings.add("Historical position: more than 30 days old; not current spending evidence");
-    for (var a : accounts.findAll().stream().filter(a -> AccessContext.reads(a.ownerId,a.shared)&&(!sharedOnly||a.shared)).sorted(Comparator.comparing(a -> a.name)).toList()) {
+    for (var a : accounts.findAll().stream().filter(a -> AccessContext.reads(a.ownerId,a.shared)&&(!sharedOnly||a.shared)&&(!ownedOnly||AccessContext.owns(a.ownerId))).sorted(Comparator.comparing(a -> a.name)).toList()) {
       if (a.openingDate.isAfter(asOf)) {
         warnings.add(a.name + " opened after this date and is excluded");
         continue;
@@ -614,19 +646,32 @@ public class LedgerService {
 
   @Transactional(readOnly = true)
   public List<LedgerEntry> activity(String id) {
-    account(id);
+    var a = account(id);
     var list = entries.findByAccountIdOrderByDateAscReferenceAsc(id);
     Collections.reverse(list);
+    if (!AccessContext.owns(a.ownerId)) {
+      // Relationship identifiers can point to an owner's private counterpart.
+      return list.stream().limit(500).map(e -> {
+        var safe = new LedgerEntry(); safe.id=e.id; safe.accountId=e.accountId;
+        safe.reference=e.reference; safe.date=e.date; safe.description=e.description;
+        safe.amountMinor=e.amountMinor; safe.status=e.status;
+        safe.kind=e.linkedEntryId==null?e.kind:"TRANSFER"; safe.source=e.source;
+        safe.reviewState=e.reviewState; return safe;
+      }).toList();
+    }
     return list.stream().limit(500).toList();
   }
 
   @Transactional(readOnly = true)
   public List<LedgerAudit> history(String id) {
     AccessContext.requireRead();
-    if(id.equals("HOUSEHOLD"))id=AccessContext.publicationId();else account(id);
+    if(id.equals("HOUSEHOLD"))id=AccessContext.publicationId();else {
+      var a=account(id);
+      if (!AccessContext.owns(a.ownerId)) return List.of();
+    }
     return audits.findByAccountIdOrderByRecordedAtDesc(id).stream()
         .filter(e -> !e.action.startsWith("PUBLISH") || (e.source.startsWith("Snapshot ") && cash.byId(e.source.substring(9)).isPresent()))
-        .limit(100).toList();
+        .toList();
   }
   @Transactional(readOnly=true)
   public boolean sourcesVisible(Set<String> ids){AccessContext.requireRead();return ids.stream().allMatch(id -> accounts.findById(id).filter(a -> AccessContext.reads(a.ownerId,a.shared)).isPresent());}
@@ -642,10 +687,15 @@ public class LedgerService {
         asOf != null && !asOf.isBefore(a.openingDate) && !asOf.isAfter(today()),
         "Reconciliation date must lie between opening date and today");
     String source = text(input.source(), 200, "Statement source");
+    check(a.reconciledDate == null || !asOf.isBefore(a.reconciledDate),
+        "Reopen the existing reconciliation before moving its protected date backwards");
     long expected = view(a, asOf).bookedMinor(),
         statement = money(input.statementEuro()),
         difference = sum(statement, -expected);
     if (!input.commit()) return new Reconciliation(expected, statement, difference, false);
+    var before = json.valueToTree(a);
+    check(difference == 0 || a.reconciledDate == null || asOf.isAfter(a.reconciledDate),
+        "Reopen reconciliation before adjusting a protected statement date");
     check(
         difference == 0 || input.acceptAdjustment(),
         "Resolve the difference or explicitly record an adjustment");
@@ -659,6 +709,7 @@ public class LedgerService {
       e.amountMinor = difference;
       e.status = "BOOKED";
       e.kind = "ADJUSTMENT";
+      e.reviewState = "CONFIRMED";
       e.source = source;
       entries.saveAndFlush(e);
       a.revision++;
@@ -672,8 +723,9 @@ public class LedgerService {
         id,
         "RECONCILE",
         source,
-        expected,
-        new Reconciliation(expected, statement, difference, true));
+        Map.of("expectedMinor", expected, "account", before),
+        Map.of("throughDate", asOf, "result", new Reconciliation(expected, statement, difference, true),
+            "account", json.valueToTree(a)));
     return new Reconciliation(expected, statement, difference, true);
   }
 

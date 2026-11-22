@@ -13,6 +13,9 @@ timestamp: 2026-07-27T00:00:00Z
 - [Planner CRUD Workflow](planner-crud.md)
 - [Transaction Import and Review Workflow](transaction-import-and-review.md)
 - [Workbook Ingestion Workflow](workbook-ingestion.md)
+- [Budget Allocations](budget-allocations.md)
+- [Recurring Bills and Cash Flow](recurring-bills.md)
+- [Savings Goals and Irregular Costs](savings-goals.md)
 
 ## Source Anchors
 - ops/pass1/data-flow.md

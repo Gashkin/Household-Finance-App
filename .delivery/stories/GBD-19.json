@@ -1,0 +1,14 @@
+{
+  "work_id":"GBD-19",
+  "page_id":"41ad3419-fef0-81e2-b93e-d682c98869d4",
+  "branch":"story/19-delivery",
+  "artifacts":[
+    {"path":"backend/src/main/java/com/householdfinance/ledger/CommitmentService.java","contains":["class CommitmentService","COMMITMENTS","previewBatch","CSV rejected"]},
+    {"path":"backend/src/main/java/com/householdfinance/forecast/CommitmentController.java","contains":["/api/forecast/commitments","/outlook/compare","/csv/preview"]},
+    {"path":"frontend/src/components/PlanAheadWorkspace.tsx","contains":["Bills & income","Six-month outlook","Save all changed rows"]},
+    {"path":"backend/src/test/java/com/householdfinance/ledger/CommitmentTest.java","contains":["sameOperationReplayAndConcurrentSameRevisionSaveExactlyOnce","failedBatchAndCsvLeaveAllRecordsBalancesAndAuditUnchanged"]},
+    {"path":"backend/src/test/java/com/householdfinance/workspace/CommitmentRecoveryTest.java","contains":["scheduleVersionsOverridesMatchesAndSavedPlansSurviveRestartAndEncryptedRestore"]},
+    {"path":"frontend/e2e/commitments.spec.ts","contains":["maintain a bill"]},
+    {"path":"product/stories/recurring-bills.md","contains":["GBD-19","explicitly approved"]}
+  ]
+}

@@ -1,5 +1,10 @@
+import McpConnection from './components/McpConnection';
 import DecisionPlansWorkspace from './components/DecisionPlansWorkspace';
-import ForecastWorkspace from "./components/ForecastWorkspace";
+import ActivityReviewWorkspace from './components/ActivityReviewWorkspace';
+import BudgetWorkspace from './components/BudgetWorkspace';
+import DebtStatementsWorkspace from './components/DebtStatementsWorkspace';
+import GoalsWorkspace from './components/GoalsWorkspace';
+import ForecastWorkspace from "./components/PlanAheadWorkspace";
 import MoneyPositionWorkspace from './components/MoneyPositionWorkspace';
 import WorkspaceRecovery from './components/WorkspaceRecovery';
 import { useState } from 'react';
@@ -9,12 +14,13 @@ import MigraterWorkspace from './components/MigraterWorkspace';
 import PlannerWorkspace from './components/PlannerWorkspace';
 import HouseholdAccess from './components/HouseholdAccess';
 import PermittedPosition from './components/PermittedPosition';
+import MemberWorkspace from './components/MemberWorkspace';
 import { useIdentity } from './api/access';
 
 function App() {
   const identity=useIdentity();
   const read=identity?.canRead??false,edit=identity?.canEdit??false,custodian=identity?.custodian??false;
-  const [role, setRole] = useState<'access'|'decision' | 'planner' | 'migrater' | 'consumer' | 'recovery' | 'money' | 'forecast' | 'plans'>(!edit?(read?'money':'access'):location.pathname === '/bank/callback' ? 'money' : 'decision');
+  const [role, setRole] = useState<'mcp'|'debts'|'goals'|'budget'|'review'|'member'|'access'|'decision' | 'planner' | 'migrater' | 'consumer' | 'recovery' | 'money' | 'forecast' | 'plans'>(!edit?(read?'money':'access'):location.pathname === '/bank/callback' ? 'money' : 'decision');
 
   const [planId, setPlanId] = useState<string | null>(null);
 
@@ -24,13 +30,19 @@ function App() {
         <h1>Household Finance</h1>
         <nav className="role-switcher" aria-label="Workspaces">
           <button onClick={()=>setRole('access')} className={role==='access'?'active':''}>Household access</button>
+          {read&&<button onClick={()=>setRole('member')} className={role==='member'?'active':''}>Spending &amp; purchases</button>}
           {edit&&<>
+          <button onClick={()=>setRole('debts')} className={role==='debts'?'active':''}>Cards, loans &amp; mortgages</button>
+          <button onClick={()=>setRole('budget')} className={role==='budget'?'active':''}>Budgets &amp; allocations</button>
+          <button onClick={()=>setRole('goals')} className={role==='goals'?'active':''}>Goals &amp; irregular costs</button>
+          <button onClick={()=>setRole('review')} className={role==='review'?'active':''}>Review &amp; reconcile</button>
           <button onClick={() => setRole('plans')} className={role === 'plans' ? 'active' : ''}>Financial plans</button>
           <button onClick={() => setRole('forecast')} className={role === 'forecast' ? 'active' : ''}>Plan ahead</button>
           <button onClick={() => setRole('money')} className={role === 'money' ? 'active' : ''}>Money position</button>
           <button onClick={() => setRole('decision')} className={role === 'decision' ? 'active' : ''}>Debt decision</button>
           </>}
           {!edit&&read&&<button onClick={()=>setRole('money')}>Money position</button>}
+          {custodian&&<button onClick={()=>setRole('mcp')} className={role==='mcp'?'active':''}>ChatGPT connection</button>}
           {custodian&&edit&&<>
           <button onClick={() => setRole('planner')} className={role === 'planner' ? 'active' : ''}>
             Planner
@@ -45,7 +57,13 @@ function App() {
       </header>
 
       <main className="app-main">
+        {role==='mcp'&&custodian?<McpConnection/>:null}
+        {role==='debts'&&edit?<DebtStatementsWorkspace openMoney={()=>setRole('money')} openReview={()=>setRole('review')} openForecast={()=>setRole('forecast')}/>:null}
+        {role==='budget'&&edit?<BudgetWorkspace/>:null}
+        {role==='goals'&&edit?<GoalsWorkspace openBills={()=>setRole('forecast')}/>:null}
+        {role==='review'&&edit?<ActivityReviewWorkspace/>:null}
         {role==='access'?<HouseholdAccess/>:null}
+        {role==='member'?<MemberWorkspace/>:null}
         {role === 'plans' ? <DecisionPlansWorkspace initialId={planId} /> : null}
         {role === 'forecast' ? <ForecastWorkspace /> : null}
         {role === 'money' ? edit?<MoneyPositionWorkspace openDecision={() => setRole('decision')} />:<PermittedPosition/> : null}

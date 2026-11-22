@@ -40,6 +40,7 @@ export type Position = {
   warnings: string[];
 };
 export type Activity = {
+  linkedEntryId?: string | null;
   id: string;
   reference: string;
   date: string;
@@ -60,6 +61,7 @@ export type Preview = {
   }[];
 };
 export type Audit = {
+  actorId: string;
   id: string;
   action: string;
   recordedAt: string;

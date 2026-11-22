@@ -1,7 +1,13 @@
-# Production deployment commissioning (GBD-30)
+# Historical production commissioning security notes
 
-Canonical requirements, plan and actual evidence: [GBD-30 in Notion](https://www.notion.so/41ad3419fef081f2a6a6f653a2bbc6d9).
-This is an operator runbook, not proof that a production instance is ready.
+This provider/AIB material is retained as security history. It is **not** part
+of GBD-30, does not describe the local statement release and must not be used to
+activate banking from that release. GBD-30 is the local-only installation in
+[local-finance-instance.md](local-finance-instance.md). Production banking is
+deferred to the separately tracked [GBD-34 story](https://app.notion.com/p/420d3419fef081909016ff956f5fef31).
+
+The sections below preserve earlier security findings and do not constitute an
+operator runbook or prove that any production instance is ready.
 
 ## Establish the actual host boundary
 

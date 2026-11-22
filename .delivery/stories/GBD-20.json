@@ -1,0 +1,14 @@
+{
+  "work_id": "GBD-20",
+  "page_id": "41ad3419-fef0-81c5-bf9b-e2c1af3bc602",
+  "branch": "story/20-delivery",
+  "artifacts": [
+    {"path":"backend/src/main/java/com/householdfinance/ledger/ActivityReviewService.java","contains":["class ActivityReviewService","Cumulative refunds/reversals","COMPLETE_REVIEW"]},
+    {"path":"backend/src/main/resources/db/migration/V4__activity_review.sql","contains":["ledger_review_records"]},
+    {"path":"frontend/src/components/ActivityReviewWorkspace.tsx","contains":["Review &amp; reconcile","Complete dated review"]},
+    {"path":"backend/src/test/java/com/householdfinance/ledger/ActivityReviewTest.java","contains":["privateCounterpartsRulesAndAuditNeverLeakToSharedReaders","concurrencyAdmitsOnlyOneSameRevisionCorrection"]},
+    {"path":"backend/src/test/java/com/householdfinance/workspace/ActivityReviewRecoveryTest.java","contains":["actualVersionSixArchiveRestoresAsProvisional"]},
+    {"path":"frontend/e2e/activity-review.spec.ts","contains":["classify activity, approve a local rule"]},
+    {"path":"product/stories/activity-review.md","contains":["GBD-20"]}
+  ]
+}
