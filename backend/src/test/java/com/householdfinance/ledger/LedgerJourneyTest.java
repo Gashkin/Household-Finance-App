@@ -137,7 +137,7 @@ class LedgerJourneyTest {
 
   @Test
   void standardAibDebitCreditExportPreviewsSignsAndLatestBalance() {
-    var a = account("CASH", "0.00");
+    var a = account("CASH", "100.00");
     String aib = "Posted Date,Description,Debit Amount,Credit Amount,Balance,Transaction Type\n"
         + today.minusDays(2).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yy"))
         + ",Synthetic groceries,12.34,,87.66,Debit\n"
