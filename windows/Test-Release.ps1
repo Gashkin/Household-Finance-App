@@ -94,6 +94,8 @@ try {
     New-Item -ItemType Directory -Path $env:LOCALAPPDATA | Out-Null
     & (Join-Path $Package 'Install.ps1') -ShortcutDirectory $shortcutDirectory
     $installed=Join-Path $env:LOCALAPPDATA 'HouseholdFinance'
+    $launchCommand=Get-Content -LiteralPath (Join-Path $installed 'Launch.cmd') -Raw
+    if($launchCommand -notmatch '-NoProfile -ExecutionPolicy Bypass -File'){throw 'Installed launcher does not bypass the machine script policy for the verified local entrypoint.'}
     $first=(Get-Content -LiteralPath (Join-Path $installed 'active.txt') -Raw).Trim()
     $versionsPath=Join-Path $installed 'versions'
     Assert-PrivatePath $versionsPath
