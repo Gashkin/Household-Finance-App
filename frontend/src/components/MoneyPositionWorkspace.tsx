@@ -601,7 +601,7 @@ export default function MoneyPositionWorkspace({
                     )}
                     <fieldset disabled={!account.owned} className="account-edit-controls"><legend>Owner activity tools</legend>
                     <details id="ledger-import-review" className="ledger-card">
-                      <summary>Preview and review statement CSV</summary>
+                      <summary>Preview and review CSV activity</summary>
                       <p>
                         Upload the standard AIB current-account or credit-card CSV, or use the app's interchange format:{" "}
                         <code>
