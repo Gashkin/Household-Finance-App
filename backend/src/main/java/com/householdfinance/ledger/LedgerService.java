@@ -18,6 +18,11 @@ public class LedgerService {
   public record AccountInput(
       String name, String kind, LocalDate openingDate, String openingEuro, String source) {}
 
+  public record OpeningCorrection(
+      Long revision, LocalDate openingDate, String openingEuro, String source) {}
+
+  public record RemoveUnusedAccount(Long revision, String reason) {}
+
   public record Row(
       String reference,
       LocalDate date,
@@ -30,7 +35,14 @@ public class LedgerService {
 
   public record Proposal(Row row, String disposition, boolean possibleOverlap) {}
 
-  public record Preview(String id, long revision, Instant expiresAt, List<Proposal> proposals) {}
+  public record Preview(
+      String id,
+      long revision,
+      Instant expiresAt,
+      List<Proposal> proposals,
+      LocalDate statementDate,
+      String statementBalanceEuro,
+      String format) {}
 
   public record Approval(Long revision, List<Row> rows, Boolean acknowledgedOverlap) {}
 
@@ -262,6 +274,58 @@ public class LedgerService {
   }
 
   @Transactional
+  public AccountView correctOpening(String id, OpeningCorrection input) {
+    var a = account(id);
+    check(input != null, "Opening balance correction required");
+    revision(a, input.revision());
+    check(entries.countByAccountId(id) == 0, "Opening balance is locked after activity; reconcile to a current statement instead");
+    check(a.reconciledDate == null && a.reconciledRevision == null && a.reconciledBalance == null,
+        "Reopen and resolve reconciliation before changing the opening balance");
+    check(!a.shared && a.sandboxIdentity == null, "Unshare and unlink the account before changing its opening balance");
+    check(!cash.referencesLedgerAccount(id), "Published positions already reference this account");
+    check(input.openingDate() != null && !input.openingDate().isAfter(today()), "Opening date must be today or earlier");
+    long amount = money(input.openingEuro());
+    String source = text(input.source(), 200, "Correction source");
+    var before = Map.of("openingDate", a.openingDate, "openingMinor", a.openingMinor, "source", a.source);
+    a.openingDate = input.openingDate();
+    a.openingMinor = amount;
+    a.source = source;
+    a.revision++;
+    accounts.saveAndFlush(a);
+    audit(id, "OPENING_CORRECTION", source, before,
+        Map.of("openingDate", a.openingDate, "openingMinor", a.openingMinor, "source", a.source));
+    return view(a, today());
+  }
+
+  @Transactional
+  public void removeUnusedAccount(String id, RemoveUnusedAccount input) {
+    var a = account(id);
+    check(input != null, "Removal confirmation required");
+    revision(a, input.revision());
+    String reason = text(input.reason(), 200, "Removal reason");
+    check(!a.shared, "Stop sharing this account before removing it");
+    check(a.sandboxIdentity == null, "Unlink this account before removing it");
+    check(
+        a.reconciledDate == null
+            && a.reconciledRevision == null
+            && a.reconciledBalance == null
+            && a.reconciledSource == null,
+        "Accounts with reconciliation history cannot be removed");
+    check(entries.countByAccountId(id) == 0, "Accounts with activity history cannot be removed");
+    check(!cash.referencesLedgerAccount(id), "Accounts used in a published position cannot be removed");
+    var history = audits.findByAccountIdOrderByRecordedAtDesc(id);
+    check(
+        !history.isEmpty()
+            && history.stream().allMatch(e -> Set.of("OPEN", "OPENING_CORRECTION").contains(e.action)),
+        "Accounts with other audit history cannot be removed");
+
+    String name = a.name;
+    String kind = a.kind;
+    accounts.deleteAndFlush(a);
+    audit(id, "ACCOUNT_REMOVED", reason, Map.of("name", name, "kind", kind), Map.of("removed", true));
+  }
+
+  @Transactional
   public void bindSandboxIdentity(String id, String identity) {
     AccessContext.requireEdit();
     check(identity != null && identity.matches("[0-9a-f]{64}"), "Invalid sandbox account identity");
@@ -335,10 +399,11 @@ public class LedgerService {
     check(input != null, "Import required");
     var a = account(id);
     String source = text(input.source(), 200, "Import source");
+    var parsed = LedgerCsv.parseStatement(input.csv());
     List<Row> rows = new ArrayList<>();
     Set<String> refs = new HashSet<>();
     int number = 1;
-    for (var cells : LedgerCsv.parse(input.csv())) {
+    for (var cells : parsed.rows()) {
       number++;
       Row r;
       try {
@@ -386,7 +451,10 @@ public class LedgerService {
                                 .findFirst()
                                 .orElse(null)),
                         overlap(r, existing, rows)))
-            .toList());
+            .toList(),
+        parsed.statementDate(),
+        parsed.statementBalanceEuro(),
+        parsed.format());
   }
 
   private LedgerEntry put(LedgerAccount a, Row row, String source, LedgerEntry old) {

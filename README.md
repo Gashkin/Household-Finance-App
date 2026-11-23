@@ -62,7 +62,7 @@ Open **Plan ahead** to save a dated cash plan, see bill/payday shortfalls and co
 
 ## Local Windows instance and statement updates
 
-[GBD-30 installation, account boundary, CSV import, backup, update and recovery guide](product/stories/local-finance-instance.md). The Windows release bundles the app and Java runtime, persists records outside the checkout, and preserves configuration across updates. It supports manually reviewed statement CSV and has live banking disabled.
+[GBD-30 installation, account boundary, AIB statement import, balance correction, backup, update and recovery guide](product/stories/local-finance-instance.md). The Windows release bundles the app and Java runtime, persists records outside the checkout, and preserves configuration across updates. It supports directly reviewed AIB current-account/card CSV exports and has live banking disabled.
 
 
 ## Read-only ChatGPT connection

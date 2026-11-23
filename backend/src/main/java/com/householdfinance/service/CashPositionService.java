@@ -109,6 +109,12 @@ public class CashPositionService {
                 .max(java.util.Comparator.comparing(CashPositionSnapshotEntity::getRecordedAt).thenComparing(CashPositionSnapshotEntity::getId)).map(this::toSnapshot);
     }
 
+    /** Prevent deleting an account that remains part of immutable published evidence. */
+    @Transactional(readOnly = true)
+    public boolean referencesLedgerAccount(String accountId) {
+        return repository.existsByScopeRefsContaining(accountId);
+    }
+
     private Snapshot toSnapshot(CashPositionSnapshotEntity entity) {
         List<Line> cash = new ArrayList<>();
         List<Line> commitments = new ArrayList<>();

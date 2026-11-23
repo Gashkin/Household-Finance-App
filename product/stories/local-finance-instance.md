@@ -69,10 +69,11 @@ restart persistence and encrypted backup/restore using synthetic data. Hosted
 or local test results do not prove the owner's Windows identities, ACLs, device
 encryption or actual denied access; record those separately before real data.
 
-## Import a statement CSV
+## Import an AIB statement or interchange CSV
 
-The current Money position workflow accepts CSV content with exactly these
-headers:
+The Money position importer accepts AIB's standard downloaded current-account
+and credit-card CSV exports directly, as well as the app's interchange CSV
+with these headers:
 
 ```csv
 reference,date,description,amount,status,kind
@@ -87,6 +88,13 @@ reference,date,description,amount,status,kind
 - `status`: `BOOKED` or `PENDING`.
 - `kind`: `ACTIVITY` or `TRANSFER`.
 
+For AIB files, the importer recognises the booked date, description and either
+separate debit/credit columns or an amount plus debit/credit transaction type.
+When the export includes a running balance, the preview shows the latest dated
+balance so it can be used in reconciliation. The account is selected explicitly
+in the app; no account number is needed in the source label. Unsupported or
+ambiguous headers are rejected before any ledger changes.
+
 To import:
 
 1. Sign in to Dev Server One, launch the app and unlock it with the workspace
@@ -94,9 +102,10 @@ To import:
 2. Open **Money position**. Select the account that matches the statement; this
    account selection is the import mapping. Create the account first if needed,
    using a dated opening balance and its statement source.
-3. Select **Preview and review CSV activity**, paste the statement rows, enter a
-   source label that identifies the institution/file period without exposing an
-   account number, then select **Preview CSV**.
+3. Select **Preview and review statement CSV** and choose the downloaded AIB
+   CSV or paste the statement rows. Enter a source label that identifies the
+   institution/file period without exposing an account number, then select
+   **Preview CSV**. No column conversion is needed for supported AIB exports.
 4. Review every proposed row, account, date, amount, status and duplicate or
    overlap warning. Correct any row only with its source visible. Do not approve
    an incorrect account mapping; return to the correct account and preview
@@ -105,10 +114,11 @@ To import:
 5. Check the acknowledgement that you reviewed the statement and resolved
    possible overlaps, then select **Approve selected activity**. Approval is
    explicit and only adds the selected reviewed rows.
-6. Enter the statement's dated closing balance and a source label. Check the
-   displayed difference. Confirm reconciliation only when the number is
-   understood; if there is a genuine adjustment, select the explicit adjustment
-   option so the app records its reason and source.
+6. Enter the statement's dated closing balance and a source label, or use the
+   balance shown from the AIB export. Check the displayed difference. Confirm
+   reconciliation only when the number is understood; if there is a genuine
+   adjustment, select the explicit adjustment option so the app records its
+   date, reason and source.
 7. Confirm the account position and its reconciliation date/source. The dated
    commitments and cash forecast remain separate from imported transactions;
    do not manually add a commitment for an already posted payment.
@@ -118,9 +128,14 @@ To import:
    Test restore only in an empty synthetic workspace, never over live records.
 
 Preview errors do not write any rows. Repeating an accepted file is safe: stable
-account-scoped references are reported as duplicates. Unsupported or malformed
-files must be corrected at source; do not edit the database or use the retired
-workbook migration path to force an import.
+account-scoped references are reported as duplicates. Before activity is
+imported, **Correct opening balance and date** can update a stale opening figure
+with an audit entry. After activity exists, use statement reconciliation and
+its explicit sourced adjustment; do not overwrite imported transactions.
+**Remove this unused account** removes a mistaken duplicate only when it has no
+activity, reconciliation, sharing/link or published-position history.
+Unsupported or malformed files must be corrected at source; do not edit the
+database or use the retired workbook migration path to force an import.
 
 ## Recovery and limits
 

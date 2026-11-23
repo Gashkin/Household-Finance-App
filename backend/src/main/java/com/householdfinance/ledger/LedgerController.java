@@ -104,6 +104,19 @@ public class LedgerController {
     return service.create(body(r, LedgerService.AccountInput.class));
   }
 
+  @PutMapping("/accounts/{id}/opening")
+  public LedgerService.AccountView correctOpening(
+      @PathVariable("id") String id, HttpServletRequest r) throws IOException {
+    return service.correctOpening(id, body(r, LedgerService.OpeningCorrection.class));
+  }
+
+  @DeleteMapping("/accounts/{id}")
+  public Map<String, Boolean> removeUnusedAccount(
+      @PathVariable("id") String id, HttpServletRequest r) throws IOException {
+    service.removeUnusedAccount(id, body(r, LedgerService.RemoveUnusedAccount.class));
+    return Map.of("removed", true);
+  }
+
   @PutMapping("/accounts/{id}/sharing")
   public LedgerService.AccountView share(@PathVariable("id") String id,HttpServletRequest r)throws IOException {
     return service.share(id,body(r,LedgerService.Sharing.class));

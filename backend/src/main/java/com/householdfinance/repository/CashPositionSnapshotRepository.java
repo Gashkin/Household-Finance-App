@@ -6,4 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CashPositionSnapshotRepository extends JpaRepository<CashPositionSnapshotEntity, String> {
     Optional<CashPositionSnapshotEntity> findFirstByOrderByRecordedAtDescIdDesc();
+    boolean existsByScopeRefsContaining(String accountId);
 }

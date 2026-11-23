@@ -28,6 +28,7 @@ class LedgerJourneyTest {
   @Autowired MockMvc mvc;
   @Autowired ObjectMapper json;
   @Autowired LedgerService service;
+  @Autowired LedgerAuditRepository audits;
   @Autowired ActivityReviewService review;
   @Autowired JdbcTemplate jdbc;
   @Autowired WorkspaceBackupService backups;
@@ -95,6 +96,81 @@ class LedgerJourneyTest {
             .bookedMinor());
     assertEquals(0, position.cashMinor());
     assertEquals(2500, position.netMinor());
+  }
+
+  @Test
+  void unusedAccountCanBeRemovedWithMinimalTombstoneAndActivityBlocksRemoval() {
+    var createdUnused = account("CASH", "25.00");
+    var unused = service.correctOpening(createdUnused.id(), new LedgerService.OpeningCorrection(
+        createdUnused.revision(), today.minusDays(2), "30.00", "Synthetic corrected opening"));
+    service.removeUnusedAccount(unused.id(),
+        new LedgerService.RemoveUnusedAccount(unused.revision(), "Synthetic duplicate account"));
+    assertTrue(service.position(today).accounts().stream().noneMatch(a -> a.id().equals(unused.id())));
+    var removalHistory = audits.findByAccountIdOrderByRecordedAtDesc(unused.id());
+    assertTrue(removalHistory.stream()
+        .anyMatch(e -> e.action.equals("ACCOUNT_REMOVED") && e.source.equals("Synthetic duplicate account")));
+    assertTrue(removalHistory.stream().anyMatch(e -> e.action.equals("OPEN")));
+    assertTrue(removalHistory.stream().anyMatch(e -> e.action.equals("OPENING_CORRECTION")));
+
+    var used = account("CASH", "25.00");
+    importRows(used, row("keep-history", "-1.00", "BOOKED", "ACTIVITY"));
+    var current = current(used.id());
+    assertThrows(IllegalArgumentException.class, () -> service.removeUnusedAccount(used.id(),
+        new LedgerService.RemoveUnusedAccount(current.revision(), "Synthetic attempted deletion")));
+    assertTrue(service.position(today).accounts().stream().anyMatch(a -> a.id().equals(used.id())));
+  }
+
+  @Test
+  void openingBalanceCanBeCorrectedOnlyBeforeActivityAndKeepsAudit() {
+    var a = account("CASH", "1000.00");
+    var corrected = service.correctOpening(a.id(), new LedgerService.OpeningCorrection(
+        a.revision(), today.minusDays(1), "276.05", "Synthetic current AIB balance"));
+    assertEquals(27605, corrected.openingMinor());
+    assertEquals(today.minusDays(1), corrected.openingDate());
+    assertTrue(service.history(a.id()).stream().anyMatch(e -> e.action.equals("OPENING_CORRECTION")));
+    importRows(corrected, row("one-activity", "-1.00", "BOOKED", "ACTIVITY"));
+    var current = current(a.id());
+    assertThrows(IllegalArgumentException.class, () -> service.correctOpening(a.id(),
+        new LedgerService.OpeningCorrection(current.revision(), today, "100.00", "Synthetic late correction")));
+    assertEquals(27505, current(a.id()).bookedMinor());
+  }
+
+  @Test
+  void standardAibDebitCreditExportPreviewsSignsAndLatestBalance() {
+    var a = account("CASH", "0.00");
+    String aib = "Posted Date,Description,Debit Amount,Credit Amount,Balance,Transaction Type\n"
+        + today.minusDays(2).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yy"))
+        + ",Synthetic groceries,12.34,,87.66,Debit\n"
+        + today.minusDays(1).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yy"))
+        + ",Synthetic refund,,5.00,92.66,Credit\n";
+    var preview = service.preview(a.id(), new LedgerService.PreviewInput(aib, "Synthetic AIB CSV"));
+    assertEquals("AIB", preview.format());
+    assertEquals(today.minusDays(1), preview.statementDate());
+    assertEquals("92.66", preview.statementBalanceEuro());
+    assertEquals(List.of("-12.34", "5.00"), preview.proposals().stream()
+        .map(p -> p.row().amountEuro()).toList());
+    var approved = service.approve(a.id(), preview.id(), new LedgerService.Approval(
+        preview.revision(), preview.proposals().stream().map(LedgerService.Proposal::row).toList(), true));
+    assertEquals(2, approved.added());
+    assertEquals(9266, current(a.id()).bookedMinor());
+    var repeated = service.preview(a.id(), new LedgerService.PreviewInput(aib, "Synthetic AIB repeat"));
+    assertTrue(repeated.proposals().stream().allMatch(p -> p.disposition().equals("DUPLICATE")));
+  }
+
+  @Test
+  void standardAibAmountTypeAndGroupedSemicolonHeadersAreRecognised() {
+    String date = today.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yy"));
+    var simple = LedgerCsv.parseStatement(
+        "Posted Date,Description,Amount,Transaction Type,Balance\n"
+            + date + ",Synthetic card purchase,7.25,Debit,15.75\n");
+    assertEquals("-7.25", simple.rows().getFirst().get(3));
+    assertEquals("15.75", simple.statementBalanceEuro());
+
+    var grouped = LedgerCsv.parseStatement(
+        "Posted;Account;Posted;Transactions;Date;Description;Debit;Amount;Credit;Amount;Balance;Transaction;Type\n"
+            + "Posted;masked;Posted;Transactions;" + date + ";Synthetic debit;;7.25;;;15.75;Transaction;Debit\n");
+    assertEquals("-7.25", grouped.rows().getFirst().get(3));
+    assertEquals("AIB", grouped.format());
   }
 
   LedgerService.Row row(String reference, String amount, String state, String kind) {

@@ -82,6 +82,55 @@
         "protected destinations are part of the local identity-boundary",
         "backups','secrets"
       ]
+    },
+    {
+      "path": "backend/src/main/java/com/householdfinance/ledger/LedgerCsv.java",
+      "contains": [
+        "parseStatement(String csv)",
+        "Unsupported statement CSV",
+        "statementBalanceEuro"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/householdfinance/ledger/LedgerService.java",
+      "contains": [
+        "correctOpening(String id, OpeningCorrection input)",
+        "removeUnusedAccount(String id, RemoveUnusedAccount input)",
+        "LedgerCsv.parseStatement(input.csv())"
+      ]
+    },
+    {
+      "path": "backend/src/test/java/com/householdfinance/ledger/LedgerJourneyTest.java",
+      "contains": [
+        "unusedAccountCanBeRemovedWithMinimalTombstoneAndActivityBlocksRemoval",
+        "openingBalanceCanBeCorrectedOnlyBeforeActivityAndKeepsAudit",
+        "standardAibDebitCreditExportPreviewsSignsAndLatestBalance",
+        "standardAibAmountTypeAndGroupedSemicolonHeadersAreRecognised"
+      ]
+    },
+    {
+      "path": "frontend/src/components/MoneyPositionWorkspace.tsx",
+      "contains": [
+        "Correct opening balance and date",
+        "Use AIB balance for this check",
+        "Preview and review statement CSV"
+      ]
+    },
+    {
+      "path": "windows/Test-Release.ps1",
+      "contains": [
+        "Synthetic AIB export preview/balance",
+        "Unused duplicate account was not removed",
+        "Synthetic AIB import or opening correction was incorrect before restart."
+      ]
+    },
+    {
+      "path": "product/stories/local-finance-instance.md",
+      "contains": [
+        "AIB statement or interchange CSV",
+        "Correct opening balance and date",
+        "Remove this unused account"
+      ]
     }
   ]
 }
