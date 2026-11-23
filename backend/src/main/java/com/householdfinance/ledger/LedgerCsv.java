@@ -96,7 +96,7 @@ public final class LedgerCsv {
     if (table.isEmpty() || table.stream().anyMatch(r -> r.size() != header.size()))
       throw new IllegalArgumentException("Provide 1–500 complete AIB transaction rows");
     List<String> names = aibColumns(header);
-    int date = uniqueFind(names, "date", "postedtransactionsdate", "posteddate", "transactiondate", "date", "posted", "bookeddate");
+    int date = uniqueFind(names, "date", "postedtransactionsdate", "posteddate", "transactiondate", "date", "bookeddate");
     int description = uniqueFind(names, "description", "description", "transactiondescription", "transactiondetails", "details", "narrative", "particulars");
     int debit = uniqueFind(names, "debit", "debit", "debitamount", "debitamounteur", "paidout", "moneyout", "withdrawal", "withdrawals");
     int credit = uniqueFind(names, "credit", "credit", "creditamount", "creditamounteur", "paidin", "moneyin", "deposit", "deposits");
