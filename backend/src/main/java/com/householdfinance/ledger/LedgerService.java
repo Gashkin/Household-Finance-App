@@ -321,7 +321,8 @@ public class LedgerService {
 
     String name = a.name;
     String kind = a.kind;
-    accounts.deleteAndFlush(a);
+    accounts.delete(a);
+    accounts.flush();
     audit(id, "ACCOUNT_REMOVED", reason, Map.of("name", name, "kind", kind), Map.of("removed", true));
   }
 
