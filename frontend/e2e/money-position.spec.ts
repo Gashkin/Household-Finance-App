@@ -44,7 +44,7 @@ test("review activity, correct facts, reconcile an explicit difference and reuse
   });
   await expect(evidence).toContainText("€1,000.00");
   await page
-    .getByText("Preview and review CSV activity", { exact: true })
+    .getByText("Preview and review statement CSV", { exact: true })
     .click();
   let csv =
     "reference,date,description,amount,status,kind\n" +
