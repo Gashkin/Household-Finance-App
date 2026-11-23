@@ -138,3 +138,65 @@ test("pending revocation cannot be forgotten without separately confirming the e
   await expect(panel).toContainText("DISCONNECTED");
   expect(confirmations).toBe(1);
 });
+
+test("empty bank refresh keeps balance evidence and clears an older activity review", async ({ page }, testInfo) => {
+  const state = {
+    configured: true, environment: "PRODUCTION", state: "CONNECTED",
+    expiresAt: new Date(Date.now() + 3600000).toISOString(), lastSuccessfulFetch: null,
+    lastError: "", callback: "http://127.0.0.1:8082/bank/callback",
+    accounts: [{ handle: "synthetic-empty-handle", label: "Synthetic empty-period account", currency: "EUR", kind: "CASH" }],
+  };
+  await page.route("**/api/banking/status", route => route.fulfill({ json: state }));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Money position", exact: true }).click();
+  const date = await page.getByLabel("Position as at", { exact: true }).inputValue();
+  const created = await page.request.post("/api/ledger/accounts", { data: {
+    name: "Synthetic empty period " + testInfo.project.name, kind: "CASH",
+    openingDate: date, openingEuro: "1000", source: "Synthetic opening statement",
+  }});
+  expect(created.ok()).toBeTruthy();
+  const account = await created.json();
+  let refreshes = 0;
+  let approvals = 0;
+  await page.route("**/api/ledger/accounts/*/previews/*/approve", async route => {
+    approvals++;
+    await route.abort();
+  });
+  await page.route("**/api/banking/preview", async route => {
+    refreshes++;
+    await route.fulfill({ json: {
+      preview: refreshes === 1 ? {
+        id: "synthetic-earlier-preview", revision: account.revision,
+        expiresAt: new Date(Date.now() + 300000).toISOString(),
+        proposals: [{ disposition: "NEW", possibleOverlap: false, row: {
+          reference: "synthetic-unapproved", date, description: "Synthetic earlier activity",
+          amountEuro: "-10.00", status: "BOOKED", kind: "ACTIVITY",
+        }}],
+      } : null,
+      balances: refreshes < 3 ? [{ type: "CLBD", amountEuro: "990.00", date }] : [],
+      warnings: [], fetchedAt: new Date().toISOString(),
+    }});
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Money position", exact: true }).click();
+  await page.getByLabel("Review account", { exact: true }).selectOption(account.id);
+  const panel = page.getByRole("region", { name: "AIB bank connection", exact: true });
+  await panel.getByLabel("I authorise Enable Banking to access only my selected AIB accounts, balances and transactions, and retain reviewed records locally").check();
+  const fetch = panel.getByRole("button", { name: "Fetch bank activity for review", exact: true });
+  await fetch.click();
+  await expect(page.getByRole("region", { name: "Review imported activity" })).toBeVisible();
+  await fetch.click();
+  const evidence = panel.getByLabel("Bank balance evidence", { exact: true });
+  await expect(evidence).toContainText("990.00");
+  await expect(evidence).toContainText("No transactions were returned for this period");
+  await expect(page.getByRole("region", { name: "Review imported activity" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Approve selected activity", exact: true })).toHaveCount(0);
+  await fetch.click();
+  await expect(evidence).toContainText("No supported booked balance was returned.");
+  expect(approvals).toBe(0);
+  const position = await (await page.request.get("/api/ledger?asOf=" + date)).json();
+  const unchanged = position.accounts.find((value: { id: string }) => value.id === account.id);
+  expect(unchanged.bookedMinor).toBe(100000);
+  expect(unchanged.entries).toBe(0);
+  expect(unchanged.revision).toBe(account.revision);
+});

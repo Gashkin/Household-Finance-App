@@ -1,0 +1,144 @@
+{
+  "work_id": "GBD-30",
+  "page_id": "41ad3419-fef0-81f2-a6a6-f653a2bbc6d9",
+  "branch": "story/30-delivery",
+  "artifacts": [
+    {
+      "path": "AnalysisScripts/audit_repository_hygiene.py",
+      "contains": [
+        "prohibited_tracked_file_count",
+        "paths_or_contents_emitted"
+      ]
+    },
+    {
+      "path": "AnalysisScripts/test_audit_repository_hygiene.py",
+      "contains": [
+        "test_gitignore_does_not_hide_force_tracked_outputs",
+        "DO_NOT_EMIT_SECRET_CONTENT"
+      ]
+    },
+    {
+      "path": "windows/Inspect-DeploymentHost.ps1",
+      "contains": [
+        "PrivilegedRunnerBoundaryBlocked",
+        "ProductionIsolationVerified=$false"
+      ]
+    },
+    {
+      "path": "windows/Test-IdentityBoundary.ps1",
+      "contains": [
+        "NonElevatedToken=$true",
+        "ElevatedAdministratorOverridePossible=$true"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/householdfinance/service/WorkbookIngestionService.java",
+      "contains": [
+        "requireWorkbookImport()",
+        "Workbook imports are disabled"
+      ]
+    },
+    {
+      "path": "backend/src/test/java/com/householdfinance/WorkbookImportPolicyTest.java",
+      "contains": [
+        "disabledServiceDoesNotEvenInspectMultipartBytes",
+        "disabledPolicyRejectsAnAttemptToExecuteAnOldReview"
+      ]
+    },
+    {
+      "path": "windows/Start.ps1",
+      "contains": [
+        "--workbook.import.enabled=false"
+      ]
+    },
+    {
+      "path": "windows/Test-Release.ps1",
+      "contains": [
+        "Installed workbook intake was enabled by an inherited setting."
+      ]
+    },
+    {
+      "path": "windows/Test-Release.ps1",
+      "contains": [
+        "Statement CSV preview/account mapping",
+        "Repeated statement row was not detected as a duplicate.",
+        "Imported synthetic statement or reconciliation changed after actual Windows restart"
+      ]
+    },
+    {
+      "path": "product/stories/local-finance-instance.md",
+      "contains": [
+        "This release is a local-only finance workspace",
+        "Dev Server One",
+        "Fast User Switching",
+        "An elevated administrator or SYSTEM",
+        "Import a statement CSV",
+        "Backup & recovery"
+      ]
+    },
+    {
+      "path": "windows/Install.ps1",
+      "contains": [
+        "protected destinations are part of the local identity-boundary",
+        "backups','secrets"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/householdfinance/ledger/LedgerCsv.java",
+      "contains": [
+        "parseStatement(String csv)",
+        "Unsupported statement CSV",
+        "statementBalanceEuro",
+        "statementBalanceAmbiguous",
+        "Ambiguous AIB"
+      ]
+    },
+    {
+      "path": "backend/src/main/java/com/householdfinance/ledger/LedgerService.java",
+      "contains": [
+        "correctOpening(String id, OpeningCorrection input)",
+        "removeUnusedAccount(String id, RemoveUnusedAccount input)",
+        "LedgerCsv.parseStatement(input.csv())",
+        "savedPlansReference(String id)",
+        "lockAccountReferences(Collection<String> ids)"
+      ]
+    },
+    {
+      "path": "backend/src/test/java/com/householdfinance/ledger/LedgerJourneyTest.java",
+      "contains": [
+        "unusedAccountCanBeRemovedWithMinimalTombstoneAndActivityBlocksRemoval",
+        "savedPlanAndPlanAuditReferencesBlockAccountRemoval",
+        "accountRemovalSerializesWithConcurrentPlanCreation",
+        "openingBalanceCanBeCorrectedOnlyBeforeActivityAndKeepsAudit",
+        "standardAibDebitCreditExportPreviewsSignsAndLatestBalance",
+        "mismatchedAibRunningBalanceIsShownAsDifferenceWithoutSilentAdjustment",
+        "standardAibAmountTypeAndGroupedSemicolonHeadersAreRecognised"
+      ]
+    },
+    {
+      "path": "frontend/src/components/MoneyPositionWorkspace.tsx",
+      "contains": [
+        "Correct opening balance and date",
+        "Use AIB balance for this check",
+        "Preview and review statement CSV",
+        "multiple rows on its latest balance date"
+      ]
+    },
+    {
+      "path": "windows/Test-Release.ps1",
+      "contains": [
+        "Synthetic AIB export preview/balance",
+        "Unused duplicate account was not removed",
+        "Synthetic AIB import or opening correction was incorrect before restart."
+      ]
+    },
+    {
+      "path": "product/stories/local-finance-instance.md",
+      "contains": [
+        "AIB statement or interchange CSV",
+        "Correct opening balance and date",
+        "Remove this unused account"
+      ]
+    }
+  ]
+}

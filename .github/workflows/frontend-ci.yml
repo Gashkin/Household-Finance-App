@@ -18,6 +18,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Test story coordination and integration guards
         run: python3 -m unittest discover -s delivery/tests -v
+      - name: Verify repository hygiene
+        run: |
+          python3 AnalysisScripts/audit_repository_hygiene.py
+          python3 -m unittest discover -s AnalysisScripts -p test_audit_repository_hygiene.py -v
       - name: Validate local-only analysis scripts
         run: |
           python3 -m py_compile AnalysisScripts/inspect_workbook.py AnalysisScripts/inspect_budget.py AnalysisScripts/audit_history_exposure.py

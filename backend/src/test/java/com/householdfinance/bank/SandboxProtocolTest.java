@@ -56,6 +56,28 @@ class SandboxProtocolTest {
   }
 
   @Test
+  void emptyActivityRetainsBalancesWithoutCreatingAnImport() {
+    var request = input(connect());
+    var before = ledger.position(today).accounts().stream()
+        .filter(a -> a.id().equals(request.ledgerAccountId())).findFirst().orElseThrow();
+    provider.mode = "empty";
+    var fetched = service.fetch(request);
+    assertNull(fetched.preview(), "No empty or invented activity review should be created");
+    assertEquals(1, fetched.balances().size());
+    assertEquals("990.00", fetched.balances().getFirst().amountEuro());
+    assertEquals(1, provider.transactionPages);
+    assertNotNull(service.status().lastSuccessfulFetch());
+    assertEquals(before, ledger.position(today).accounts().stream()
+        .filter(a -> a.id().equals(request.ledgerAccountId())).findFirst().orElseThrow());
+    // A later nonempty refresh still requires explicit approval and reconciliation.
+    provider.mode = "ok";
+    var later = service.fetch(request);
+    assertEquals(2, later.preview().proposals().size());
+    assertEquals(before, ledger.position(today).accounts().stream()
+        .filter(a -> a.id().equals(request.ledgerAccountId())).findFirst().orElseThrow());
+  }
+
+  @Test
   void completePaginatedJourneySignsJwtAndNeverChangesLedgerBeforeReview() throws Exception {
     var status = connect();
     assertEquals("CONNECTED", status.state());

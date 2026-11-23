@@ -81,6 +81,9 @@ public class GoalService {
     check(!in.cancelled()||before!=null,"Cannot cancel an unknown goal");
     if(in.cancelled()){reserved=0;monthly=0;}
     var as=cash();String savings=optional(in.savingsAccountId()),bill=optional(in.billAccountId()),category=optional(in.categoryId());
+    var lockedAccounts=new HashSet<String>();if(savings!=null)lockedAccounts.add(savings);if(bill!=null)lockedAccounts.add(bill);
+    if(before!=null){if(before.savingsAccountId()!=null)lockedAccounts.add(before.savingsAccountId());if(before.billAccountId()!=null)lockedAccounts.add(before.billAccountId());}
+    ledger.lockAccountReferences(lockedAccounts);
     if(savings!=null)account(as,savings);
     String schedule=before==null?null:before.scheduleId();var commitment=commitments.get().state();
     if(kind.equals("BILL")){

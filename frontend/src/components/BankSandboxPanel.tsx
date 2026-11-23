@@ -104,8 +104,8 @@ export default function BankSandboxPanel({
         acknowledged: consent,
       });
       setBalance(value);
+      onPreview(value); // Also clears any older activity review for an empty refresh.
       setStatus(await sandbox<SandboxStatus>("status"));
-      onPreview(value);
     });
   }
   const production = status?.environment === "PRODUCTION";
@@ -298,6 +298,7 @@ export default function BankSandboxPanel({
           {balance && (
             <div aria-label={production ? "Bank balance evidence" : "Sandbox balance evidence"}>
               <h4>{production ? "Bank balance evidence" : "Sandbox balance evidence"}</h4>
+              {balance.balances.length === 0 && <p>No supported booked balance was returned.</p>}
               {balance.balances.map((b, i) => (
                 <p key={i}>
                   {b.type}: €{b.amountEuro} · {b.date}
@@ -309,9 +310,10 @@ export default function BankSandboxPanel({
                 ))}
               </ul>
               <p>
-                Review and approve the proposed activity below, then explicitly
-                compare your booked statement balance. No account balance has
-                been overwritten.
+                {balance.preview
+                  ? "Review and approve the proposed activity below, then explicitly compare your booked statement balance."
+                  : "No transactions were returned for this period. There is no activity to approve; compare the dated balance evidence with your ledger."}
+                {" "}No account balance has been overwritten.
               </p>
             </div>
           )}

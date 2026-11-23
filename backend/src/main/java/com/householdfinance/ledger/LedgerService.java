@@ -18,6 +18,11 @@ public class LedgerService {
   public record AccountInput(
       String name, String kind, LocalDate openingDate, String openingEuro, String source) {}
 
+  public record OpeningCorrection(
+      Long revision, LocalDate openingDate, String openingEuro, String source) {}
+
+  public record RemoveUnusedAccount(Long revision, String reason) {}
+
   public record Row(
       String reference,
       LocalDate date,
@@ -30,7 +35,15 @@ public class LedgerService {
 
   public record Proposal(Row row, String disposition, boolean possibleOverlap) {}
 
-  public record Preview(String id, long revision, Instant expiresAt, List<Proposal> proposals) {}
+  public record Preview(
+      String id,
+      long revision,
+      Instant expiresAt,
+      List<Proposal> proposals,
+      LocalDate statementDate,
+      String statementBalanceEuro,
+      boolean statementBalanceAmbiguous,
+      String format) {}
 
   public record Approval(Long revision, List<Row> rows, Boolean acknowledgedOverlap) {}
 
@@ -107,6 +120,8 @@ public class LedgerService {
   private final LedgerAuditRepository audits;
   private final CashPositionService cash;
   private final ObjectMapper json;
+  @org.springframework.beans.factory.annotation.Autowired private LedgerReviewRepository reviewRecords;
+  @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
   private final Map<String, Draft> drafts = new HashMap<>();
   @org.springframework.beans.factory.annotation.Autowired(required=false) private com.householdfinance.access.AccessService identityAccess;
 
@@ -171,10 +186,60 @@ public class LedgerService {
         .orElseThrow(() -> new IllegalArgumentException("Unknown ledger account"));
   }
 
+  /** Lock referenced accounts while a saved plan is written, serialising it with safe account removal. */
+  @Transactional
+  public void lockAccountReferences(Collection<String> ids) {
+    AccessContext.requireEdit();
+    if (ids == null) return;
+    ids.stream().filter(Objects::nonNull).filter(id -> !id.isBlank()).distinct().sorted().forEach(id -> {
+      var locked = accounts.findByIdForUpdate(id)
+          .filter(a -> AccessContext.owns(a.ownerId))
+          .orElseThrow(() -> new IllegalArgumentException("A saved plan references an unavailable account"));
+      entityManager.refresh(locked);
+    });
+  }
+
+  private boolean containsAccountId(JsonNode value, String id) {
+    if (value == null || value.isNull()) return false;
+    if (value.isTextual()) return value.textValue().equals(id);
+    if (value.isArray()) {
+      for (JsonNode child : value) if (containsAccountId(child, id)) return true;
+    } else if (value.isObject()) {
+      var fields = value.fields();
+      while (fields.hasNext()) if (containsAccountId(fields.next().getValue(), id)) return true;
+    }
+    return false;
+  }
+
+  private boolean savedPlansReference(String id) {
+    for (var record : reviewRecords.findAll()) {
+      if (!AccessContext.owns(record.ownerId) || !Set.of("COMMITMENTS", "DEBTS", "GOALS").contains(record.kind)) continue;
+      try {
+        if (containsAccountId(json.readTree(record.payload), id)) return true;
+      } catch (Exception e) {
+        throw new IllegalStateException("Cannot verify saved-plan account references", e);
+      }
+    }
+    for (var event : audits.findAll()) {
+      if (!AccessContext.userId().equals(event.actorId)
+          || !Set.of("COMMITMENT_CHANGE", "DEBT_CHANGE", "GOAL_CHANGE").contains(event.action)) continue;
+      try {
+        if (containsAccountId(json.readTree(event.beforeJson), id)
+            || containsAccountId(json.readTree(event.afterJson), id)) return true;
+      } catch (Exception e) {
+        throw new IllegalStateException("Cannot verify saved-plan audit references", e);
+      }
+    }
+    return false;
+  }
+
   private void revision(LedgerAccount a, Long revision) {
     AccessContext.requireEdit();
-    check(AccessContext.owns(a.ownerId), "Only the account owner may change this account");
-    check(revision != null && a.revision == revision, "Account changed; reload and review again");
+    var locked = accounts.findByIdForUpdate(a.id)
+        .filter(account -> AccessContext.owns(account.ownerId))
+        .orElseThrow(() -> new IllegalArgumentException("Only the account owner may change this account"));
+    entityManager.refresh(locked);
+    check(revision != null && locked.revision == revision, "Account changed; reload and review again");
   }
 
   private void unprotected(LedgerAccount a, LocalDate date) {
@@ -262,6 +327,60 @@ public class LedgerService {
   }
 
   @Transactional
+  public AccountView correctOpening(String id, OpeningCorrection input) {
+    var a = account(id);
+    check(input != null, "Opening balance correction required");
+    revision(a, input.revision());
+    check(entries.countByAccountId(id) == 0, "Opening balance is locked after activity; reconcile to a current statement instead");
+    check(a.reconciledDate == null && a.reconciledRevision == null && a.reconciledBalance == null,
+        "Reopen and resolve reconciliation before changing the opening balance");
+    check(!a.shared && a.sandboxIdentity == null, "Unshare and unlink the account before changing its opening balance");
+    check(!cash.referencesLedgerAccount(id), "Published positions already reference this account");
+    check(input.openingDate() != null && !input.openingDate().isAfter(today()), "Opening date must be today or earlier");
+    long amount = money(input.openingEuro());
+    String source = text(input.source(), 200, "Correction source");
+    var before = Map.of("openingDate", a.openingDate, "openingMinor", a.openingMinor, "source", a.source);
+    a.openingDate = input.openingDate();
+    a.openingMinor = amount;
+    a.source = source;
+    a.revision++;
+    accounts.saveAndFlush(a);
+    audit(id, "OPENING_CORRECTION", source, before,
+        Map.of("openingDate", a.openingDate, "openingMinor", a.openingMinor, "source", a.source));
+    return view(a, today());
+  }
+
+  @Transactional
+  public void removeUnusedAccount(String id, RemoveUnusedAccount input) {
+    var a = account(id);
+    check(input != null, "Removal confirmation required");
+    revision(a, input.revision());
+    String reason = text(input.reason(), 200, "Removal reason");
+    check(!a.shared, "Stop sharing this account before removing it");
+    check(a.sandboxIdentity == null, "Unlink this account before removing it");
+    check(
+        a.reconciledDate == null
+            && a.reconciledRevision == null
+            && a.reconciledBalance == null
+            && a.reconciledSource == null,
+        "Accounts with reconciliation history cannot be removed");
+    check(entries.countByAccountId(id) == 0, "Accounts with activity history cannot be removed");
+    check(!cash.referencesLedgerAccount(id), "Accounts used in a published position cannot be removed");
+    check(!savedPlansReference(id), "A saved plan or its history refers to this account");
+    var history = audits.findByAccountIdOrderByRecordedAtDesc(id);
+    check(
+        !history.isEmpty()
+            && history.stream().allMatch(e -> Set.of("OPEN", "OPENING_CORRECTION").contains(e.action)),
+        "Accounts with other audit history cannot be removed");
+
+    String name = a.name;
+    String kind = a.kind;
+    accounts.delete(a);
+    accounts.flush();
+    audit(id, "ACCOUNT_REMOVED", reason, Map.of("name", name, "kind", kind), Map.of("removed", true));
+  }
+
+  @Transactional
   public void bindSandboxIdentity(String id, String identity) {
     AccessContext.requireEdit();
     check(identity != null && identity.matches("[0-9a-f]{64}"), "Invalid sandbox account identity");
@@ -335,10 +454,11 @@ public class LedgerService {
     check(input != null, "Import required");
     var a = account(id);
     String source = text(input.source(), 200, "Import source");
+    var parsed = LedgerCsv.parseStatement(input.csv());
     List<Row> rows = new ArrayList<>();
     Set<String> refs = new HashSet<>();
     int number = 1;
-    for (var cells : LedgerCsv.parse(input.csv())) {
+    for (var cells : parsed.rows()) {
       number++;
       Row r;
       try {
@@ -386,7 +506,11 @@ public class LedgerService {
                                 .findFirst()
                                 .orElse(null)),
                         overlap(r, existing, rows)))
-            .toList());
+            .toList(),
+        parsed.statementDate(),
+        parsed.statementBalanceEuro(),
+        parsed.statementBalanceAmbiguous(),
+        parsed.format());
   }
 
   private LedgerEntry put(LedgerAccount a, Row row, String source, LedgerEntry old) {
@@ -750,6 +874,10 @@ public class LedgerService {
           .orElseThrow(() -> new IllegalArgumentException("Published cash record unavailable"));
     }
     Position p = position(input.asOf());
+    lockAccountReferences(p.accounts().stream()
+        .filter(a -> a.owned() && a.kind().equals("CASH"))
+        .map(AccountView::id).toList());
+    p = position(input.asOf());
     check(
         input.revisions() != null && input.revisions().size() == p.accounts().size(),
         "Review all account revisions again");

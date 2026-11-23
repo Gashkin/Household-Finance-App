@@ -94,9 +94,12 @@ try {
     New-Item -ItemType Directory -Path $env:LOCALAPPDATA | Out-Null
     & (Join-Path $Package 'Install.ps1') -ShortcutDirectory $shortcutDirectory
     $installed=Join-Path $env:LOCALAPPDATA 'HouseholdFinance'
+    $launchCommand=Get-Content -LiteralPath (Join-Path $installed 'Launch.cmd') -Raw
+    if($launchCommand -notmatch '-NoProfile -ExecutionPolicy Bypass -File'){throw 'Installed launcher does not bypass the machine script policy for the verified local entrypoint.'}
     $first=(Get-Content -LiteralPath (Join-Path $installed 'active.txt') -Raw).Trim()
     $versionsPath=Join-Path $installed 'versions'
     Assert-PrivatePath $versionsPath
+    foreach($name in @('backups','secrets')) { $privatePath=Join-Path $installed $name; if(-not (Test-Path -LiteralPath $privatePath)){throw "Installer did not create the protected $name directory."}; Assert-PrivatePath $privatePath }
     # A weak versions ACL must prevent reinstalling even if the root stays private.
     Set-SyntheticWeakDirectoryAcl $versionsPath
     try { Assert-Rejected { & (Join-Path $Package 'Install.ps1') -ShortcutDirectory $shortcutDirectory } }
@@ -185,6 +188,9 @@ function Unlock-SyntheticInstance {
     Invoke-WebRequest "${baseUrl}/api/workspace/unlock" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body '{"password":"synthetic-install-password"}' -WebSession $web -UseBasicParsing | Out-Null
     return $web
 }
+# Even an inherited developer opt-in cannot enable binary intake in the installed runtime.
+$originalWorkbookImportEnabled=$env:WORKBOOK_IMPORT_ENABLED
+$env:WORKBOOK_IMPORT_ENABLED='true'
 $process=Start-Process -FilePath (Join-Path $env:WINDIR 'System32/WindowsPowerShell/v1.0/powershell.exe') -ArgumentList @('-NoProfile','-File',('"'+$startScript+'"'),'-Port',[string]$fixturePort) -WorkingDirectory $instance -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $instance 'app.log') -RedirectStandardError (Join-Path $instance 'error.log')
 try {
     $ready=$false
@@ -209,20 +215,119 @@ try {
     Invoke-WebRequest "${baseUrl}/api/workspace/unlock" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body '{"password":"synthetic-install-password"}' -WebSession $session -UseBasicParsing | Out-Null
     $status=Invoke-RestMethod "${baseUrl}/api/banking/status" -WebSession $session
     if($status.configured -or $status.environment -ne 'SANDBOX') { throw 'Production was enabled by default.' }
+    $boundary='gbd30-synthetic-workbook-boundary'
+    $multipart="--$boundary`r`nContent-Disposition: form-data; name=`"file`"; filename=`"synthetic.xlsx`"`r`nContent-Type: application/octet-stream`r`n`r`nsynthetic-not-a-workbook`r`n--$boundary--`r`n"
+    foreach($route in @('preview','map','validate')) {
+        $disabled=$false
+        try {
+            Invoke-WebRequest "${baseUrl}/migration/workbook/$route" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType "multipart/form-data; boundary=$boundary" -Body ([Text.Encoding]::UTF8.GetBytes($multipart)) -WebSession $session -UseBasicParsing | Out-Null
+        } catch {
+            if(-not $_.Exception.Response -or $_.Exception.Response.StatusCode.value__ -ne 400){throw}
+            $details=if($_.ErrorDetails){[string]$_.ErrorDetails.Message}else{''}
+            if($details -notlike '*Workbook imports are disabled*'){throw 'Installed workbook intake reached validation/parsing instead of the disabled policy.'}
+            $disabled=$true
+        }
+        if(-not $disabled){throw 'Installed workbook intake was enabled by an inherited setting.'}
+    }
     if(-not (Test-Path -LiteralPath (Join-Path $installed 'data\household-finance.mv.db'))) { throw 'Launcher did not use the persistent private data directory.' }
-    $today=[DateTime]::UtcNow.ToString('yyyy-MM-dd')
+    $dublin=[TimeZoneInfo]::FindSystemTimeZoneById('GMT Standard Time')
+    $today=[TimeZoneInfo]::ConvertTimeFromUtc([DateTime]::UtcNow,$dublin).ToString('yyyy-MM-dd')
     $account=@{name='Synthetic Windows recovery account';kind='CASH';openingDate=$today;openingEuro='123.45';source='Synthetic Windows opening'}
-    Invoke-RestMethod "${baseUrl}/api/ledger/accounts" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($account | ConvertTo-Json) -WebSession $session | Out-Null
+    $created=Invoke-RestMethod "${baseUrl}/api/ledger/accounts" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($account | ConvertTo-Json) -WebSession $session
+    if(-not $created.id){throw 'Synthetic account creation failed.'}
+    $csv="reference,date,description,amount,status,kind`nsynthetic-statement-row,$today,Synthetic statement purchase,-20.00,BOOKED,ACTIVITY`n"
+    $badCsv="reference,date,description,amount,status,kind`nsynthetic-invalid-row,not-a-date,Synthetic invalid row,-1.00,BOOKED,ACTIVITY`n"
+    $badPreview=$false
+    try {
+        Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($created.id)/preview" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body (@{csv=$badCsv;source='Synthetic malformed statement'} | ConvertTo-Json) -WebSession $session | Out-Null
+    } catch { if($_.Exception.Response.StatusCode.value__ -eq 400){$badPreview=$true}else{throw} }
+    if(-not $badPreview){throw 'Malformed statement CSV was not rejected during preview.'}
+    $afterRejected=Invoke-RestMethod ("${baseUrl}/api/ledger?asOf="+$today) -WebSession $session
+    $unchangedAccount=@($afterRejected.accounts | Where-Object {$_.id -eq $created.id}) | Select-Object -First 1
+    if(-not $unchangedAccount -or $unchangedAccount.entries -ne 0 -or $unchangedAccount.bookedMinor -ne 12345){throw 'Rejected statement preview partially changed the account.'}
+    $wrongMappingRejected=$false
+    try {
+        Invoke-RestMethod "${baseUrl}/api/ledger/accounts/00000000-0000-0000-0000-000000000000/preview" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body (@{csv=$csv;source='Synthetic wrong account mapping'} | ConvertTo-Json) -WebSession $session | Out-Null
+    } catch { if($_.Exception.Response.StatusCode.value__ -eq 400){$wrongMappingRejected=$true}else{throw} }
+    if(-not $wrongMappingRejected){throw 'Unknown statement account mapping was not rejected.'}
+    $preview=Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($created.id)/preview" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body (@{csv=$csv;source='Synthetic statement CSV'} | ConvertTo-Json) -WebSession $session
+    if($preview.proposals.Count -ne 1 -or $preview.proposals[0].disposition -ne 'NEW'){throw 'Statement CSV preview/account mapping was not explicit or clean.'}
+    $approval=@{revision=$preview.revision;rows=@($preview.proposals[0].row);acknowledgedOverlap=$true}
+    Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($created.id)/previews/$($preview.id)/approve" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($approval | ConvertTo-Json -Depth 6) -WebSession $session | Out-Null
+    $duplicate=Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($created.id)/preview" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body (@{csv=$csv;source='Synthetic repeated statement CSV'} | ConvertTo-Json) -WebSession $session
+    if($duplicate.proposals.Count -ne 1 -or $duplicate.proposals[0].disposition -ne 'DUPLICATE'){throw 'Repeated statement row was not detected as a duplicate.'}
+    $unused=@{name='Synthetic duplicate account';kind='DEBT';openingDate=$today;openingEuro='0.00';source='Synthetic duplicate opening'}
+    $unusedAccount=Invoke-RestMethod "${baseUrl}/api/ledger/accounts" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($unused | ConvertTo-Json) -WebSession $session
+    $removal=@{revision=$unusedAccount.revision;reason='Synthetic duplicate account cleanup'}
+    Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($unusedAccount.id)" -Method DELETE -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($removal | ConvertTo-Json) -WebSession $session | Out-Null
+    $afterRemoval=Invoke-RestMethod ("${baseUrl}/api/ledger?asOf="+$today) -WebSession $session
+    if(@($afterRemoval.accounts | Where-Object {$_.id -eq $unusedAccount.id}).Count -ne 0){throw 'Unused duplicate account was not removed.'}
+    $closing=@{revision=$created.revision+1;statementEuro='103.45';source='Synthetic statement closing balance';commit=$true;acceptAdjustment=$false}
+    Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($created.id)/reconcile?asOf=$today" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($closing | ConvertTo-Json) -WebSession $session | Out-Null
+    $aibOpeningDate=([DateTime]::ParseExact($today,'yyyy-MM-dd',[Globalization.CultureInfo]::InvariantCulture)).AddDays(-2).ToString('yyyy-MM-dd')
+    $aibOpening=@{name='Synthetic AIB import account';kind='DEBT';openingDate=$aibOpeningDate;openingEuro='0.00';source='Synthetic AIB opening'}
+    $aibAccount=Invoke-RestMethod "${baseUrl}/api/ledger/accounts" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($aibOpening | ConvertTo-Json) -WebSession $session
+    $openingCorrection=@{revision=$aibAccount.revision;openingDate=$aibOpeningDate;openingEuro='100.00';source='Synthetic corrected opening evidence'}
+    $aibAccount=Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($aibAccount.id)/opening" -Method PUT -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($openingCorrection | ConvertTo-Json) -WebSession $session
+    $yesterday=([DateTime]::ParseExact($today,'yyyy-MM-dd',[Globalization.CultureInfo]::InvariantCulture)).AddDays(-1).ToString('dd/MM/yy')
+    $aibDate=[DateTime]::ParseExact($today,'yyyy-MM-dd',[Globalization.CultureInfo]::InvariantCulture).ToString('dd/MM/yy')
+    $aibCsv="Posted Date,Description,Debit Amount,Credit Amount,Balance,Transaction Type`n$yesterday,Synthetic AIB debit,12.34,,87.66,Debit`n$aibDate,Synthetic AIB credit,,5.00,92.66,Credit`n"
+    $aibPreview=Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($aibAccount.id)/preview" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body (@{csv=$aibCsv;source='Synthetic AIB export'} | ConvertTo-Json) -WebSession $session
+    if($aibPreview.format -ne 'AIB' -or $aibPreview.proposals.Count -ne 2 -or $aibPreview.statementBalanceEuro -ne '92.66'){throw 'Synthetic AIB export preview/balance was not recognised.'}
+    if($aibPreview.proposals[0].row.amountEuro -ne '-12.34' -or $aibPreview.proposals[1].row.amountEuro -ne '5.00'){throw 'AIB debit/credit signs were mapped incorrectly.'}
+    $sameDayAibCsv="Posted Date,Description,Debit Amount,Credit Amount,Balance,Transaction Type`n$aibDate,Synthetic first row,1.00,,91.66,Debit`n$aibDate,Synthetic second row,,2.00,93.66,Credit`n"
+    $sameDayPreview=Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($aibAccount.id)/preview" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body (@{csv=$sameDayAibCsv;source='Synthetic same-day AIB export'} | ConvertTo-Json) -WebSession $session
+    if(-not $sameDayPreview.statementBalanceAmbiguous -or $null -ne $sameDayPreview.statementBalanceEuro){throw 'Same-day AIB balances were not marked ambiguous for manual statement closing balance entry.'}
+    $duplicateHeaderCsv="Posted Date,Date,Description,Debit Amount,Credit Amount,Balance,Transaction Type`n$aibDate,Synthetic ambiguous header,1.00,,91.66,Debit`n"
+    $duplicateHeaderRejected=$false
+    try {
+        Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($aibAccount.id)/preview" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body (@{csv=$duplicateHeaderCsv;source='Synthetic duplicate AIB date header'} | ConvertTo-Json) -WebSession $session | Out-Null
+    } catch { if($_.Exception.Response.StatusCode.value__ -eq 400){$duplicateHeaderRejected=$true}else{throw} }
+    if(-not $duplicateHeaderRejected){throw 'Duplicate semantic AIB headers were not rejected.'}
+    $aibApproval=@{revision=$aibPreview.revision;rows=@($aibPreview.proposals | ForEach-Object {$_.row});acknowledgedOverlap=$true}
+    Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($aibAccount.id)/previews/$($aibPreview.id)/approve" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($aibApproval | ConvertTo-Json -Depth 6) -WebSession $session | Out-Null
+    $aibDuplicate=Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($aibAccount.id)/preview" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body (@{csv=$aibCsv;source='Synthetic repeated AIB export'} | ConvertTo-Json) -WebSession $session
+    if(@($aibDuplicate.proposals | Where-Object {$_.disposition -ne 'DUPLICATE'}).Count -ne 0){throw 'Repeated AIB export was not idempotent.'}
+    $afterAibImport=Invoke-RestMethod ("${baseUrl}/api/ledger?asOf="+$today) -WebSession $session
+    $aibCurrent=@($afterAibImport.accounts | Where-Object {$_.id -eq $aibAccount.id}) | Select-Object -First 1
+    $aibClosing=@{revision=$aibCurrent.revision;statementEuro=$aibPreview.statementBalanceEuro;source='Synthetic AIB closing balance';commit=$true;acceptAdjustment=$false}
+    Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($aibAccount.id)/reconcile?asOf=$today" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($aibClosing | ConvertTo-Json) -WebSession $session | Out-Null
     $backupFile=Join-Path $instance 'synthetic.hfb'
     Invoke-WebRequest "${baseUrl}/api/workspace/backup" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body '{"password":"synthetic-recovery-passphrase"}' -WebSession $session -UseBasicParsing -OutFile $backupFile | Out-Null
     $bytes=[IO.File]::ReadAllBytes($backupFile)
     if($bytes.Length -lt 45 -or [Text.Encoding]::UTF8.GetString($bytes).Contains('Synthetic Windows recovery account')){throw 'Encrypted backup failed.'}
     $beforeRestart=Invoke-RestMethod ("${baseUrl}/api/ledger?asOf="+$today) -WebSession $session
-    if($beforeRestart.cashMinor -ne 12345){throw 'Synthetic opening position was not committed before restart.'}
+    $beforeAccount=@($beforeRestart.accounts | Where-Object {$_.id -eq $created.id}) | Select-Object -First 1
+    if($beforeRestart.cashMinor -ne 10345 -or -not $beforeAccount -or $beforeAccount.entries -ne 1 -or -not $beforeAccount.reconciled){throw 'Imported synthetic statement, balance or reconciliation was incorrect before restart.'}
+    $beforeAib=@($beforeRestart.accounts | Where-Object {$_.id -eq $aibAccount.id}) | Select-Object -First 1
+    if(-not $beforeAib -or $beforeAib.bookedMinor -ne 9266 -or $beforeAib.entries -ne 2 -or -not $beforeAib.reconciled){throw 'Synthetic AIB import or balance correction was incorrect before restart.'}
     $process=Restart-SyntheticInstance $process
     $session=Unlock-SyntheticInstance
     $position=Invoke-RestMethod ("${baseUrl}/api/ledger?asOf="+$today) -WebSession $session
-    if($position.cashMinor -ne 12345){throw ('Synthetic records lost after actual Windows restart: observed '+$position.cashMinor+' minor units.')}
+    $afterAccount=@($position.accounts | Where-Object {$_.id -eq $created.id}) | Select-Object -First 1
+    if($position.cashMinor -ne 10345 -or -not $afterAccount -or $afterAccount.entries -ne 1 -or -not $afterAccount.reconciled){throw ('Imported synthetic statement or reconciliation changed after actual Windows restart: observed '+$position.cashMinor+' minor units.')}
+    $afterAib=@($position.accounts | Where-Object {$_.id -eq $aibAccount.id}) | Select-Object -First 1
+    if(-not $afterAib -or $afterAib.bookedMinor -ne 9266 -or $afterAib.entries -ne 2 -or -not $afterAib.reconciled){throw 'Synthetic AIB import or opening correction changed after Windows restart.'}
+    Stop-SyntheticInstance $process
+    # Exercise the real installer update path after committed statement data.
+    # The ZIP contents are unchanged; a distinct version identity verifies that
+    # activation leaves the persistent data tree untouched.
+    Stop-SyntheticInstance $process
+    $upgradeOriginal=Get-Content -LiteralPath (Join-Path $Package 'manifest.json') -Raw
+    $upgradeManifest=$upgradeOriginal | ConvertFrom-Json
+    $upgradeManifest.commit='cccccccccccccccccccccccccccccccccccccccc'
+    $upgradeManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $Package 'manifest.json') -Encoding UTF8
+    function Read-Host { param([string]$Prompt,[switch]$AsSecureString) 'BACKUP VERIFIED' }
+    try { & (Join-Path $Package 'Install.ps1') -ShortcutDirectory $shortcutDirectory }
+    finally { $upgradeOriginal | Set-Content -LiteralPath (Join-Path $Package 'manifest.json') -Encoding UTF8; Remove-Item Function:\Read-Host }
+    $activeVersion=(Get-Content -LiteralPath (Join-Path $installed 'active.txt') -Raw).Trim()
+    if($activeVersion -ne $upgradeManifest.commit){throw 'Post-import update did not activate the new version.'}
+    $startScript=Join-Path $installed ('versions\'+$activeVersion+'\Start.ps1')
+    $process=Restart-SyntheticInstance $process
+    $session=Unlock-SyntheticInstance
+    $position=Invoke-RestMethod ("${baseUrl}/api/ledger?asOf="+$today) -WebSession $session
+    $upgradeAccount=@($position.accounts | Where-Object {$_.id -eq $created.id}) | Select-Object -First 1
+    if($position.cashMinor -ne 10345 -or -not $upgradeAccount -or $upgradeAccount.entries -ne 1 -or -not $upgradeAccount.reconciled){throw 'Installed update changed the reviewed synthetic statement or reconciliation.'}
     Stop-SyntheticInstance $process
     $originalData=Join-Path $installed 'data'
     $recoveryData=Join-Path $installed 'original-synthetic-data'
@@ -235,10 +340,13 @@ try {
     Assert-Rejected { Invoke-RestMethod ("${baseUrl}/api/ledger?asOf="+$today) -WebSession $session | Out-Null }
     $session=Unlock-SyntheticInstance
     $position=Invoke-RestMethod ("${baseUrl}/api/ledger?asOf="+$today) -WebSession $session
-    if($position.cashMinor -ne 12345){throw 'Packaged Windows encrypted restore changed synthetic records.'}
+    $restoredAccount=@($position.accounts | Where-Object {$_.id -eq $created.id}) | Select-Object -First 1
+    $restoredAib=@($position.accounts | Where-Object {$_.id -eq $aibAccount.id}) | Select-Object -First 1
+    if($position.cashMinor -ne 10345 -or -not $restoredAccount -or $restoredAccount.entries -ne 1 -or -not $restoredAccount.reconciled -or -not $restoredAib -or $restoredAib.bookedMinor -ne 9266 -or -not $restoredAib.reconciled){throw 'Packaged Windows encrypted restore changed imported synthetic statement data.'}
     [Array]::Clear($bytes,0,$bytes.Length)
-    Write-Host 'Packaged Windows runtime, actual launcher/restart/encrypted restore, static app, callback, private ACLs, DPAPI and authenticated banking checks passed using synthetic data.'
+    Write-Host 'Packaged Windows runtime, AIB/interchange CSV preview/import/deduplication/reconciliation, account removal/opening correction, actual restart/encrypted restore, static app, private ACLs and DPAPI checks passed using synthetic data. Banking remained disabled.'
 } finally {
+    $env:WORKBOOK_IMPORT_ENABLED=$originalWorkbookImportEnabled
     $env:LOCALAPPDATA=$originalLocalAppData
     Stop-SyntheticInstance $process
     Assert-FixturePath $instance

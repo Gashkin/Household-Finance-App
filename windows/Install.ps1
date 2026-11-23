@@ -18,6 +18,13 @@ try {
     }
     # The root ACL alone cannot protect a replaced/junctioned versions directory.
     Assert-PrivatePath $versions
+    # These protected destinations are part of the local identity-boundary
+    # contract. Backups are independently passphrase-encrypted by the app.
+    foreach($name in @('backups','secrets')) {
+        $privateDirectory=Join-Path $root $name
+        if(-not (Test-Path -LiteralPath $privateDirectory)) { New-Item -ItemType Directory -Path $privateDirectory | Out-Null; Set-PrivatePath $privateDirectory $true }
+        Assert-PrivatePath $privateDirectory
+    }
     $target = Join-Path $versions $manifest.commit
     if (Test-Path -LiteralPath $target) {
         Assert-PrivatePath $target
@@ -67,7 +74,7 @@ try {
     else { Move-Item -LiteralPath $next -Destination $active }
     # Stable shortcut locates the active version without changing any data paths.
     $launcher = Join-Path $root 'Launch.cmd'
-    '@echo off' + "`r`n" + 'set /p VERSION=<"%LOCALAPPDATA%\HouseholdFinance\active.txt"' + "`r`n" + '"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -File "%LOCALAPPDATA%\HouseholdFinance\versions\%VERSION%\Start.ps1"' | Set-Content -LiteralPath $launcher -Encoding ASCII
+    '@echo off' + "`r`n" + 'set /p VERSION=<"%LOCALAPPDATA%\HouseholdFinance\active.txt"' + "`r`n" + '"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\HouseholdFinance\versions\%VERSION%\Start.ps1"' | Set-Content -LiteralPath $launcher -Encoding ASCII
     $shell = New-Object -ComObject WScript.Shell
     $desktop=$ShortcutDirectory
     if(-not (Test-Path -LiteralPath $desktop)){New-Item -ItemType Directory -Path $desktop | Out-Null}
@@ -75,5 +82,5 @@ try {
     $shortcut.TargetPath = $launcher
     $shortcut.WorkingDirectory = $root
     $shortcut.Save()
-    Write-Host 'Installed. Use Household Finance on your desktop. Production remains gated by readiness for this exact version.'
+    Write-Host 'Installed for local statement review. Use Household Finance on your desktop. Live banking remains disabled.'
 } finally { $mutex.ReleaseMutex(); $mutex.Dispose() }

@@ -1,7 +1,7 @@
 name: Windows release verification
 on:
   pull_request:
-    paths: ['windows/**', 'backend/**', 'frontend/**', '.github/workflows/windows-release.yml', 'product/stories/persistent-aib-instance.md']
+    paths: ['windows/**', 'backend/**', 'frontend/**', '.github/workflows/windows-release.yml', 'product/stories/persistent-aib-instance.md', 'product/stories/local-finance-instance.md']
   push:
     branches: [main]
   workflow_dispatch:

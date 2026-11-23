@@ -131,7 +131,15 @@ public class CommitmentService {
     }
     return List.copyOf(result);
   }
-  @Transactional public State batch(Batch b){check(b!=null,"Batch required");var s=visible(read());if(replay(s,b.revision(),b.operationId(),b))return s;return save(s,edited(s,b.edits()),s.payrolls(),s.exceptions(),b.operationId(),b.reason(),b);}
+  private void lockAccountReferences(State state,List<Edit> edits){
+    var ids=new HashSet<String>();
+    java.util.function.Consumer<Rule> add=r->{if(r!=null){if(r.accountId()!=null)ids.add(r.accountId());if(r.counterpartId()!=null&&!r.counterpartId().isBlank())ids.add(r.counterpartId());}};
+    state.schedules().forEach(s->s.versions().forEach(v->add.accept(v.rule())));
+    state.exceptions().forEach(e->add.accept(e.frozenRule()));
+    if(edits!=null)edits.forEach(e->{if(e!=null)add.accept(e.rule());});
+    ledger.lockAccountReferences(ids);
+  }
+  @Transactional public State batch(Batch b){check(b!=null,"Batch required");var s=visible(read());if(replay(s,b.revision(),b.operationId(),b))return s;lockAccountReferences(s,b.edits());return save(s,edited(s,b.edits()),s.payrolls(),s.exceptions(),b.operationId(),b.reason(),b);}
   @Transactional(readOnly=true) public BatchPreview previewBatch(Batch b){AccessContext.requireEdit();check(b!=null,"Batch required");var s=visible(read());check(b.revision()!=null&&b.revision()==s.revision(),"Commitments changed; reload saved revisions");var next=new State(s.revision(),edited(s,b.edits()),s.payrolls(),s.exceptions(),s.operations());return new BatchPreview(s.revision(),occurrences(s,today().minusDays(31),today().plusMonths(6),today()),occurrences(next,today().minusDays(31),today().plusMonths(6),today()));}
   @Transactional(readOnly=true) public Workspace get(){var s=read();return new Workspace(today(),visible(s),ledger.position(today()).accounts().stream().filter(a->a.kind().equals("CASH")&&a.owned()).toList(),review.categories());}
   // Redact the entire dependent plan after source access is lost, including audit/operation responses.
@@ -350,5 +358,5 @@ public class CommitmentService {
     return new CsvPreview(s.revision(),List.copyOf(result),!result.isEmpty()&&result.stream().allMatch(r->r.errors().isEmpty()));
   }
   @Transactional(readOnly=true) public CsvPreview preview(CsvInput in){check(in!=null,"CSV required");return preview(visible(read()),in.csv());}
-  @Transactional public State apply(CsvApply in){check(in!=null,"CSV required");var s=visible(read());if(replay(s,in.revision(),in.operationId(),in))return s;var preview=preview(s,in.csv());check(preview.applicable(),"CSV rejected; download complete rejection report and correct every row");return save(s,edited(s,preview.rows().stream().map(CsvRow::edit).toList()),s.payrolls(),s.exceptions(),in.operationId(),in.reason(),in);}
+  @Transactional public State apply(CsvApply in){check(in!=null,"CSV required");var s=visible(read());if(replay(s,in.revision(),in.operationId(),in))return s;var preview=preview(s,in.csv());check(preview.applicable(),"CSV rejected; download complete rejection report and correct every row");var edits=preview.rows().stream().map(CsvRow::edit).toList();lockAccountReferences(s,edits);return save(s,edited(s,edits),s.payrolls(),s.exceptions(),in.operationId(),in.reason(),in);}
 }

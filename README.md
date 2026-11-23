@@ -49,20 +49,20 @@ Unlock once to access financial workspaces; lock when finished. **Backup & recov
 
 ## Reviewed household money position
 
-Open **Money position** to record account evidence, review manual/CSV activity, reconcile a closing statement, and reuse reconciled cash in the debt report. Pending payments, transfers, overdrafts and corrections stay explicit. [Workflow, import format, backup compatibility and banking boundary](product/stories/reviewed-money-position.md). AIB production setup and the persistent Windows release are described below; no live connection is established by installation.
+Open **Money position** to record account evidence, review manual/CSV activity, reconcile a closing statement, and reuse reconciled cash in the debt report. Pending payments, transfers, overdrafts and corrections stay explicit. [Workflow, import format, backup compatibility and banking boundary](product/stories/reviewed-money-position.md).
 
 
 ## GBD-10 sandbox connection
 
-Read-only Enable Banking SANDBOX / Mock ASPSP connection is included in the same GBD-10 PR: [setup, consent, review and protection details](product/stories/enable-banking-sandbox.md). Synthetic protocol/browser evidence is distinct from an owner-run external sandbox smoke test. Production/AIB is tracked by [GBD-14](https://www.notion.so/418d3419fef081808864ca465d4eff7a), after GBD-10 integration and production security readiness/consent. Production remains disabled by default.
+Read-only Enable Banking SANDBOX / Mock ASPSP connection is included in the same GBD-10 PR: [setup, consent, review and protection details](product/stories/enable-banking-sandbox.md). Synthetic protocol/browser evidence is distinct from an owner-run external sandbox smoke test. Live banking activation remains deferred and disabled; it is not part of local statement operation.
 
 ## Dated affordability
 
 Open **Plan ahead** to save a dated cash plan, see bill/payday shortfalls and compare an unsaved purchase or income delay. Use reconciled cash-ledger evidence or an explicitly labelled manual estimate. Expected income stays separate from bank cash. [Financial rules, source staleness and operation](product/stories/dated-affordability.md). Encrypted backup payload v3 includes the plan and retains complete v1/v2 restore compatibility.
 
-## Persistent Windows instance and optional AIB production
+## Local Windows instance and statement updates
 
-[GBD-14 setup, update, recovery, provider evidence and security-readiness gates](product/stories/persistent-aib-instance.md). The Windows release bundles the app and Java runtime, persists records outside the checkout, and preserves configuration across updates. Real-bank linking is an owner-only action after synthetic verification, independent security review and actual Windows readiness. Production is disabled by default; no successful live AIB connection is claimed.
+[GBD-30 installation, account boundary, AIB statement import, balance correction, backup, update and recovery guide](product/stories/local-finance-instance.md). The Windows release bundles the app and Java runtime, persists records outside the checkout, and preserves configuration across updates. It supports directly reviewed AIB current-account/card CSV exports and has live banking disabled.
 
 
 ## Read-only ChatGPT connection

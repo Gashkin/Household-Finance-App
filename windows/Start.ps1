@@ -37,7 +37,7 @@ try {
     Set-Location $root
     # Foreground process: closing this window stops the local instance. No background sync/service.
     Write-Host "Open http://127.0.0.1:$Port in your browser. Keep this window open; Ctrl+C stops the instance."
-    & (Join-Path $PSScriptRoot 'runtime\bin\java.exe') -jar (Join-Path $PSScriptRoot 'app.jar') '--spring.flyway.ignore-migration-patterns='
+    & (Join-Path $PSScriptRoot 'runtime\bin\java.exe') -jar (Join-Path $PSScriptRoot 'app.jar') '--spring.flyway.ignore-migration-patterns=' '--workbook.import.enabled=false'
     if ($LASTEXITCODE -ne 0) { throw 'Application stopped with an error. Keep the data directory; follow the recovery guide.' }
 } finally {
     foreach ($name in @('WORKSPACE_PASSWORD','BANK_PRODUCTION_APP_ID','BANK_PRODUCTION_KEY_PATH','BANK_PRODUCTION_CALLBACK','BANK_PRODUCTION_STORE_PATH','BANK_PRODUCTION_STORAGE_KEY','BANK_PRODUCTION_ENABLED','BANK_PRODUCTION_READINESS','SPRING_DATASOURCE_URL')) { [Environment]::SetEnvironmentVariable($name,$null,'Process') }

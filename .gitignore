@@ -74,3 +74,14 @@ delivery-receipt.json
 *.key
 **/bank-connection.bin
 **/bank-connection.bin.initialized
+
+# Local environment and private runtime material (GBD-30)
+/.venv/
+/.worktrees/
+/backups/
+/secrets/
+/config.xml
+*.db
+*.p12
+*.pfx
+*.jks

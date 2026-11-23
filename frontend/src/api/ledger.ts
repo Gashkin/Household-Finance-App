@@ -54,6 +54,10 @@ export type Preview = {
   id: string;
   revision: number;
   expiresAt: string;
+  statementDate: string | null;
+  statementBalanceEuro: string | null;
+  statementBalanceAmbiguous: boolean;
+  format: string;
   proposals: {
     row: ActivityRow;
     disposition: string;

@@ -16,6 +16,7 @@ public final class SyntheticProvider implements AutoCloseable {
   final String app = "11111111-1111-4111-8111-111111111111";
   final String session = "22222222-2222-4222-8222-222222222222";
   final String account = "33333333-3333-4333-8333-333333333333";
+  final String identificationHash = "synthetic-" + UUID.randomUUID();
   final String callback;
   volatile String environment = "SANDBOX", mode = "ok", state = "", authorization = "";
   volatile JsonNode auth;
@@ -113,7 +114,7 @@ public final class SyntheticProvider implements AutoCloseable {
                         "uid",
                         account,
                         "identification_hash",
-                        "synthetic-stable-identity",
+                        identificationHash,
                         "currency",
                         mode.equals("currency") ? "USD" : "EUR",
                         "cash_account_type",
@@ -176,6 +177,7 @@ public final class SyntheticProvider implements AutoCloseable {
         row.put("remittance_information", List.of("Synthetic groceries"));
         if (mode.equals("missing-id")) row.remove("entry_reference");
         result =
+            mode.equals("empty") ? Map.of("transactions", List.of()) :
             second && !mode.equals("repeat")
                 ? Map.of("transactions", List.of(row))
                 : Map.of("transactions", List.of(row), "continuation_key", "next");

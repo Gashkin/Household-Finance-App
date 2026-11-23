@@ -75,9 +75,18 @@ export default function MoneyPositionWorkspace({
     [openingDate, setOpeningDate] = useState(todayInDublin()),
     [opening, setOpening] = useState("0.00"),
     [openingSource, setOpeningSource] = useState("");
+  const [openingEditDate, setOpeningEditDate] = useState(todayInDublin()),
+    [openingEditAmount, setOpeningEditAmount] = useState("0.00"),
+    [openingEditSource, setOpeningEditSource] = useState("");
   const [csv, setCsv] = useState(header),
     [source, setSource] = useState(""),
     [preview, setPreview] = useState<Preview | null>(null);
+  const [aibBalance, setAibBalance] = useState<{
+    accountId: string;
+    date: string;
+    amount: string;
+    source: string;
+  } | null>(null);
   const [proposals, setProposals] = useState<
       {
         include: boolean;
@@ -102,6 +111,12 @@ export default function MoneyPositionWorkspace({
     [publishReviewed, setPublishReviewed] = useState(false),
     [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const account = position?.accounts.find((a) => a.id === selected);
+  useEffect(() => {
+    if (!account) return;
+    setOpeningEditDate(account.openingDate);
+    setOpeningEditAmount(euroText(account.openingMinor));
+    setOpeningEditSource(account.source);
+  }, [account?.id, account?.openingDate, account?.openingMinor, account?.source]);
   async function refresh() {
     const version = ++generation.current;
     const p = await ledger<Position>("?asOf=" + asOf);
@@ -121,38 +136,45 @@ export default function MoneyPositionWorkspace({
   }, [asOf]);
   useEffect(() => {
     let live = true;
+    if (!selected) return;
+    void Promise.all([
+      ledger<Activity[]>("/accounts/" + selected + "/activity"),
+      ledger<Audit[]>("/accounts/" + selected + "/history"),
+    ])
+      .then(([a, h]) => {
+        if (live) {
+          setActivity(a);
+          setHistory(h);
+        }
+      })
+      .catch((e) => {
+        if (live) setError(e.message);
+      });
+    return () => {
+      live = false;
+    };
+  }, [selected, account?.revision, account?.reconciledDate, asOf]);
+  useEffect(() => {
+    setActivity([]);
+    setHistory([]);
     setPreview(null);
     setProposals([]);
     setReconciliation(null);
     setStatement("");
     setStatementSource("");
+    setAibBalance(null);
     setAdjust(false);
     setEditId("");
     setRow(newRow(asOf));
     setRowSource("");
     setRowReviewed(false);
-    setActivity([]);
-    setHistory([]);
     setPublishReviewed(false);
     setRequestId(crypto.randomUUID());
-    if (selected)
-      void Promise.all([
-        ledger<Activity[]>("/accounts/" + selected + "/activity"),
-        ledger<Audit[]>("/accounts/" + selected + "/history"),
-      ])
-        .then(([a, h]) => {
-          if (live) {
-            setActivity(a);
-            setHistory(h);
-          }
-        })
-        .catch((e) => {
-          if (live) setError(e.message);
-        });
-    return () => {
-      live = false;
-    };
-  }, [selected, account?.revision, account?.reconciledDate, asOf]);
+  }, [selected]);
+  useEffect(() => {
+    setReconciliation(null);
+    setAdjust(false);
+  }, [selected, account?.revision, asOf]);
   async function run(action: () => Promise<void>) {
     setBusy(true);
     setError("");
@@ -186,6 +208,40 @@ export default function MoneyPositionWorkspace({
       setMessage(
         "Account created. Review activity, then reconcile its booked closing balance.",
       );
+    });
+  }
+  async function correctOpening(e: FormEvent) {
+    e.preventDefault();
+    if (!account) return;
+    await run(async () => {
+      await ledger(
+        "/accounts/" + selected + "/opening",
+        {
+          revision: account.revision,
+          openingDate: openingEditDate,
+          openingEuro: openingEditAmount,
+          source: openingEditSource,
+        },
+        "PUT",
+      );
+      await refresh();
+      setMessage("Opening balance and effective date updated with an audit record.");
+    });
+  }
+  async function removeUnusedAccount() {
+    if (!account) return;
+    const confirmed = window.confirm(
+      `Remove ${account.name} and its opening balance from the active position? This is only allowed when the account has no activity, reconciliation, sharing, bank link, or published position history. A minimal removal audit will remain.`,
+    );
+    if (!confirmed) return;
+    await run(async () => {
+      await ledger<{ removed: boolean }>(
+        "/accounts/" + account.id,
+        { revision: account.revision, reason: "Removed unused account entered by mistake" },
+        "DELETE",
+      );
+      await refresh();
+      setMessage("Unused account removed from the active position.");
     });
   }
   async function saveRow(e: FormEvent) {
@@ -223,6 +279,11 @@ export default function MoneyPositionWorkspace({
         source,
       });
       setPreview(p);
+      setAibBalance(
+        p.format === "AIB" && p.statementDate && p.statementBalanceEuro
+          ? { accountId: selected, date: p.statementDate, amount: p.statementBalanceEuro, source }
+          : null,
+      );
       setProposals(
         p.proposals.map((x) => ({
           ...x,
@@ -329,7 +390,7 @@ export default function MoneyPositionWorkspace({
           onPreview={(value) => {
             setPreview(value.preview);
             setProposals(
-              value.preview.proposals.map((p) => ({
+              (value.preview?.proposals ?? []).map((p) => ({
                 ...p,
                 include:
                   p.disposition !== "DUPLICATE" && p.disposition !== "CONFLICT",
@@ -337,9 +398,11 @@ export default function MoneyPositionWorkspace({
             );
             setReviewed(false);
             setMessage(
-              "Sandbox activity fetched. Review proposed facts before approval.",
+              value.preview
+                ? "Bank activity fetched. Review proposed facts before approval."
+                : "No bank transactions returned. Dated balance evidence is available; the ledger is unchanged.",
             );
-            setTimeout(
+            if (value.preview) setTimeout(
               () =>
                 document
                   .getElementById("ledger-import-review")
@@ -499,18 +562,54 @@ export default function MoneyPositionWorkspace({
                       </p>
                     </section>
                     {!account.owned&&<p>This shared account is read-only. Its owner reviews activity and reconciliation.</p>}
+                    {account.owned && account.entries === 0 && !account.reconciledDate && (
+                      <details className="ledger-card">
+                        <summary>Correct opening balance and date</summary>
+                        <p>Available before activity is loaded. This correction is recorded in the account history.</p>
+                        <form className="ledger-form" onSubmit={correctOpening}>
+                          <label>
+                            Opening balance date
+                            <input type="date" max={todayInDublin()} value={openingEditDate} onChange={(e) => setOpeningEditDate(e.target.value)} required />
+                          </label>
+                          <label>
+                            Opening balance (€)
+                            <input inputMode="decimal" value={openingEditAmount} onChange={(e) => setOpeningEditAmount(e.target.value)} required />
+                          </label>
+                          <label>
+                            Evidence / reason
+                            <input value={openingEditSource} onChange={(e) => setOpeningEditSource(e.target.value)} maxLength={200} required />
+                          </label>
+                          <button disabled={busy}>Save opening correction</button>
+                        </form>
+                      </details>
+                    )}
+                    {account.owned && (
+                      <section className="ledger-card" aria-label="Remove unused account">
+                        <h3>Remove unused account</h3>
+                        <p>
+                          Removes its opening balance from the active position. Accounts with activity,
+                          reconciliation, sharing, bank links, or published position history are retained.
+                        </p>
+                        <button
+                          type="button"
+                          disabled={busy || account.entries > 0 || account.reconciledDate !== null || account.shared}
+                          onClick={() => void removeUnusedAccount()}
+                        >
+                          Remove this unused account
+                        </button>
+                      </section>
+                    )}
                     <fieldset disabled={!account.owned} className="account-edit-controls"><legend>Owner activity tools</legend>
                     <details id="ledger-import-review" className="ledger-card">
                       <summary>Preview and review CSV activity</summary>
                       <p>
-                        Use this exact header:{" "}
+                        Upload the standard AIB current-account or credit-card CSV, or use the app's interchange format:{" "}
                         <code>
                           reference,date,description,amount,status,kind
                         </code>
                         . ISO dates; signed EUR amounts; BOOKED/PENDING;
                         ACTIVITY/TRANSFER. Stable references prevent re-import
-                        duplication. Quote fields containing commas. Convert
-                        bank-specific columns before import.
+                        duplication. No column conversion is needed for supported AIB exports.
                       </p>
                       <label>
                         CSV file
@@ -529,6 +628,7 @@ export default function MoneyPositionWorkspace({
                                 setCsv(text);
                                 setSource(f.name.slice(0, 200));
                                 setPreview(null);
+                                setAibBalance(null);
                               });
                           }}
                         />
@@ -541,6 +641,7 @@ export default function MoneyPositionWorkspace({
                         onChange={(e) => {
                           setCsv(e.target.value);
                           setPreview(null);
+                          setAibBalance(null);
                         }}
                         maxLength={100000}
                       />
@@ -551,6 +652,7 @@ export default function MoneyPositionWorkspace({
                           onChange={(e) => {
                             setSource(e.target.value);
                             setPreview(null);
+                            setAibBalance(null);
                           }}
                           maxLength={200}
                         />
@@ -561,6 +663,17 @@ export default function MoneyPositionWorkspace({
                       {preview && (
                         <section aria-label="Review imported activity">
                           <h4>Review imported activity</h4>
+                          <p>Detected {preview.format === "AIB" ? "standard AIB statement" : "app interchange"} format.</p>
+                          {preview.statementDate && preview.statementBalanceEuro && (
+                            <p>
+                              Latest balance in file: {money(Math.round(Number(preview.statementBalanceEuro) * 100))} on {preview.statementDate}. After importing, use this figure in the statement check if it is the statement closing balance.
+                            </p>
+                          )}
+                          {preview.statementBalanceAmbiguous && (
+                            <p>
+                              The export has multiple rows on its latest balance date, so I cannot identify the closing balance safely. Enter the statement closing balance yourself for reconciliation.
+                            </p>
+                          )}
                           <p>
                             Nothing has been saved yet. Preview expires{" "}
                             {new Date(preview.expiresAt).toLocaleTimeString()}.
@@ -869,6 +982,14 @@ export default function MoneyPositionWorkspace({
                           maxLength={200}
                         />
                       </label>
+                      {aibBalance?.accountId === selected && (
+                        <p>
+                          AIB export balance: {money(Math.round(Number(aibBalance.amount) * 100))} on {aibBalance.date}. The source file is {aibBalance.source}.
+                          <button type="button" onClick={() => { setAsOf(aibBalance.date); setStatement(aibBalance.amount); setStatementSource(aibBalance.source); setReconciliation(null); setAdjust(false); }}>
+                            Use AIB balance for this check
+                          </button>
+                        </p>
+                      )}
                       <button type="button" onClick={() => reconcile(false)}>
                         Check statement balance
                       </button>
