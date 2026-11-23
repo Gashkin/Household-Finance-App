@@ -91,9 +91,11 @@ reference,date,description,amount,status,kind
 For AIB files, the importer recognises the booked date, description and either
 separate debit/credit columns or an amount plus debit/credit transaction type.
 When the export includes a running balance, the preview shows the latest dated
-balance so it can be used in reconciliation. The account is selected explicitly
-in the app; no account number is needed in the source label. Unsupported or
-ambiguous headers are rejected before any ledger changes.
+balance only when that date has one unambiguous balance row. If multiple rows
+share the latest date, or that date has no balance, enter the statement closing
+balance manually before reconciling. Duplicate semantic headers and unsupported
+or ambiguous headers are rejected before any ledger changes. The account is
+selected explicitly in the app; no account number is needed in the source label.
 
 To import:
 

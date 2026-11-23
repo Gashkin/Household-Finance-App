@@ -56,6 +56,7 @@ export type Preview = {
   expiresAt: string;
   statementDate: string | null;
   statementBalanceEuro: string | null;
+  statementBalanceAmbiguous: boolean;
   format: string;
   proposals: {
     row: ActivityRow;

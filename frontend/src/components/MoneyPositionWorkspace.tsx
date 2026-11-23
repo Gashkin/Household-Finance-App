@@ -171,6 +171,10 @@ export default function MoneyPositionWorkspace({
     setPublishReviewed(false);
     setRequestId(crypto.randomUUID());
   }, [selected]);
+  useEffect(() => {
+    setReconciliation(null);
+    setAdjust(false);
+  }, [selected, account?.revision, asOf]);
   async function run(action: () => Promise<void>) {
     setBusy(true);
     setError("");
@@ -663,6 +667,11 @@ export default function MoneyPositionWorkspace({
                           {preview.statementDate && preview.statementBalanceEuro && (
                             <p>
                               Latest balance in file: {money(Math.round(Number(preview.statementBalanceEuro) * 100))} on {preview.statementDate}. After importing, use this figure in the statement check if it is the statement closing balance.
+                            </p>
+                          )}
+                          {preview.statementBalanceAmbiguous && (
+                            <p>
+                              The export has multiple rows on its latest balance date, so I cannot identify the closing balance safely. Enter the statement closing balance yourself for reconciliation.
                             </p>
                           )}
                           <p>

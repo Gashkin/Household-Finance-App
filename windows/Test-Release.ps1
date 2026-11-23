@@ -273,6 +273,15 @@ try {
     $aibPreview=Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($aibAccount.id)/preview" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body (@{csv=$aibCsv;source='Synthetic AIB export'} | ConvertTo-Json) -WebSession $session
     if($aibPreview.format -ne 'AIB' -or $aibPreview.proposals.Count -ne 2 -or $aibPreview.statementBalanceEuro -ne '92.66'){throw 'Synthetic AIB export preview/balance was not recognised.'}
     if($aibPreview.proposals[0].row.amountEuro -ne '-12.34' -or $aibPreview.proposals[1].row.amountEuro -ne '5.00'){throw 'AIB debit/credit signs were mapped incorrectly.'}
+    $sameDayAibCsv="Posted Date,Description,Debit Amount,Credit Amount,Balance,Transaction Type`n$aibDate,Synthetic first row,1.00,,91.66,Debit`n$aibDate,Synthetic second row,,2.00,93.66,Credit`n"
+    $sameDayPreview=Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($aibAccount.id)/preview" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body (@{csv=$sameDayAibCsv;source='Synthetic same-day AIB export'} | ConvertTo-Json) -WebSession $session
+    if(-not $sameDayPreview.statementBalanceAmbiguous -or $null -ne $sameDayPreview.statementBalanceEuro){throw 'Same-day AIB balances were not marked ambiguous for manual statement closing balance entry.'}
+    $duplicateHeaderCsv="Posted Date,Date,Description,Debit Amount,Credit Amount,Balance,Transaction Type`n$aibDate,Synthetic ambiguous header,1.00,,91.66,Debit`n"
+    $duplicateHeaderRejected=$false
+    try {
+        Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($aibAccount.id)/preview" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body (@{csv=$duplicateHeaderCsv;source='Synthetic duplicate AIB date header'} | ConvertTo-Json) -WebSession $session | Out-Null
+    } catch { if($_.Exception.Response.StatusCode.value__ -eq 400){$duplicateHeaderRejected=$true}else{throw} }
+    if(-not $duplicateHeaderRejected){throw 'Duplicate semantic AIB headers were not rejected.'}
     $aibApproval=@{revision=$aibPreview.revision;rows=@($aibPreview.proposals | ForEach-Object {$_.row});acknowledgedOverlap=$true}
     Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($aibAccount.id)/previews/$($aibPreview.id)/approve" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body ($aibApproval | ConvertTo-Json -Depth 6) -WebSession $session | Out-Null
     $aibDuplicate=Invoke-RestMethod "${baseUrl}/api/ledger/accounts/$($aibAccount.id)/preview" -Method POST -Headers @{'X-Workspace-Request'='1'} -ContentType 'application/json' -Body (@{csv=$aibCsv;source='Synthetic repeated AIB export'} | ConvertTo-Json) -WebSession $session

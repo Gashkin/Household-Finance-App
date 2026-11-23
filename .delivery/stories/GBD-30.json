@@ -88,7 +88,9 @@
       "contains": [
         "parseStatement(String csv)",
         "Unsupported statement CSV",
-        "statementBalanceEuro"
+        "statementBalanceEuro",
+        "statementBalanceAmbiguous",
+        "Ambiguous AIB"
       ]
     },
     {
@@ -96,15 +98,20 @@
       "contains": [
         "correctOpening(String id, OpeningCorrection input)",
         "removeUnusedAccount(String id, RemoveUnusedAccount input)",
-        "LedgerCsv.parseStatement(input.csv())"
+        "LedgerCsv.parseStatement(input.csv())",
+        "savedPlansReference(String id)",
+        "lockAccountReferences(Collection<String> ids)"
       ]
     },
     {
       "path": "backend/src/test/java/com/householdfinance/ledger/LedgerJourneyTest.java",
       "contains": [
         "unusedAccountCanBeRemovedWithMinimalTombstoneAndActivityBlocksRemoval",
+        "savedPlanAndPlanAuditReferencesBlockAccountRemoval",
+        "accountRemovalSerializesWithConcurrentPlanCreation",
         "openingBalanceCanBeCorrectedOnlyBeforeActivityAndKeepsAudit",
         "standardAibDebitCreditExportPreviewsSignsAndLatestBalance",
+        "mismatchedAibRunningBalanceIsShownAsDifferenceWithoutSilentAdjustment",
         "standardAibAmountTypeAndGroupedSemicolonHeadersAreRecognised"
       ]
     },
@@ -113,7 +120,8 @@
       "contains": [
         "Correct opening balance and date",
         "Use AIB balance for this check",
-        "Preview and review statement CSV"
+        "Preview and review statement CSV",
+        "multiple rows on its latest balance date"
       ]
     },
     {

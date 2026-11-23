@@ -14,7 +14,8 @@ public final class LedgerCsv {
   private LedgerCsv() {}
 
   public record ParsedStatement(
-      List<List<String>> rows, LocalDate statementDate, String statementBalanceEuro, String format) {}
+      List<List<String>> rows, LocalDate statementDate, String statementBalanceEuro,
+      boolean statementBalanceAmbiguous, String format) {}
 
   public static List<List<String>> parse(String csv) {
     return parse(csv,List.of("reference", "date", "description", "amount", "status", "kind"));
@@ -36,7 +37,7 @@ public final class LedgerCsv {
     if (header.equals(List.of("reference", "date", "description", "amount", "status", "kind"))) {
       if (table.isEmpty() || table.stream().anyMatch(r -> r.size() != 6))
         throw new IllegalArgumentException("Provide 1–500 complete activity rows");
-      return new ParsedStatement(table, null, null, "canonical");
+      return new ParsedStatement(table, null, null, false, "canonical");
     }
     return parseAib(header, table);
   }
@@ -95,14 +96,14 @@ public final class LedgerCsv {
     if (table.isEmpty() || table.stream().anyMatch(r -> r.size() != header.size()))
       throw new IllegalArgumentException("Provide 1–500 complete AIB transaction rows");
     List<String> names = aibColumns(header);
-    int date = find(names, "postedtransactionsdate", "posteddate", "transactiondate", "date", "posted", "bookeddate");
-    int description = find(names, "description", "transactiondescription", "transactiondetails", "details", "narrative", "particulars");
-    int debit = find(names, "debit", "debitamount", "debitamounteur", "paidout", "moneyout", "withdrawal", "withdrawals");
-    int credit = find(names, "credit", "creditamount", "creditamounteur", "paidin", "moneyin", "deposit", "deposits");
-    int amount = find(names, "amount", "transactionamount");
-    int balance = find(names, "balance", "runningbalance", "accountbalance");
-    int reference = find(names, "reference", "transactionreference", "transactionid", "bankreference");
-    int transactionType = find(names, "transactiontype", "type");
+    int date = uniqueFind(names, "date", "postedtransactionsdate", "posteddate", "transactiondate", "date", "posted", "bookeddate");
+    int description = uniqueFind(names, "description", "description", "transactiondescription", "transactiondetails", "details", "narrative", "particulars");
+    int debit = uniqueFind(names, "debit", "debit", "debitamount", "debitamounteur", "paidout", "moneyout", "withdrawal", "withdrawals");
+    int credit = uniqueFind(names, "credit", "credit", "creditamount", "creditamounteur", "paidin", "moneyin", "deposit", "deposits");
+    int amount = uniqueFind(names, "amount", "amount", "transactionamount");
+    int balance = uniqueFind(names, "balance", "balance", "runningbalance", "accountbalance");
+    int reference = uniqueFind(names, "reference", "reference", "transactionreference", "transactionid", "bankreference");
+    int transactionType = uniqueFind(names, "transaction type", "transactiontype", "type");
     if (date < 0 || description < 0 || (amount < 0 && debit < 0 && credit < 0))
       throw new IllegalArgumentException(
           "Unsupported statement CSV. Select the standard AIB transaction export with date, description and amount columns.");
@@ -117,6 +118,8 @@ public final class LedgerCsv {
     Map<String,Integer> generatedReferences = new HashMap<>();
     LocalDate statementDate = null;
     String statementBalance = null;
+    int latestDateRows = 0;
+    boolean latestDateHasMissingBalance = false;
     for (int i = 0; i < table.size(); i++) {
       List<String> source = table.get(i);
       try {
@@ -151,16 +154,23 @@ public final class LedgerCsv {
           stableReference = "AIB-" + fingerprint + "-" + occurrence;
         }
         rows.add(List.of(stableReference, booked.toString(), label, signedAmount, "BOOKED", "ACTIVITY"));
-        if (balance >= 0 && !source.get(balance).isBlank()
-            && (statementDate == null || booked.isAfter(statementDate))) {
+        if (balance >= 0 && (statementDate == null || booked.isAfter(statementDate))) {
           statementDate = booked;
-          statementBalance = cleanAmount(source.get(balance));
+          latestDateRows = 1;
+          latestDateHasMissingBalance = source.get(balance).isBlank();
+          statementBalance = latestDateHasMissingBalance ? null : cleanAmount(source.get(balance));
+        } else if (balance >= 0 && booked.equals(statementDate)) {
+          latestDateRows++;
+          if (source.get(balance).isBlank()) latestDateHasMissingBalance = true;
+          statementBalance = null;
         }
       } catch (Exception e) {
         throw new IllegalArgumentException("AIB CSV row " + (i + 2) + ": check date, description, debit/credit and balance values");
       }
     }
-    return new ParsedStatement(rows, statementDate, statementBalance, "AIB");
+    boolean ambiguousBalance = latestDateRows > 1 || latestDateHasMissingBalance;
+    return new ParsedStatement(rows, statementDate,
+        ambiguousBalance ? null : statementBalance, ambiguousBalance, "AIB");
   }
 
   private static String column(String value) {
@@ -200,11 +210,12 @@ public final class LedgerCsv {
     return semicolons > commas ? ';' : ',';
   }
 
-  private static int find(List<String> names, String... aliases) {
-    for (String alias : aliases) {
-      for (int i = 0; i < names.size(); i++) if (names.get(i).equals(alias)) return i;
-    }
-    return -1;
+  private static int uniqueFind(List<String> names, String label, String... aliases) {
+    Set<String> accepted = Set.of(aliases);
+    List<Integer> matches = new ArrayList<>();
+    for (int i = 0; i < names.size(); i++) if (accepted.contains(names.get(i))) matches.add(i);
+    if (matches.size() > 1) throw new IllegalArgumentException("Ambiguous AIB " + label + " columns");
+    return matches.isEmpty() ? -1 : matches.getFirst();
   }
 
   private static LocalDate parseDate(String value, DateTimeFormatter twoDigitYear) {

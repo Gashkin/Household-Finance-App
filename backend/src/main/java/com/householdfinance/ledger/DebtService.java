@@ -336,6 +336,16 @@ public class DebtService {
     check(old.operations().size() < 2000, "Debt operation capacity reached");
     String id = uuid(in.id()), why = text(in.reason(), 200);
     var before = old.debts().stream().filter(d -> d.id().equals(id)).findFirst().orElse(null);
+    var lockedAccounts = new HashSet<String>();
+    if (in.terms() != null) {
+      if (in.terms().accountId() != null) lockedAccounts.add(in.terms().accountId());
+      if (in.terms().paymentAccountId() != null) lockedAccounts.add(in.terms().paymentAccountId());
+    }
+    if (before != null) {
+      lockedAccounts.add(before.terms().accountId());
+      lockedAccounts.add(before.terms().paymentAccountId());
+    }
+    ledger.lockAccountReferences(lockedAccounts);
     terms(in.terms(), before);
     check(
         old.debts().stream()

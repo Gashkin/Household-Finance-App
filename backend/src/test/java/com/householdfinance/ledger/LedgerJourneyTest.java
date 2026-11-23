@@ -9,6 +9,7 @@ import com.householdfinance.workspace.*;
 import jakarta.servlet.http.Cookie;
 import java.time.*;
 import java.util.*;
+import java.util.concurrent.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -29,7 +30,9 @@ class LedgerJourneyTest {
   @Autowired ObjectMapper json;
   @Autowired LedgerService service;
   @Autowired LedgerAuditRepository audits;
+  @Autowired LedgerReviewRepository reviewRecords;
   @Autowired ActivityReviewService review;
+  @Autowired CommitmentService commitments;
   @Autowired JdbcTemplate jdbc;
   @Autowired WorkspaceBackupService backups;
   @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
@@ -121,6 +124,94 @@ class LedgerJourneyTest {
   }
 
   @Test
+  void savedPlanAndPlanAuditReferencesBlockAccountRemoval() throws Exception {
+    var a = account("CASH", "25.00");
+    var debt = account("DEBT", "-25.00");
+    var references = List.of(
+        new Object[] {"COMMITMENTS", "accountId", a.id()},
+        new Object[] {"COMMITMENTS", "counterpartId", a.id()},
+        new Object[] {"DEBTS", "accountId", debt.id()},
+        new Object[] {"DEBTS", "paymentAccountId", a.id()},
+        new Object[] {"GOALS", "savingsAccountId", a.id()},
+        new Object[] {"GOALS", "billAccountId", a.id()});
+    for (var reference : references) {
+      var record = new LedgerReviewRecord();
+      record.id = UUID.randomUUID().toString();
+      record.ownerId = com.householdfinance.access.AccessContext.userId();
+      record.kind = (String) reference[0];
+      record.revision = 1;
+      record.payload = json.writeValueAsString(Map.of((String) reference[1], (String) reference[2]));
+      reviewRecords.saveAndFlush(record);
+      String referencedAccount = (String) reference[2];
+      assertThrows(IllegalArgumentException.class, () -> service.removeUnusedAccount(referencedAccount,
+          new LedgerService.RemoveUnusedAccount(a.revision(), "Synthetic plan dependency")));
+      reviewRecords.delete(record);
+      reviewRecords.flush();
+    }
+    var planAudit = new LedgerAudit();
+    planAudit.id = UUID.randomUUID().toString();
+    planAudit.accountId = com.householdfinance.access.AccessContext.publicationId();
+    planAudit.recordedAt = Instant.now();
+    planAudit.action = "COMMITMENT_CHANGE";
+    planAudit.source = "Synthetic historical saved plan";
+    planAudit.beforeJson = json.writeValueAsString(Map.of("accountId", a.id()));
+    planAudit.afterJson = "{}";
+    audits.saveAndFlush(planAudit);
+    assertThrows(IllegalArgumentException.class, () -> service.removeUnusedAccount(a.id(),
+        new LedgerService.RemoveUnusedAccount(a.revision(), "Synthetic historical dependency")));
+  }
+
+  @Test
+  void accountRemovalSerializesWithConcurrentPlanCreation() throws Exception {
+    var target = account("CASH", "100.00");
+    var category = review.category(null, new ActivityReviewService.CategoryInput(
+        null, "Synthetic race category", null, false, "0.00", null, "Synthetic test"));
+    var rule = new CommitmentService.Rule("Synthetic concurrent bill", target.id(), category.id(),
+        "EXPENSE", "EXPECTED", "FIXED", "1.00", "ONCE", today, null, null, 0, null);
+    var accountLocked = new CountDownLatch(1);
+    var finishPlan = new CountDownLatch(1);
+    var pool = Executors.newFixedThreadPool(2);
+    try {
+      var writer = pool.submit(() -> com.householdfinance.access.OwnerFixture.call(() -> {
+        new org.springframework.transaction.support.TransactionTemplate(transactions).execute(status -> {
+          service.lockAccountReferences(List.of(target.id()));
+          accountLocked.countDown();
+          try {
+            if (!finishPlan.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Synthetic plan gate timed out");
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+          }
+          commitments.batch(new CommitmentService.Batch(0L, UUID.randomUUID().toString(),
+              "Synthetic concurrent plan", List.of(new CommitmentService.Edit(UUID.randomUUID().toString(),
+                  0L, today, false, rule))));
+          return null;
+        });
+        return true;
+      }));
+      assertTrue(accountLocked.await(5, TimeUnit.SECONDS));
+      var remover = pool.submit(() -> com.householdfinance.access.OwnerFixture.call(() -> {
+        try {
+          service.removeUnusedAccount(target.id(),
+              new LedgerService.RemoveUnusedAccount(target.revision(), "Synthetic concurrent deletion"));
+          return false;
+        } catch (IllegalArgumentException expected) {
+          return true;
+        }
+      }));
+      assertThrows(TimeoutException.class, () -> remover.get(200, TimeUnit.MILLISECONDS));
+      finishPlan.countDown();
+      assertTrue(writer.get(10, TimeUnit.SECONDS));
+      assertTrue(remover.get(10, TimeUnit.SECONDS));
+      assertTrue(service.position(today).accounts().stream().anyMatch(a -> a.id().equals(target.id())));
+      assertEquals(1, commitments.get().state().schedules().size());
+    } finally {
+      finishPlan.countDown();
+      pool.shutdownNow();
+    }
+  }
+
+  @Test
   void openingBalanceCanBeCorrectedOnlyBeforeActivityAndKeepsAudit() {
     var a = account("CASH", "1000.00");
     var corrected = service.correctOpening(a.id(), new LedgerService.OpeningCorrection(
@@ -158,6 +249,28 @@ class LedgerJourneyTest {
   }
 
   @Test
+  void mismatchedAibRunningBalanceIsShownAsDifferenceWithoutSilentAdjustment() {
+    var a = account("CASH", "0.00");
+    String aib = "Posted Date,Description,Debit Amount,Credit Amount,Balance\n"
+        + today.minusDays(1).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yy"))
+        + ",Synthetic debit,12.34,,87.66\n";
+    var preview = service.preview(a.id(), new LedgerService.PreviewInput(aib, "Synthetic mismatch"));
+    var approved = service.approve(a.id(), preview.id(), new LedgerService.Approval(
+        preview.revision(), preview.proposals().stream().map(LedgerService.Proposal::row).toList(), true));
+    assertEquals(1, approved.added());
+    var current = current(a.id());
+    assertEquals(-1234, current.bookedMinor());
+    var beforeHistory = service.history(a.id()).size();
+    var comparison = service.reconcile(a.id(), today.minusDays(1), new LedgerService.Reconcile(
+        current.revision(), "87.66", "Synthetic AIB closing balance", false, false));
+    assertEquals(10_000, comparison.differenceMinor());
+    assertFalse(comparison.applied());
+    assertEquals(1, service.activity(a.id()).size());
+    assertEquals(beforeHistory, service.history(a.id()).size());
+    assertEquals(-1234, current(a.id()).bookedMinor());
+  }
+
+  @Test
   void standardAibAmountTypeAndGroupedSemicolonHeadersAreRecognised() {
     String date = today.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yy"));
     var simple = LedgerCsv.parseStatement(
@@ -171,6 +284,23 @@ class LedgerJourneyTest {
             + "Posted;masked;Posted;Transactions;" + date + ";Synthetic debit;;7.25;;;15.75;Transaction;Debit\n");
     assertEquals("-7.25", grouped.rows().getFirst().get(3));
     assertEquals("AIB", grouped.format());
+
+    String sameDay = "Posted Date,Description,Debit Amount,Credit Amount,Balance\n"
+        + date + ",Synthetic first debit,10.00,,90.00\n"
+        + date + ",Synthetic second debit,20.00,,70.00\n";
+    for (String order : List.of(sameDay, "Posted Date,Description,Debit Amount,Credit Amount,Balance\n"
+        + date + ",Synthetic second debit,20.00,,70.00\n"
+        + date + ",Synthetic first debit,10.00,,90.00\n")) {
+      var ambiguous = LedgerCsv.parseStatement(order);
+      assertTrue(ambiguous.statementBalanceAmbiguous());
+      assertNull(ambiguous.statementBalanceEuro());
+    }
+
+    var account = account("CASH", "10.00");
+    assertThrows(IllegalArgumentException.class, () -> service.preview(account.id(),
+        new LedgerService.PreviewInput("Posted Date,Date,Description,Debit,Credit\n"
+            + date + "," + date + ",Synthetic ambiguous date,1.00,\n", "Synthetic ambiguous headers")));
+    assertTrue(service.activity(account.id()).isEmpty());
   }
 
   LedgerService.Row row(String reference, String amount, String state, String kind) {
