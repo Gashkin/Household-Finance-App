@@ -1,9 +1,15 @@
 import { test, expect } from '@playwright/test';
 import { openWorkspace } from './workspace-navigation';
-import { PASSWORD, unlockFixture } from './workspace-helper';
+import { BACKEND_URL, PASSWORD, unlockFixture } from './workspace-helper';
 
-test('module links support keyboard navigation, direct links, refresh and history', async ({ page, request }) => {
-  await unlockFixture({ page, request });
+const headers = { 'X-Workspace-Request': '1' };
+
+test.beforeEach(unlockFixture);
+test.afterEach(async ({ request }) => {
+  await request.post(BACKEND_URL + '/api/workspace/lock', { headers });
+});
+
+test('module links support keyboard navigation, direct links, refresh and history', async ({ page }) => {
   await page.goto('/');
   const modules = page.getByRole('navigation', { name: 'Modules', exact: true });
   await expect(modules.getByRole('link')).toHaveText(['Overview', 'Activity', 'Planning', 'Debt', 'Settings']);
@@ -30,13 +36,11 @@ test('module links support keyboard navigation, direct links, refresh and histor
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
 });
 
-test('combined roles, deep-link denial and revoked plans access', async ({ page, request, browser, baseURL }, info) => {
-  await unlockFixture({ page, request });
+test('combined roles, deep-link denial and revoked plans access', async ({ page, browser, baseURL }, info) => {
   await page.goto('/');
   await openWorkspace(page, 'Household access');
   const name = 'navigation' + Date.now();
   const password = PASSWORD + '-member';
-  const headers = { 'X-Workspace-Request': '1' };
   const invitation = await page.request.post('/api/access/invitations', { headers, data: { username: name } });
   expect(invitation.ok()).toBeTruthy();
   const { code } = await invitation.json();
@@ -90,6 +94,10 @@ test('combined roles, deep-link denial and revoked plans access', async ({ page,
     await modules.getByRole('link', { name: 'Overview', exact: true }).click();
     await expect(member.getByRole('heading', { name: 'Permitted money position', exact: true })).toBeVisible();
   } finally {
-    await context.close();
+    try {
+      await member.request.post('/api/workspace/lock', { headers });
+    } finally {
+      await context.close();
+    }
   }
 });
