@@ -1,3 +1,4 @@
+import { openWorkspace } from './workspace-navigation';
 import { test, expect } from "@playwright/test";
 import { unlockFixture } from "./workspace-helper";
 function after(date: string, days: number) {
@@ -12,7 +13,7 @@ test("dated affordability, delayed payday, corrected inputs and stale evidence s
 }, testInfo) => {
   test.setTimeout(120000);
   await page.goto("/");
-  await page.getByRole("button", { name: "Plan ahead", exact: true }).click();
+  await openWorkspace(page, "Plan ahead");
   await page.getByRole("button", {name:"Starting evidence & saved plan",exact:true}).click();
   await expect(page.getByText("Loading dated plan…")).toBeHidden();
   const original = await (await page.request.get("/api/forecast")).json();
@@ -145,7 +146,7 @@ test("dated affordability, delayed payday, corrected inputs and stale evidence s
     .click();
   await expect(saved.getByText("€700.00", { exact: true })).toBeVisible();
   await page.reload();
-  await page.getByRole("button", { name: "Plan ahead", exact: true }).click();
+  await openWorkspace(page, "Plan ahead");
   await page.getByRole("button", {name:"Starting evidence & saved plan",exact:true}).click();
   await expect(
     page.getByLabel("Expectation 1 amount", { exact: true }),
@@ -238,7 +239,7 @@ test("a second-tab ledger change withdraws current evidence after comparing", as
   });
   expect(saved.ok()).toBeTruthy();
   await page.goto("/");
-  await page.getByRole("button", { name: "Plan ahead", exact: true }).click();
+  await openWorkspace(page, "Plan ahead");
   await page.getByRole("button", {name:"Starting evidence & saved plan",exact:true}).click();
   const claim =
     "Starting evidence is current and reconciled. Future income is still only projected.";
@@ -248,9 +249,7 @@ test("a second-tab ledger change withdraws current evidence after comparing", as
     data: { revision: account.revision, reason: "Synthetic late receipt requires reopening" },
   })).ok()).toBeTruthy();
   await other.goto("/");
-  await other
-    .getByRole("button", { name: "Money position", exact: true })
-    .click();
+  await openWorkspace(other, "Money position");
   await other
     .getByLabel("Review account", { exact: true })
     .selectOption(account.id);

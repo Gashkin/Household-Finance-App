@@ -1,8 +1,9 @@
+import { openWorkspace } from './workspace-navigation';
 import { test,expect,type Page } from '@playwright/test';
 const PASSWORD='synthetic-browser-workspace-password',MEMBER='synthetic-member-purchase-password';
 const headers={'X-Workspace-Request':'1'};
-async function login(page:Page,name='owner',password=PASSWORD){await page.goto('/');await page.getByLabel('Username',{exact:true}).fill(name);await page.getByLabel('Workspace password',{exact:true}).fill(password);await page.getByRole('button',{name:'Unlock workspace',exact:true}).click();await expect(page.getByRole('button',{name:'Spending & purchases',exact:true})).toBeVisible();}
-async function spending(page:Page){await page.getByRole('button',{name:'Spending & purchases',exact:true}).click();await expect(page.getByRole('heading',{name:'Spending & purchases',exact:true})).toBeVisible();await expect(page.getByText('Checking current evidence…')).toHaveCount(0);}
+async function login(page:Page,name='owner',password=PASSWORD){await page.goto('/');await page.getByLabel('Username',{exact:true}).fill(name);await page.getByLabel('Workspace password',{exact:true}).fill(password);await page.getByRole('button',{name:'Unlock workspace',exact:true}).click();await expect(page.getByRole('link',{name:'Activity',exact:true})).toBeVisible();}
+async function spending(page:Page){await openWorkspace(page, 'Spending & purchases');await expect(page.getByRole('heading',{name:'Spending & purchases',exact:true})).toBeVisible();await expect(page.getByText('Checking current evidence…')).toHaveCount(0);}
 
 test('member plans, requests, matches and revisits a scoped purchase on desktop and mobile',async({page,browser,baseURL},info)=>{
   test.setTimeout(90000);await login(page);

@@ -72,12 +72,57 @@ class HouseholdAccessTest {
     for(int bits=0;bits<8;bits++){
       List<String> roles=new ArrayList<>();if((bits&1)!=0)roles.add("ADMIN");if((bits&2)!=0)roles.add("EDITOR");if((bits&4)!=0)roles.add("READER");
       grant("combinations",roles.toArray(String[]::new));Cookie c=login("combinations",MEMBER);
+      boolean editor=(bits&2)!=0, financial=(bits&6)!=0;
+      assertEquals(editor ? List.of("overview","activity","planning","debt","settings")
+          : financial ? List.of("overview","activity","settings") : List.of("settings"),
+          moduleIds(c));
+      assertFalse(invoke("GET","/api/access/me",c,null,200).toString().contains("Backup & recovery"));
       mvc.perform(send("GET","/api/ledger?asOf="+today,c,null)).andExpect(status().is((bits&6)!=0?200:403));
       mvc.perform(send("GET","/api/access/users",c,null)).andExpect(status().is((bits&1)!=0?200:403));
       mvc.perform(send("POST","/api/ledger/accounts",c,Map.of("name","Own "+bits,"kind","CASH","openingDate",today,"openingEuro","1.00","source","Synthetic"))).andExpect(status().is((bits&2)!=0?200:403));
       mvc.perform(send("POST","/api/workspace/backup",c,Map.of("password","synthetic-archive-passphrase"))).andExpect(status().isForbidden());
       mvc.perform(send("GET","/planner",c,null)).andExpect(status().isForbidden());
     }
+  }
+  List<String> moduleIds(Cookie actor)throws Exception{
+    List<String> ids=new ArrayList<>();
+    invoke("GET","/api/access/me",actor,null,200).path("modules").forEach(m->ids.add(m.path("id").asText()));
+    return ids;
+  }
+  @Test void navigationAndApiGrantsUseCurrentRolesAndPreserveReadCompatibility()throws Exception{
+    var modules=invoke("GET","/api/access/me",owner,null,200).path("modules");
+    List<String> paths=new ArrayList<>();
+    modules.forEach(m->m.path("pages").forEach(p->paths.add(p.path("path").asText())));
+    assertEquals(15,paths.size());
+    assertEquals(15,new HashSet<>(paths).size());
+    for(String path:paths)
+      mvc.perform(get(path)).andExpect(status().isOk()).andExpect(forwardedUrl("/index.html"));
+
+    Cookie none=enrol("navigator");
+    for(String path:List.of("/api/member","/api/ledger/review/categories","/api/forecast",
+        "/api/ledger/debts","/api/access/users","/api/mcp"))
+      mvc.perform(send("GET",path,none,null)).andExpect(status().isForbidden());
+    mvc.perform(send("GET","/api/ledger/new-module",owner,null)).andExpect(status().isForbidden());
+
+    grant("navigator","ADMIN","EDITOR");
+    Cookie editor=login("navigator",MEMBER);
+    mvc.perform(send("GET","/api/forecast",editor,null)).andExpect(status().isOk());
+    mvc.perform(send("GET","/api/banking/status",editor,null)).andExpect(status().isForbidden());
+    mvc.perform(send("GET","/api/evidence-intake/capabilities",editor,null)).andExpect(status().isForbidden());
+    mvc.perform(send("GET","/api/workspace/records",editor,null)).andExpect(status().isForbidden());
+    mvc.perform(send("GET","/api/mcp",editor,null)).andExpect(status().isForbidden());
+    mvc.perform(send("GET","/reports/monthly-overview",editor,null)).andExpect(status().isForbidden());
+
+    grant("navigator","ADMIN","READER");
+    mvc.perform(send("GET","/api/forecast",editor,null)).andExpect(status().isUnauthorized());
+    Cookie reader=login("navigator",MEMBER);
+    assertEquals(List.of("overview","activity","settings"),moduleIds(reader));
+    mvc.perform(send("GET","/api/access/users",reader,null)).andExpect(status().isOk());
+    mvc.perform(send("GET","/api/forecast",reader,null)).andExpect(status().isOk());
+    mvc.perform(send("POST","/api/forecast",reader,Map.of())).andExpect(status().isForbidden());
+    mvc.perform(send("POST","/api/ledger/debts",reader,Map.of())).andExpect(status().isForbidden());
+    mvc.perform(send("POST","/api/ledger/review/complete",reader,Map.of())).andExpect(status().isForbidden());
+    assertEquals(0,jdbc.queryForObject("SELECT COUNT(*) FROM FORECAST_PLANS",Integer.class));
   }
   @Test void privateAccountNamesBalancesActivityAndAuditNeverReachOtherAdmin()throws Exception{
     var a=account(owner,"Hidden confidential label","913.57");Cookie c=enrol("readeradmin","READER","ADMIN");

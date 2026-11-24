@@ -1,3 +1,4 @@
+import { openWorkspace } from './workspace-navigation';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { unlockFixture, BACKEND_URL } from './workspace-helper';
@@ -6,6 +7,7 @@ test.beforeEach(unlockFixture);
 
 test('capture cash evidence, inspect and download a reproducible debt decision', async ({ page, request }, testInfo) => {
   await page.goto('/');
+  await openWorkspace(page, 'Debt decision');
   await expect(page.getByRole('heading',{name:'Cash position',exact:true})).toBeVisible();
   await expect(page.getByText('Loading saved cash position…')).toBeHidden();
   const editor = page.locator('.cash-editor');
@@ -54,6 +56,7 @@ test('capture cash evidence, inspect and download a reproducible debt decision',
 
 test('service outage and obsolete responses cannot yield an export', async ({ page }) => {
   await page.goto('/');
+  await openWorkspace(page, 'Debt decision');
   await page.route('**/api/debt-scenarios/report', route => route.abort('failed'));
   await page.getByRole('button', { name: 'Compare scenarios', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Cannot reach the financial calculation service');

@@ -152,7 +152,7 @@ public class WorkspaceFilter extends OncePerRequestFilter {
         if (path.startsWith("/h2-console")) { deny(response, 404, "Not found"); return; }
         boolean safe = Set.of("GET", "HEAD").contains(request.getMethod());
         if (!safe && !"1".equals(request.getHeader("X-Workspace-Request"))) { deny(response, 403, "Workspace request header required"); return; }
-        boolean shell = request.getMethod().equals("GET") && (path.equals("/") || path.equals("/index.html") || path.equals("/bank/callback") || path.matches("/assets/[A-Za-z0-9_-]+\\.(?:js|css|svg)"));
+        boolean shell = request.getMethod().equals("GET") && (path.equals("/") || path.equals("/index.html") || path.equals("/bank/callback") || path.matches("/workspaces/[a-z-]+/[a-z-]+") || path.matches("/assets/[A-Za-z0-9_-]+\\.(?:js|css|svg)"));
         boolean publicRoute = shell || (path.equals("/api/workspace/status") && request.getMethod().equals("GET")) || (Set.of("/api/workspace/unlock","/api/access/accept","/api/access/recover").contains(path) && request.getMethod().equals("POST"));
         var guard = safe ? lock.readLock() : lock.writeLock();
         var previousActor=AccessContext.actor();

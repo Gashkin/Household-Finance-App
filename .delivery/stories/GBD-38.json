@@ -1,0 +1,27 @@
+{
+  "work_id": "GBD-38",
+  "page_id": "422d3419-fef0-8139-8095-fef0104d51d5",
+  "branch": "story/38-delivery",
+  "artifacts": [
+    {
+      "path": "backend/src/main/java/com/householdfinance/access/WorkspaceModules.java",
+      "contains": ["NavigationModule", "public static boolean permits"]
+    },
+    {
+      "path": "frontend/src/App.tsx",
+      "contains": ["aria-label=\"Modules\"", "Workspace unavailable", "popstate"]
+    },
+    {
+      "path": "backend/src/test/java/com/householdfinance/access/HouseholdAccessTest.java",
+      "contains": ["navigationAndApiGrantsUseCurrentRolesAndPreserveReadCompatibility"]
+    },
+    {
+      "path": "frontend/e2e/module-navigation.spec.ts",
+      "contains": ["direct links, refresh and history", "revoked plans access"]
+    },
+    {
+      "path": "product/stories/module-navigation.md",
+      "contains": ["Workspace navigation (GBD-38)", "## Upgrading"]
+    }
+  ]
+}

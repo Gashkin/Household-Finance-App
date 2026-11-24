@@ -1,3 +1,4 @@
+import { openWorkspace } from './workspace-navigation';
 import {test,expect} from '@playwright/test';
 import {unlockFixture} from './workspace-helper';
 test.use({extraHTTPHeaders:{'X-Workspace-Request':'1'}});
@@ -9,7 +10,7 @@ test('annual bill and competing savings retain drafts, recover unknown saves and
  const before=await(await page.request.get('/api/ledger/goals')).json(),today=before.today;
  const account=await(await page.request.post('/api/ledger/accounts',{data:{name:'Synthetic goal account '+suffix,kind:'CASH',openingDate:today,openingEuro:'1000.00',source:'Synthetic statement'}})).json();
  const category=await(await page.request.post('/api/ledger/review/categories',{data:{name:'Synthetic goal category '+suffix,parentId:null,retired:false,budgetEuro:'0.00',mergeInto:null,reason:'Synthetic goal category'}})).json();
- await page.goto('/');await page.getByRole('button',{name:'Goals & irregular costs',exact:true}).click();await expect(page.getByRole('heading',{name:'Goals & irregular costs'})).toBeVisible();
+ await page.goto('/');await openWorkspace(page, 'Goals & irregular costs');await expect(page.getByRole('heading',{name:'Goals & irregular costs'})).toBeVisible();
  await page.getByRole('button',{name:'New goal',exact:true}).click();await page.getByLabel('Goal name',{exact:true}).fill(name);await page.getByRole('combobox',{name:'Goal type',exact:true}).selectOption('BILL');await page.getByLabel('Target EUR',{exact:true}).fill('300.01');await page.getByLabel('Reserve existing cash EUR',{exact:true}).fill('100.01');await page.getByLabel('Planned monthly contribution EUR',{exact:true}).fill('50.00');await page.getByRole('combobox',{name:'Optional savings account',exact:true}).selectOption(account.id);await page.getByRole('combobox',{name:'Bill payment account',exact:true}).selectOption(account.id);await page.getByRole('combobox',{name:'Bill category',exact:true}).selectOption(category.id);await page.getByLabel('Estimated cost',{exact:true}).check();await page.getByLabel('Reason for this decision',{exact:true}).fill('Synthetic annual insurance funding');
  // Lose the response after the real server commits. Reconcile by the saved operation identity.
  await page.route('**/api/ledger/goals',async route=>{if(route.request().method()==='POST'){await route.fetch();await route.abort('failed');}else await route.continue();});

@@ -1,3 +1,4 @@
+import { openWorkspace } from './workspace-navigation';
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { unlockFixture } from "./workspace-helper";
@@ -14,9 +15,7 @@ test("review activity, correct facts, reconcile an explicit difference and reuse
   expect(seed.ok()).toBeTruthy();const longAccount=await seed.json();
   expect((await page.request.post('/api/ledger/accounts/'+longAccount.id+'/reconcile?asOf='+today,{data:{revision:longAccount.revision,statementEuro:'1.00',source:'Synthetic closing evidence',commit:true,acceptAdjustment:false}})).ok()).toBeTruthy();
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Money position", exact: true })
-    .click();
+  await openWorkspace(page, "Money position");
   await expect(page.getByText("Loading reviewed position…")).toBeHidden();
   await expect(page.getByLabel('Review account',{exact:true})).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
