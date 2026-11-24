@@ -1,0 +1,14 @@
+{
+  "work_id": "GBD-38",
+  "page_id": "422d3419-fef0-8139-8095-fef0104d51d5",
+  "branch": "story/38-delivery",
+  "token": "claim-token:codex-gbd38-48b3c074e2eb",
+  "claimed_at": "2026-11-24T22:44:51.461Z",
+  "base_sha": "55763e98d2f00f8f2553de18f871fa6014bf4c0a",
+  "history": [
+    {
+      "event": "claim",
+      "method": "Canonical GitHub branch claim with committed ownership and Notion readback."
+    }
+  ]
+}
