@@ -1,6 +1,6 @@
 # Transaction suggestion benchmark
 
-The installed app starts a configured local model by default under Dev Server One. Owners request suggestions for individual transactions and retain the final decision. On the eight frozen synthetic cases, the model gave six category recommendations, five of them wrong. One of its two commitment recommendations was wrong. The approved-rule baseline recommended one category correctly. This small diagnostic set cannot establish a household-wide error rate.
+The installed app starts a configured local model by default under Dev Server One. Owners request suggestions for individual transactions and retain the final decision. On the corrected eight-case run the model gave five category recommendations, four of them wrong. One request failed. One of its two commitment recommendations was wrong. The approved-rule baseline recommended one category correctly. This small diagnostic set cannot establish a household-wide error rate.
 
 ## Development-account measurements, 25 November 2026
 
@@ -9,15 +9,15 @@ Ryzen 7 5800H, 20,782,837,760 bytes of system RAM, Windows x64. The CPU build us
 | Adapter | Task | Correct recommendations | Wrong recommendations | Abstentions (appropriate) | Invalid / failed | Accuracy including appropriate abstentions | Coverage |
 |---|---|---:|---:|---:|---:|---:|---:|
 | Approved rules | Category | 1 | 0 | 7 (5) | 0 / 0 | 75% | 12.5% |
-| Local model | Category | 1 | 5 | 2 (2) | 0 / 0 | 37.5% | 75% |
-| Local model | Merchant | 1 | 0 | 7 (3) | 0 / 0 | 50% | 12.5% |
-| Local model | Commitment | 1 | 1 | 6 (6) | 0 / 0 | 87.5% | 25% |
+| Local model | Category | 1 | 4 | 2 (2) | 0 / 1 | 37.5% | 62.5% |
+| Local model | Merchant | 1 | 0 | 6 (2) | 0 / 1 | 37.5% | 12.5% |
+| Local model | Commitment | 1 | 1 | 5 (5) | 0 / 1 | 75% | 25% |
 
 The benchmark uses one synthetic author's expected answers, frozen before inference. For a category or commitment, a recommendation is correct only if the returned ID equals the expected ID. For a merchant, the scorer compares the expected label with the returned label case-insensitively. For example, “Wren Foods” is accepted for “POS 104 WREN FOODS”. Extra words that might make a label equally useful to a person can score as wrong. An abstention is appropriate only when the expected answer is null. No household owner has ratified these synthetic labels.
 
 The rules have no merchant or commitment output. Category confirmation removes categories from the model choices and enables eligible commitment candidates. A legitimate no-match counts toward accuracy. Coverage counts only actual recommendations. The frozen held-out labels include three correct no-merchant outcomes. The tuning example is excluded from scoring.
 
-Model loading to readiness took 2,270 ms. The first request took 2,999 ms. Across seven subsequent requests the median was 2,025 ms and the nearest-rank p95 was 2,827 ms. Windows reported a peak server working set of 1,877,520,384 bytes. The Python rule comparison took 0.03 ms on its first case and at most 0.01 ms at warm p95. The production review-queue integration test checks the same corpus against the actual approved-rule service. Development measurements do not establish installed-instance readiness.
+The table uses the recheck after aligning duplicate-key rejection and string normalisation with the app. Startup took 3,827 ms, first response 5,373 ms, warm median 6,173 ms and nearest-rank p95 30,004 ms including one failed request. Windows reported a peak working set of 1,842,274,304 bytes. The initial run with the earlier scorer returned six category recommendations (one correct), seven merchant abstentions and the same two commitment recommendations. Its warm median was 2,025 ms. Both runs used the same frozen corpus. One separate live request through the packaged app took 5,837 ms; a simultaneous authenticated ledger read completed in 16 ms, and the source transaction was unchanged. The Python rule comparison took 0.03 ms on its first case and at most 0.01 ms at warm p95. The production review-queue integration test checks the same corpus against the actual approved-rule service. Development measurements do not establish installed-instance readiness.
 
 OpenAI benchmark pending protected credentials. No billable requests or purchases were made during this run.
 

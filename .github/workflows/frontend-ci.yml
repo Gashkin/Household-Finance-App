@@ -24,6 +24,7 @@ jobs:
           python3 -m unittest discover -s AnalysisScripts -p test_audit_repository_hygiene.py -v
       - name: Validate local-only analysis scripts
         run: |
+          python3 -m unittest discover -s AnalysisScripts/classification -v
           python3 -m py_compile AnalysisScripts/inspect_workbook.py AnalysisScripts/inspect_budget.py AnalysisScripts/audit_history_exposure.py
           python3 -m unittest discover -s AnalysisScripts -p test_audit_history_exposure.py -v
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

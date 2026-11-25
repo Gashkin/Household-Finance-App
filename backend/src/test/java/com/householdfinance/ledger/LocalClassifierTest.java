@@ -47,6 +47,16 @@ class LocalClassifierTest {
         reply.set(envelope(invalid));
         assertThrows(IllegalArgumentException.class,()->model.suggest(entry,categories,options,5));
       }
+      var cases=json.readTree(java.nio.file.Path.of("../AnalysisScripts/classification/contract-cases.json").toFile());
+      for(var fixture:cases) {
+        var wire=fixture.get("wire").asText()+" ".repeat(fixture.path("padding").asInt());
+        reply.set(wire.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        if(fixture.get("accepted").asBoolean()) {
+          assertEquals("Synthetic evidence",model.suggest(entry,categories,options,5).advice().explanation());
+        } else {
+          assertThrows(IllegalArgumentException.class,()->model.suggest(entry,categories,options,5),fixture.get("name").asText());
+        }
+      }
       entry.reviewState="CONFIRMED";reply.set(envelope(valid));
       assertThrows(IllegalArgumentException.class,()->model.suggest(entry,categories,options,5));
       reply.set(new byte[8193]);
