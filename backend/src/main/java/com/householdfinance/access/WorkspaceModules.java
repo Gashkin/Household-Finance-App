@@ -41,7 +41,8 @@ public final class WorkspaceModules {
         new Item("forecast", "Plan ahead", Grant.EDIT),
         new Item("budget", "Budgets & allocations", Grant.EDIT),
         new Item("goals", "Goals & irregular costs", Grant.EDIT),
-        new Item("plans", "Financial plans", Grant.EDIT)),
+        new Item("plans", "Financial plans", Grant.EDIT),
+        new Item("contracts", "Contracts & subscriptions")),
     DEBT("debt", "Debt", Grant.READ,
         new Item("debts", "Cards, loans & mortgages", Grant.EDIT),
         new Item("decision", "Debt decision", Grant.EDIT)),
@@ -88,6 +89,8 @@ public final class WorkspaceModules {
   private static final ApiAccess MEMBER = new ApiAccess(Module.ACTIVITY, Grant.READ);
   private static final ApiAccess REVIEW = new ApiAccess(Module.ACTIVITY, Grant.READ, Grant.EDIT);
   private static final ApiAccess PLANNING = new ApiAccess(Module.PLANNING, Grant.READ, Grant.EDIT);
+  private static final ApiAccess CONTRACT_ALERTS = new ApiAccess(Module.PLANNING, Grant.READ);
+  private static final ApiAccess CONTRACT_LINKS = new ApiAccess(Module.PLANNING, Grant.EDIT);
   private static final ApiAccess DEBT = new ApiAccess(Module.DEBT, Grant.READ, Grant.EDIT);
   private static final ApiAccess INTAKE = new ApiAccess(Module.DEBT, Grant.CUSTODIAN_EDITOR);
   private static final ApiAccess PERSONAL = new ApiAccess(Module.SETTINGS, Grant.SIGNED_IN);
@@ -128,6 +131,9 @@ public final class WorkspaceModules {
     if (within(path, "/api/member")) return MEMBER;
     if (within(path, "/api/ledger/review") ||
         (within(path, "/api/ledger/accounts") && path.endsWith("/reopen"))) return REVIEW;
+    if (within(path, "/api/contracts/alerts")) return CONTRACT_ALERTS;
+    if (within(path, "/api/contracts/links")) return CONTRACT_LINKS;
+    if (within(path, "/api/contracts")) return PLANNING;
     if (within(path, "/api/forecast") || within(path, "/api/plans") ||
         within(path, "/api/ledger/budgets") || within(path, "/api/ledger/goals")) return PLANNING;
     if (within(path, "/api/debt-scenarios") || within(path, "/api/cash-position") ||

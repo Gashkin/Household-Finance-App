@@ -47,6 +47,24 @@ class WorkspaceFilterTest {
         clock.now=clock.now.plusSeconds(1800);assertFalse(filter.authenticated(request));
         assertFalse(new WorkspaceFilter("synthetic-local-workspace-password","",clock).authenticated(request));
     }
+    @Test void backgroundContractInboxReadsRespectWorkspaceIdleExpiry() throws Exception {
+        var clock = new MutableClock();
+        var filter = new WorkspaceFilter("synthetic-local-workspace-password", "", clock);
+        var login = new MockHttpServletResponse();
+        assertEquals(204, filter.login("synthetic-local-workspace-password", new MockHttpServletRequest(), login));
+        var session = new Cookie("workspace_session", login.getHeader("Set-Cookie").split(";", 2)[0].split("=", 2)[1]);
+
+        for (int minute = 1; minute <= 30; minute++) {
+            clock.now = clock.now.plusSeconds(60);
+            var poll = new MockHttpServletRequest("GET", "/api/contracts/alerts");
+            poll.setServerName("localhost");
+            poll.setCookies(session);
+            var result = new MockHttpServletResponse();
+            filter.doFilter(poll, result, new MockFilterChain());
+            assertEquals(minute < 30 ? 200 : 401, result.getStatus());
+            if (minute == 30) assertEquals("1", result.getHeader("X-Workspace-Locked"));
+        }
+    }
     @Test void unconfiguredFinancialAccessIsUnavailableEvenWithForgedCookie() throws Exception {
         var filter=new WorkspaceFilter("short","",Clock.systemUTC());var req=new MockHttpServletRequest("GET","/planner");req.setServerName("localhost");req.setCookies(new Cookie("workspace_session","forged"));
         var response=new MockHttpServletResponse();filter.doFilter(req,response,new MockFilterChain());assertEquals(503,response.getStatus());

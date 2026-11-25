@@ -283,7 +283,7 @@ class DecisionPlanJourneyTest {
     var archive =
         json.readValue(
             BackupCrypto.decrypt(backup, password), WorkspaceBackupService.Archive.class);
-    assertEquals(7, archive.version());
+    assertEquals(8, archive.version());
     clear();
     backups.restore(backup, password, "RESTORE INTO EMPTY WORKSPACE");
     assertEquals(expected, service.get(p.id()).data());

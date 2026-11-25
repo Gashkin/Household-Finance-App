@@ -8,6 +8,7 @@ const modules = {
   'Budgets & allocations': 'Planning',
   'Goals & irregular costs': 'Planning',
   'Financial plans': 'Planning',
+  'Contracts & subscriptions': 'Planning',
   'Cards, loans & mortgages': 'Debt',
   'Debt decision': 'Debt',
   'Household access': 'Settings',

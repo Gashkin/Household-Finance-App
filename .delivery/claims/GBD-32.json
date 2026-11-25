@@ -1,0 +1,14 @@
+{
+  "work_id": "GBD-32",
+  "page_id": "41fd3419-fef0-81fb-b248-c1b27588c037",
+  "branch": "story/32-delivery",
+  "token": "claim token work-c17cc1c008ea-gbd32-7ac3",
+  "claimed_at": "2026-11-25T07:10:00Z",
+  "base_sha": "45ca917079d4664675d67125f9a4c0f80fd19419",
+  "history": [
+    {
+      "event": "claim",
+      "method": "Canonical GitHub branch creation followed by verified Notion ownership."
+    }
+  ]
+}
