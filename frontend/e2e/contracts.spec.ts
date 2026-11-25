@@ -49,7 +49,7 @@ test('review a rolling subscription, follow the alert, and record provider closu
   await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: 'Review decision', exact: true }).click();
-  await page.getByLabel('Decision', { exact: true }).selectOption('CANCEL');
+  await page.getByRole('combobox', { name: 'Decision', exact: true }).selectOption('CANCEL');
   await page.getByLabel('Decision notes or evidence').fill('Synthetic assessment');
   await page.getByRole('button', { name: 'Record decision', exact: true }).click();
   await expect(page.getByText('Subscription · Active · Private')).toBeVisible();
@@ -60,7 +60,7 @@ test('review a rolling subscription, follow the alert, and record provider closu
   await page.getByRole('button', { name: 'Record attempted action', exact: true }).click();
   await expect(page.getByText(/Attempted: Cancel/)).toBeVisible();
   await page.getByRole('button', { name: 'Record provider confirmation', exact: true }).click();
-  await page.getByLabel('Provider outcome').selectOption('CANCELLED');
+  await page.getByRole('combobox', { name: 'Provider outcome', exact: true }).selectOption('CANCELLED');
   await page.getByLabel('Provider evidence').fill('Synthetic confirmation reference');
   await page.getByRole('button', { name: 'Save provider confirmation', exact: true }).click();
   await expect(page.getByText('Subscription · Closed · Private')).toBeVisible();
