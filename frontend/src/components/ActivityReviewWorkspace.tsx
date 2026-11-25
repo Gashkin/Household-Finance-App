@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { ledger, type Activity, type Position, type Audit } from '../api/ledger';
+import LocalSuggestions from './LocalSuggestions';
 import { todayInDublin } from '../domain/dates';
 import { money } from '../domain/money';
 
 type Category={id:string;revision:number;name:string;parentId:string|null;retired:boolean;budgetEuro:string};
 type Rule={id:string;revision:number;description:string;categoryId:string;approved:boolean};
-type Entry=Activity&{categoryId:string|null;reviewState:string;linkedEntryId:string|null;linkType:string|null};
+type Entry=Activity&{reviewedMerchant?:string;categoryId:string|null;reviewState:string;linkedEntryId:string|null;linkType:string|null};
 type Item={accountId:string;accountName:string;revision:number;entry:Entry;issues:string[];risk:string;suggestion:{categoryId:string|null;confidence:string;explanation:string}};
 type Guide={guide:{throughDate:string;unresolved:number;checks:string[];monthSpendingMinor:number;budgetMinor:number;completedReviews:{id:string;payload:string}[]};auditCount:number};
 
@@ -59,6 +60,8 @@ export default function ActivityReviewWorkspace(){
  <p>{items.length} matching activity items. High risk includes unmatched transfers and amounts of €1,000 or more.</p>
  <div className="table-scroll"><table><thead><tr><th>Activity</th><th>Account / amount</th><th>Review</th><th>Action</th></tr></thead><tbody>{items.map(i=><tr key={i.entry.id}><td>{i.entry.date} · {i.entry.description}<br/>{i.entry.reference}</td><td>{i.accountName} · {money(i.entry.amountMinor)}</td><td>{label(i.entry.categoryId)} · {i.entry.reviewState}<br/>{i.risk}: {i.issues.join(', ')||'No open activity issue'}{i.entry.linkType&&<p>{i.entry.linkType} linked</p>}</td><td><button disabled={busy} onClick={()=>choose(i)}>Review {i.entry.description}</button></td></tr>)}</tbody></table></div>
  {current&&<fieldset disabled={busy}><legend>Review selected activity</legend><h3>{current.entry.description}</h3>
+ {current.entry.reviewedMerchant&&<p>Reviewed merchant: {current.entry.reviewedMerchant}</p>}
+ <LocalSuggestions key={current.entry.id+':'+current.revision} id={current.entry.id} revision={current.revision} categories={categories.filter(c=>!c.retired)} refresh={load}/>
  <p>{current.suggestion.confidence} confidence: {current.suggestion.explanation}</p>
  <label>Category<select value={category} onChange={e=>setCategory(e.target.value)}><option value="">Choose category</option>{categories.filter(c=>!c.retired).map(c=><option key={c.id} value={c.id}>{c.parentId?label(c.parentId)+' / ':''}{c.name}</option>)}</select></label>
  <label>Review state<select value={state} onChange={e=>setState(e.target.value)}><option>PROVISIONAL</option><option>CONFIRMED</option></select></label>

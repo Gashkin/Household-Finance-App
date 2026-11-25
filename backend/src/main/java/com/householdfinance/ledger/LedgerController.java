@@ -42,6 +42,25 @@ public class LedgerController {
   @PostMapping("/budgets/periods/{id}/apply") public Object budgetApply(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return budgets.apply(id,body(r,BudgetService.Apply.class));}
   @GetMapping("/budgets/periods/{id}/history") public Object budgetHistory(@PathVariable("id")String id){return budgets.history(id);}
 
+  @org.springframework.beans.factory.annotation.Autowired private LocalClassifier localClassifier;
+  @org.springframework.beans.factory.annotation.Autowired private CommitmentService commitments;
+
+  @PostMapping("/review/activity/{id}/suggest")
+  public java.util.concurrent.Callable<LocalClassifier.Result> suggest(@PathVariable("id") String id, HttpServletRequest request) throws IOException {
+    var revision = body(request, ActivityReviewService.Revision.class).revision();
+    var entry = review.suggestionEntry(id, revision);
+    var categories = review.categories();
+    var shortlist = commitments.shortlist(entry);
+    // Authorise and snapshot under workspace admission. Release admission before waiting on inference.
+    return () -> localClassifier.suggest(entry, categories, shortlist, revision);
+  }
+
+  @PutMapping("/review/activity/{id}/merchant")
+  public Object merchant(@PathVariable("id") String id, HttpServletRequest request) throws IOException {
+    review.merchant(id, body(request, ActivityReviewService.Merchant.class));
+    return Map.of("saved", true);
+  }
+
   @GetMapping("/review/categories") public Object categories(){return review.categories();}
   @PostMapping("/review/categories") public Object createCategory(HttpServletRequest r)throws IOException{return review.category(null,body(r,ActivityReviewService.CategoryInput.class));}
   @PutMapping("/review/categories/{id}") public Object category(@PathVariable("id")String id,HttpServletRequest r)throws IOException{return review.category(id,body(r,ActivityReviewService.CategoryInput.class));}

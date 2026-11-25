@@ -7,6 +7,7 @@ import jakarta.persistence.*;
     name = "ledger_entries",
     uniqueConstraints = @UniqueConstraint(columnNames = {"account_id", "reference"}))
 public class LedgerEntry {
+  @Column(length=80) public String reviewedMerchant;
   @Column(length=36) public String categoryId;
   @Column(nullable=false, length=12) public String reviewState = "PROVISIONAL";
   @Column(length=36) public String linkedEntryId;

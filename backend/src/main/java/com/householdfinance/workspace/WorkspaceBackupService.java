@@ -100,7 +100,7 @@ public class WorkspaceBackupService {
             });
             tables.put(table, new TableData(cols, rows));
         }
-        return new Archive(8, Instant.now().toString(), tables);
+        return new Archive(9, Instant.now().toString(), tables);
     }
     private byte[] encodeSnapshot() {
         byte[] plain;
@@ -146,7 +146,7 @@ public class WorkspaceBackupService {
         try { archive = json.readValue(plain,Archive.class); }
         catch (Exception e) { throw new IllegalArgumentException("Invalid backup contents"); }
         finally { Arrays.fill(plain,(byte)0); }
-        if (archive==null || archive.version()<1 || archive.version()>8 || archive.createdAt()==null || archive.tables()==null) throw new IllegalArgumentException("Incomplete or unsupported backup");
+        if (archive==null || archive.version()<1 || archive.version()>9 || archive.createdAt()==null || archive.tables()==null) throw new IllegalArgumentException("Incomplete or unsupported backup");
         List<String> restoreTables = archive.version()==1 ? V1_TABLES : archive.version()==2 ? V2_TABLES : archive.version()==3 ? V3_TABLES : archive.version()==4 ? TABLES : archive.version()==5 ? V5_TABLES : archive.version()==6 ? V6_TABLES : archive.version()==7 ? V7_TABLES : ALL_TABLES;
         if (!archive.tables().keySet().equals(new HashSet<>(restoreTables))) throw new IllegalArgumentException("Incomplete or unsupported backup");
         var currentOwner=jdbc.queryForList("SELECT CREDENTIAL FROM HOUSEHOLD_USERS WHERE ID='owner'");
@@ -155,6 +155,7 @@ public class WorkspaceBackupService {
         for (String table : restoreTables) {
             TableData data = archive.tables().get(table);
             var expected=columns(table);
+            if(archive.version()<9 && table.equals("LEDGER_ENTRIES"))expected=expected.stream().filter(c -> !c.equals("REVIEWED_MERCHANT")).toList();
             if(archive.version()<7 && table.equals("LEDGER_ENTRIES"))expected=expected.stream().filter(c -> !Set.of("CATEGORY_ID","REVIEW_STATE","LINKED_ENTRY_ID","LINK_TYPE").contains(c)).toList();
             if(archive.version()<5)expected=expected.stream().filter(c -> !Set.of("OWNER_ID","SHARED","ACTOR_ID","SCOPE_REFS").contains(c)).toList();
             if (data==null || data.columns()==null || data.columns().size()!=expected.size()

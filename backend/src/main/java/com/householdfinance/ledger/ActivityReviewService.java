@@ -71,8 +71,29 @@ public class ActivityReviewService {
     var result=new Category(r.id,r.revision,name,input.parentId(),input.retired()||input.mergeInto()!=null,input.budgetEuro());r.payload=encode(result);records.save(r);
     audit(AccessContext.publicationId(),"CATEGORY",reason,before,result);return result;
   }
+  public record Revision(Long revision) {}
+  public record Merchant(Long revision, String label) {}
+  @Transactional(readOnly=true)
+  public LedgerEntry suggestionEntry(String id, Long expectedRevision) {
+    var e = entry(id);
+    revision(account(e.accountId), expectedRevision);
+    return e;
+  }
+  @Transactional
+  public void merchant(String id, Merchant input) {
+    var a = accounts.lockForActivity(id).orElseThrow(() -> new IllegalArgumentException("Unknown activity"));
+    var e = entry(id);
+    revision(a, input.revision());
+    protect(a, e);
+    var label = text(input.label(), 80);
+    check(label.chars().noneMatch(Character::isISOControl), "Use a single-line merchant label");
+    var before = encode(e);
+    e.reviewedMerchant = label;
+    audit(a.id, "REVIEW_MERCHANT", "Owner reviewed " + LocalClassifier.MODEL + " merchant suggestion", before, e);
+    changed(a);
+  }
   @Transactional public void classify(String id,Classification input){
-    check(input!=null,"Review required");var e=entry(id);var a=account(e.accountId);revision(a,input.revision());protect(a,e);
+    check(input!=null,"Review required");var a=accounts.lockForActivity(id).orElseThrow(() -> new IllegalArgumentException("Unknown activity"));revision(a,input.revision());var e=entry(id);protect(a,e);
     var c=active(input.categoryId());check(Set.of("CONFIRMED","PROVISIONAL").contains(Objects.toString(input.state(),"")),"Choose confirmed or provisional");
     var before=encode(e);e.categoryId=c.id();e.reviewState=input.state();audit(a.id,"CLASSIFY",input.reason(),before,e);changed(a);
     if(Boolean.TRUE.equals(input.offerRule())){

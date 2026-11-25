@@ -14,6 +14,20 @@ test('classify activity, approve a local rule and reopen protected source eviden
  await page.goto('/');await openWorkspace(page, 'Review & reconcile');await expect(page.getByRole('heading',{name:'Review & reconcile',exact:true})).toBeVisible();
  await page.getByText('Categories, subcategories and monthly budgets',{exact:true}).click();await page.getByLabel('Category name',{exact:true}).fill('Interest & Fees '+suffix);await page.getByLabel('Monthly budget (€)',{exact:true}).fill('20.00');await page.getByLabel('Category change reason',{exact:true}).fill('Synthetic category approval');await page.getByRole('button',{name:'Save category',exact:true}).click();await expect(page.getByRole('status')).toContainText('Category saved');
  await page.getByRole('combobox',{name:'Account filter',exact:true}).selectOption(account.id);await page.getByRole('button',{name:'Review '+row.description,exact:true}).click();
+ await page.getByRole('button',{name:'Suggest locally'}).click();
+ await expect(page.getByRole('alert')).toContainText('Local suggestions are disabled');
+ await page.route('**/api/ledger/review/activity/*/suggest',route=>route.fulfill({json:{
+   revision:route.request().postDataJSON().revision, model:'synthetic fixture',
+   advice:{merchant:'Synthetic fee',categoryId:null,commitmentId:null,explanation:'The description includes the label.'},
+   commitments:{revision:0,options:[]}
+ }}));
+ await page.getByRole('button',{name:'Suggest locally'}).click();
+ await page.getByRole('button',{name:'Dismiss suggestions'}).click();
+ await expect(page.getByText('Reviewed merchant: Synthetic fee')).toHaveCount(0);
+ await page.getByRole('button',{name:'Suggest locally'}).click();
+ await page.getByLabel('Suggested merchant').fill('Reviewed synthetic fee');
+ await page.getByRole('button',{name:'Save merchant label'}).click();
+ await expect(page.getByText('Reviewed merchant: Reviewed synthetic fee')).toBeVisible();
  await page.getByRole('combobox',{name:'Category',exact:true}).selectOption({label:'Interest & Fees '+suffix});await page.getByRole('combobox',{name:'Review state',exact:true}).selectOption('CONFIRMED');await page.getByLabel('Review reason / source',{exact:true}).fill('Synthetic fee source checked');await page.getByLabel('Offer an exact-description local rule after this confirmed correction',{exact:true}).check();await page.getByRole('button',{name:'Save classification',exact:true}).click();await expect(page.getByRole('status')).toContainText('Classification saved');
  await page.getByText('Review reusable local rules',{exact:true}).click();await page.getByLabel('Rule decision reason',{exact:true}).fill('Synthetic explicitly reviewed exact match');await page.getByRole('button',{name:'Approve rule for '+row.description,exact:true}).click();await expect(page.getByRole('status')).toContainText('Rule choice saved');
  account=(await(await page.request.get('/api/ledger?asOf='+day)).json()).accounts.find((a:{id:string})=>a.id===account.id);
