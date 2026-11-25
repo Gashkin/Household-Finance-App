@@ -6,6 +6,8 @@ import {
 } from './api/access';
 import ActivityReviewWorkspace from './components/ActivityReviewWorkspace';
 import BudgetWorkspace from './components/BudgetWorkspace';
+import ContractsWorkspace from './components/ContractsWorkspace';
+import { contractPath, contracts, type Inbox } from './api/contracts';
 import ConsumerDashboard from './components/ConsumerDashboard';
 import DebtDecisionWorkspace from './components/DebtDecisionWorkspace';
 import DebtStatementsWorkspace from './components/DebtStatementsWorkspace';
@@ -33,6 +35,36 @@ function App() {
   const modules = identity?.modules ?? [];
   const defaultPage = modules[0]?.pages[0];
   const [route, setRoute] = useState(currentRoute);
+  const [inbox, setInbox] = useState<Inbox | null>(null);
+  const inboxSequence = useRef(0);
+  const contractAccess = modules.some(module => module.pages.some(page => page.id === 'contracts'));
+
+  async function refreshInbox() {
+    const sequence = ++inboxSequence.current;
+    try {
+      const next = await contracts<Inbox>('/alerts');
+      if (sequence === inboxSequence.current) setInbox(next);
+    } catch {
+      if (sequence === inboxSequence.current) setInbox(null);
+    }
+  }
+
+  useEffect(() => {
+    if (!contractAccess) return;
+    void refreshInbox();
+    const refreshVisible = () => {
+      if (document.visibilityState === 'visible') void refreshInbox();
+    };
+    const timer = window.setInterval(refreshVisible, 60_000);
+    document.addEventListener('visibilitychange', refreshVisible);
+    return () => {
+      ++inboxSequence.current;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshVisible);
+    };
+  }, [contractAccess]);
+
+  const unreadReviews = contractAccess ? inbox?.notifications.filter(item => item.unread).length ?? 0 : 0;
   const main = useRef<HTMLElement>(null);
   const focusOnChange = useRef(false);
 
@@ -104,6 +136,7 @@ function App() {
       case 'forecast': return <PlanAheadWorkspace />;
       case 'budget': return <BudgetWorkspace />;
       case 'goals': return <GoalsWorkspace openBills={() => openItem('forecast')} />;
+      case 'contracts': return <ContractsWorkspace inbox={inbox} refreshInbox={refreshInbox} />;
       case 'plans': return <DecisionPlansWorkspace initialId={route.planId} />;
       case 'debts':
         return <DebtStatementsWorkspace openMoney={() => openItem('money')}
@@ -137,6 +170,9 @@ function App() {
         <nav aria-label="Modules" className="module-navigation">
           <ul>{modules.map(moduleLink)}</ul>
         </nav>
+        {unreadReviews > 0 && activePage?.id !== 'contracts' && <a className="contract-review-link" href={contractPath + '?view=reviews'}>
+          Contract reviews ({unreadReviews} unread)
+        </a>}
         {activeModule && (
           <nav aria-label={activeModule.label + ' pages'} className="module-pages">
             <ul>

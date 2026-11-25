@@ -74,7 +74,7 @@ class HouseholdAccessTest {
       grant("combinations",roles.toArray(String[]::new));Cookie c=login("combinations",MEMBER);
       boolean editor=(bits&2)!=0, financial=(bits&6)!=0;
       assertEquals(editor ? List.of("overview","activity","planning","debt","settings")
-          : financial ? List.of("overview","activity","settings") : List.of("settings"),
+          : financial ? List.of("overview","activity","planning","settings") : List.of("settings"),
           moduleIds(c));
       assertFalse(invoke("GET","/api/access/me",c,null,200).toString().contains("Backup & recovery"));
       mvc.perform(send("GET","/api/ledger?asOf="+today,c,null)).andExpect(status().is((bits&6)!=0?200:403));
@@ -93,8 +93,8 @@ class HouseholdAccessTest {
     var modules=invoke("GET","/api/access/me",owner,null,200).path("modules");
     List<String> paths=new ArrayList<>();
     modules.forEach(m->m.path("pages").forEach(p->paths.add(p.path("path").asText())));
-    assertEquals(15,paths.size());
-    assertEquals(15,new HashSet<>(paths).size());
+    assertEquals(16,paths.size());
+    assertEquals(16,new HashSet<>(paths).size());
     for(String path:paths)
       mvc.perform(get(path)).andExpect(status().isOk()).andExpect(forwardedUrl("/index.html"));
 
@@ -116,7 +116,7 @@ class HouseholdAccessTest {
     grant("navigator","ADMIN","READER");
     mvc.perform(send("GET","/api/forecast",editor,null)).andExpect(status().isUnauthorized());
     Cookie reader=login("navigator",MEMBER);
-    assertEquals(List.of("overview","activity","settings"),moduleIds(reader));
+    assertEquals(List.of("overview","activity","planning","settings"),moduleIds(reader));
     mvc.perform(send("GET","/api/access/users",reader,null)).andExpect(status().isOk());
     mvc.perform(send("GET","/api/forecast",reader,null)).andExpect(status().isOk());
     mvc.perform(send("POST","/api/forecast",reader,Map.of())).andExpect(status().isForbidden());

@@ -23,7 +23,9 @@ public class WorkspaceBackupService {
     static final List<String> ACCESS_TABLES = List.of("HOUSEHOLD_USERS","ACCESS_AUDIT");
     static final List<String> V5_TABLES = java.util.stream.Stream.concat(TABLES.stream(),ACCESS_TABLES.stream()).toList();
     static final List<String> V6_TABLES = java.util.stream.Stream.concat(V5_TABLES.stream(),java.util.stream.Stream.of("MEMBER_RECORDS")).toList();
-    static final List<String> ALL_TABLES = java.util.stream.Stream.concat(V6_TABLES.stream(),java.util.stream.Stream.of("LEDGER_REVIEW_RECORDS")).toList();
+    static final List<String> V7_TABLES = java.util.stream.Stream.concat(V6_TABLES.stream(),java.util.stream.Stream.of("LEDGER_REVIEW_RECORDS")).toList();
+    static final List<String> CONTRACT_TABLES = List.of("HOUSEHOLD_CONTRACTS", "CONTRACT_REVIEW_ALERTS");
+    static final List<String> ALL_TABLES = java.util.stream.Stream.concat(V7_TABLES.stream(), CONTRACT_TABLES.stream()).toList();
     public record TableData(List<String> columns, List<List<String>> rows) {}
     public record Archive(int version, String createdAt, Map<String, TableData> tables) {}
     private final JdbcTemplate jdbc;
@@ -40,6 +42,7 @@ public class WorkspaceBackupService {
         for (String table : TABLES) result.put(table, jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Long.class));
         result.put("MEMBER_RECORDS",jdbc.queryForObject("SELECT COUNT(*) FROM MEMBER_RECORDS",Long.class));
         result.put("LEDGER_REVIEW_RECORDS",jdbc.queryForObject("SELECT COUNT(*) FROM LEDGER_REVIEW_RECORDS",Long.class));
+        for (String table : CONTRACT_TABLES) result.put(table, jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Long.class));
         return result;
     }
     private List<String> columns(String table) {
@@ -97,7 +100,7 @@ public class WorkspaceBackupService {
             });
             tables.put(table, new TableData(cols, rows));
         }
-        return new Archive(7, Instant.now().toString(), tables);
+        return new Archive(8, Instant.now().toString(), tables);
     }
     private byte[] encodeSnapshot() {
         byte[] plain;
@@ -143,8 +146,8 @@ public class WorkspaceBackupService {
         try { archive = json.readValue(plain,Archive.class); }
         catch (Exception e) { throw new IllegalArgumentException("Invalid backup contents"); }
         finally { Arrays.fill(plain,(byte)0); }
-        if (archive==null || archive.version()<1 || archive.version()>7 || archive.createdAt()==null || archive.tables()==null) throw new IllegalArgumentException("Incomplete or unsupported backup");
-        List<String> restoreTables = archive.version()==1 ? V1_TABLES : archive.version()==2 ? V2_TABLES : archive.version()==3 ? V3_TABLES : archive.version()==4 ? TABLES : archive.version()==5 ? V5_TABLES : archive.version()==6 ? V6_TABLES : ALL_TABLES;
+        if (archive==null || archive.version()<1 || archive.version()>8 || archive.createdAt()==null || archive.tables()==null) throw new IllegalArgumentException("Incomplete or unsupported backup");
+        List<String> restoreTables = archive.version()==1 ? V1_TABLES : archive.version()==2 ? V2_TABLES : archive.version()==3 ? V3_TABLES : archive.version()==4 ? TABLES : archive.version()==5 ? V5_TABLES : archive.version()==6 ? V6_TABLES : archive.version()==7 ? V7_TABLES : ALL_TABLES;
         if (!archive.tables().keySet().equals(new HashSet<>(restoreTables))) throw new IllegalArgumentException("Incomplete or unsupported backup");
         var currentOwner=jdbc.queryForList("SELECT CREDENTIAL FROM HOUSEHOLD_USERS WHERE ID='owner'");
         try { Instant.parse(archive.createdAt()); } catch (Exception e) { throw new IllegalArgumentException("Invalid backup timestamp"); }
@@ -237,6 +240,16 @@ public class WorkspaceBackupService {
                 if(!ids.contains(row.get(owner))||!Set.of("BOARD","PURCHASE","PREFERENCES","EVENT").contains(Objects.toString(row.get(kind),"")))throw new IllegalArgumentException("Invalid member record ownership or kind");
                 try{if(Long.parseLong(row.get(version))<0)throw new NumberFormatException();}catch(RuntimeException e){throw new IllegalArgumentException("Invalid member record revision");}
             }
+        }
+        if(archive.version()>=8){
+            var contracts=archive.tables().get("HOUSEHOLD_CONTRACTS");
+            int owner=contracts.columns().indexOf("OWNER_ID");
+            if(contracts.rows().stream().anyMatch(row -> !ids.contains(row.get(owner))))
+                throw new IllegalArgumentException("Backup has contracts without an owning identity");
+            var alerts=archive.tables().get("CONTRACT_REVIEW_ALERTS");
+            int recipient=alerts.columns().indexOf("RECIPIENT_ID");
+            if(alerts.rows().stream().anyMatch(row -> !ids.contains(row.get(recipient))))
+                throw new IllegalArgumentException("Backup has alerts without a recipient identity");
         }
         for(String table:List.of("LEDGER_ACCOUNTS","CASH_POSITION_SNAPSHOTS","DECISION_PLANS")) {
             var data=archive.tables().get(table); int owner=data.columns().indexOf("OWNER_ID");

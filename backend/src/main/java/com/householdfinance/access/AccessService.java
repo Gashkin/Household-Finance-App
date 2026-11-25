@@ -21,13 +21,18 @@ public class AccessService {
   public record Invitation(String username,String code,Instant expiresAt) {}
   public record Change(long revision,Set<String> roles,String state) {}
   public record Outcome(boolean accepted,String message) {}
+  public record CapabilitiesChanged(String userId) {}
   private final JdbcTemplate jdbc;
+  private final org.springframework.context.ApplicationEventPublisher events;
   private final String bootstrap;
   private final SecureRandom random = new SecureRandom();
   @org.springframework.beans.factory.annotation.Autowired(required=false) Clock clock=Clock.systemUTC();
   private Instant attemptWindow = Instant.EPOCH;
   private int publicAttempts;
-  public AccessService(JdbcTemplate jdbc,@Value("${workspace.password:}") String bootstrap) { this.jdbc=jdbc;this.bootstrap=bootstrap; }
+  public AccessService(JdbcTemplate jdbc,@Value("${workspace.password:}") String bootstrap,
+      org.springframework.context.ApplicationEventPublisher events) {
+    this.jdbc=jdbc;this.bootstrap=bootstrap;this.events=events;
+  }
   public boolean configured() { return bootstrap.length()>=16 && bootstrap.length()<=256 || jdbc.queryForObject("SELECT COUNT(*) FROM HOUSEHOLD_USERS WHERE ID='owner'",Long.class)>0; }
   private String secret() { byte[] b=new byte[32];random.nextBytes(b);return Base64.getUrlEncoder().withoutPadding().encodeToString(b); }
   private static String hash(String text) {
@@ -132,6 +137,7 @@ public class AccessService {
     long admins=jdbc.queryForObject("SELECT COUNT(*) FROM HOUSEHOLD_USERS WHERE STATE='ACTIVE' AND (',' || ROLES || ',') LIKE '%,ADMIN,%'",Long.class);
     if(u.state().equals("ACTIVE")&&u.roles().contains("ADMIN")&&(!change.roles().contains("ADMIN")||!change.state().equals("ACTIVE"))&&admins<=1){audit(AccessContext.userId(),id,"USER_CHANGE","REJECTED_LAST_ADMIN");return new Outcome(false,"Keep at least one active administrator");}
     jdbc.update("UPDATE HOUSEHOLD_USERS SET ROLES=?,STATE=?,REVISION=REVISION+1 WHERE ID=?",String.join(",",new TreeSet<>(change.roles())),change.state(),id);
+    events.publishEvent(new CapabilitiesChanged(id));
     audit(AccessContext.userId(),id,"USER_CHANGE","SUCCESS");return new Outcome(true,"Account updated; existing sessions were revoked");
   }
   @Transactional

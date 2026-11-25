@@ -64,6 +64,8 @@ Open **Plan ahead** to save a dated cash plan, see bill/payday shortfalls and co
 
 ## Local Windows instance and statement updates
 
+Open **Planning → Contracts & subscriptions** to track renewals, cancellation windows and discounted terms. [Contract reviews, provider confirmation and backup compatibility](product/stories/contract-reviews.md).
+
 [GBD-30 installation, account boundary, AIB statement import, balance correction, backup, update and recovery guide](product/stories/local-finance-instance.md). The Windows release bundles the app and Java runtime, persists records outside the checkout, and preserves configuration across updates. It supports directly reviewed AIB current-account/card CSV exports and has live banking disabled.
 
 

@@ -21,7 +21,7 @@ test('module links support keyboard navigation, direct links, refresh and histor
   await expect(page).toHaveURL(/\/workspaces\/planning\/forecast$/);
   await expect(page.getByRole('main')).toBeFocused();
   const pages = page.getByRole('navigation', { name: 'Planning pages', exact: true });
-  await expect(pages.getByRole('link')).toHaveText(['Plan ahead', 'Budgets & allocations', 'Goals & irregular costs', 'Financial plans']);
+  await expect(pages.getByRole('link')).toHaveText(['Plan ahead', 'Budgets & allocations', 'Goals & irregular costs', 'Financial plans', 'Contracts & subscriptions']);
   await pages.getByRole('link', { name: 'Financial plans', exact: true }).click();
   await expect(page).toHaveURL(/\/workspaces\/planning\/plans$/);
   await expect(page.getByRole('heading', { name: 'Financial plans', exact: true })).toBeVisible();
@@ -89,7 +89,7 @@ test('combined roles, deep-link denial and revoked plans access', async ({ page,
     expect((await member.request.post('/api/plans', { headers, data: {} })).status()).toBe(401);
     await signin(deniedPath);
     await expect(denied).toBeVisible();
-    await expect(modules.getByRole('link')).toHaveText(['Overview', 'Activity', 'Settings']);
+    await expect(modules.getByRole('link')).toHaveText(['Overview', 'Activity', 'Planning', 'Settings']);
     expect((await member.request.post('/api/plans', { headers, data: {} })).status()).toBe(403);
     await modules.getByRole('link', { name: 'Overview', exact: true }).click();
     await expect(member.getByRole('heading', { name: 'Permitted money position', exact: true })).toBeVisible();

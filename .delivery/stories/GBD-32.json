@@ -1,0 +1,31 @@
+{
+  "work_id": "GBD-32",
+  "page_id": "41fd3419-fef0-81fb-b248-c1b27588c037",
+  "branch": "story/32-delivery",
+  "artifacts": [
+    {
+      "path": "backend/src/main/java/com/householdfinance/contracts/ContractsService.java",
+      "contains": ["ConfirmInput", "Reactivate", "exportVisible"]
+    },
+    {
+      "path": "backend/src/main/java/com/householdfinance/contracts/ContractAlerts.java",
+      "contains": ["@Scheduled", "capabilitiesChanged", "SNOOZE"]
+    },
+    {
+      "path": "backend/src/main/resources/db/migration/V5__contract_reviews.sql",
+      "contains": ["household_contracts", "primary key (contract_id, term_id, recipient_id)"]
+    },
+    {
+      "path": "frontend/src/components/ContractsWorkspace.tsx",
+      "contains": ["Review inbox", "Record provider confirmation"]
+    },
+    {
+      "path": "backend/src/test/java/com/householdfinance/contracts/ContractsJourneyTest.java",
+      "contains": ["verifiedCutoffAndLocalMidnight", "PreserveHistoryAndCashFlow"]
+    },
+    {
+      "path": "frontend/e2e/contracts.spec.ts",
+      "contains": ["rolling subscription", "provider closure"]
+    }
+  ]
+}

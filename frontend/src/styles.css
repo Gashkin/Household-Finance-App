@@ -865,3 +865,21 @@ body {
 .mcp-connection button:disabled { opacity: .55; cursor: default; }
 .mcp-connection article { border: 1px solid #d6dfeb; border-radius: .6rem; padding: 1rem; margin-block: 1rem; }
 .mcp-connection [role=alert] { color: #991b1b; background: #fff1f2; padding: .75rem; border-radius: .5rem; }
+
+/* Contracts and subscription reviews */
+.contracts-workspace .contract-workspace-body { border: 0; padding: 0; margin: 1rem 0; min-inline-size: 0; }
+.contract-form, .contract-evidence, .contract-fields { display: grid; gap: .75rem; min-width: 0; }
+.contract-fields { grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); }
+.contract-form label, .contract-evidence label, .contract-snooze label { display: grid; gap: .25rem; }
+.contract-form input, .contract-form select, .contract-form textarea { min-width: 0; max-width: 100%; }
+.contract-form label.contract-check { display: flex; align-items: center; gap: .4rem; }
+.contract-form details, .contracts-workspace .contract-evidence { padding: .65rem; }
+.contract-form details > summary, .contracts-workspace details > summary { margin-bottom: .55rem; cursor: pointer; }
+.contracts-workspace .contract-list, .contracts-workspace .contract-term-list { list-style: none; padding: 0; }
+.contracts-workspace .contract-term-list { display: flex; flex-wrap: wrap; gap: .75rem; }
+.contracts-workspace .contract-term-list [aria-current="page"] { font-weight: 700; }
+.contract-facts dt { font-weight: 650; }
+.contract-facts dd { margin: .25rem 0; overflow-wrap: anywhere; }
+.contract-history, .contract-alert p { overflow-wrap: anywhere; }
+.contract-snooze { display: flex; flex-wrap: wrap; align-items: end; gap: .5rem; }
+.contract-review-link { display: inline-block; margin: .4rem 0; }
