@@ -12,6 +12,8 @@ the comparison itself is not saved. See [the journey and API notes](product/date
 
 **Security boundary:** one local household workspace with named users, combined roles, private accounts and explicit sharing. Use a private OS profile and encrypted disk: the live H2 database is not application-encrypted, and application permissions do not isolate people who can read its files. Loopback access only; remote or public deployment is unsupported. See [named access and recovery](product/stories/household-access.md) and [encrypted backup setup](product/stories/private-workspace.md).
 
+Open **Overview → Money position** for the current position. Use the [workspace navigation guide](product/stories/module-navigation.md) to find other pages and see which roles can use them.
+
 **Spending & purchases** gives named members a shared-only spending report, personal purchase plans, auditable shared requests, explicit actual-transaction matching and local preferences. [Setup, financial rules, permissions and recovery](product/stories/member-spending.md).
 
 **Plan ahead** maintains recurring bills and expected income, reviews explicit payment matches and explains six-month household/account cash risk. Existing dated/manual plans remain available separately. [Schedules, payroll, CSV updates and recovery](product/stories/recurring-bills.md).

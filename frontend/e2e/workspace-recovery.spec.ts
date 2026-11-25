@@ -1,3 +1,4 @@
+import { openWorkspace } from './workspace-navigation';
 import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 import {PASSWORD,BACKEND_URL} from './workspace-helper';
@@ -12,7 +13,7 @@ test('locked workspace, encrypted download and safe recovery controls',async({pa
   await expect(page.getByRole('alert')).toContainText('Incorrect workspace password');
   await page.getByLabel('Workspace password',{exact:true}).fill(PASSWORD);
   await page.getByRole('button',{name:'Unlock workspace',exact:true}).click();
-  await page.getByRole('button',{name:'Backup & recovery',exact:true}).click();
+  await openWorkspace(page, 'Backup & recovery');
   await page.getByLabel('Backup passphrase',{exact:true}).fill('separate-synthetic-backup-passphrase');
   await page.getByLabel('Repeat backup passphrase',{exact:true}).fill('separate-synthetic-backup-passphrase');
   const event=page.waitForEvent('download');
@@ -39,7 +40,7 @@ test('recover an encrypted backup in a fresh workspace without partial writes',a
   const backup=await request.post(`${BACKEND_URL}/api/workspace/backup`,{headers:{'X-Workspace-Request':'1'},data:{password:'separate-synthetic-backup-passphrase'}});expect(backup.ok()).toBeTruthy();
   const bytes=await backup.body();
   await page.goto('http://127.0.0.1:4174/');await page.getByLabel('Workspace password',{exact:true}).fill(PASSWORD);await page.getByRole('button',{name:'Unlock workspace',exact:true}).click();
-  await page.getByRole('button',{name:'Backup & recovery',exact:true}).click();
+  await openWorkspace(page, 'Backup & recovery');
   await expect(page.getByText('This workspace is empty and can receive a backup.',{exact:false})).toBeVisible();
   await page.getByLabel('Encrypted backup file',{exact:true}).setInputFiles({name:'synthetic.hfb',mimeType:'application/octet-stream',buffer:bytes});
   await page.getByLabel('Backup passphrase',{exact:true}).fill('wrong-but-long-passphrase');
@@ -52,7 +53,7 @@ test('recover an encrypted backup in a fresh workspace without partial writes',a
   await expect(page.getByRole('status')).toContainText('Recovery complete');
   await expect(page.getByRole('button',{name:'Unlock workspace',exact:true})).toBeVisible();
   await page.getByLabel('Workspace password',{exact:true}).fill(PASSWORD);await page.getByRole('button',{name:'Unlock workspace',exact:true}).click();
-  await page.getByRole('button',{name:'Debt decision',exact:true}).click();
+  await openWorkspace(page, 'Debt decision');
   await expect(page.getByText('Loading saved cash position…')).toBeHidden();
   await expect(page.getByRole('button',{name:'Use this cash position in debt comparison',exact:true})).toBeVisible();
   await page.screenshot({path:testInfo.outputPath('restored-workspace.png'),fullPage:true});

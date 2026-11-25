@@ -1,5 +1,7 @@
 import { createContext, useContext } from 'react';
-export type Identity = { id:string; username:string; roles:string[]; custodian:boolean; canRead:boolean; canEdit:boolean; scope:string };
+export type WorkspacePage = { id:string; label:string; path:string };
+export type WorkspaceModule = { id:string; label:string; pages:WorkspacePage[] };
+export type Identity = { id:string; username:string; roles:string[]; custodian:boolean; canRead:boolean; canEdit:boolean; scope:string; modules:WorkspaceModule[] };
 export const IdentityContext=createContext<Identity|null>(null);
 export function useIdentity(){return useContext(IdentityContext);}
 export async function accessRequest<T>(path:string,body?:unknown,method=body===undefined?'GET':'POST'):Promise<T>{

@@ -1,3 +1,4 @@
+import { openWorkspace } from './workspace-navigation';
 import { test, expect } from '@playwright/test';
 import { unlockFixture, BACKEND_URL } from './workspace-helper';
 
@@ -17,7 +18,7 @@ test('legacy consumer summary never turns missing evidence into actual income or
   expect(summary.allowableSpend).toBeNull();
   expect(summary.recentTransactions).toEqual([]);
   await page.goto('/');
-  await page.getByRole('button', { name: 'Consumer', exact: true }).click();
+  await openWorkspace(page, 'Consumer');
   await expect(page.getByRole('heading', { name: 'No verified monthly summary' })).toBeVisible();
   await expect(page.getByText('On Track', { exact: false })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Allowable spend' })).toHaveCount(0);

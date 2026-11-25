@@ -1,5 +1,6 @@
 import { plans, type DecisionPlan } from '../api/plans';
 import EvidenceIntakePanel from './EvidenceIntakePanel';
+import { useIdentity } from '../api/access';
 import DebtReportPreview from './DebtReportPreview';
 import { useRef, useState, type FormEvent } from 'react';
 import { createDebtReport, type DebtComparisonReport, type DebtScenarioInput, type DebtScenarioResult } from '../api/debtScenarios';
@@ -19,6 +20,7 @@ const fields: { key: Field; label: string; hint: string }[] = [
 ];
 
 export default function DebtDecisionWorkspace({ onPlanCreated }: { onPlanCreated: (id: string) => void }) {
+  const canUseIntake = useIdentity()?.custodian;
   const [values, setValues] = useState(defaults);
   const [cashRefresh, setCashRefresh] = useState(0);
   const [sourceSnapshot, setSourceSnapshot] = useState<CashPositionSnapshot | null>(null);
@@ -86,7 +88,7 @@ export default function DebtDecisionWorkspace({ onPlanCreated }: { onPlanCreated
         <h2>Repay debt or keep the cash?</h2>
         <p>Compare the cost of keeping your repayment schedule with making an extra payment today. Debt comparisons are illustrative. Save a comparison to Financial plans to record a decision and follow-up. Your optional cash evidence is stored in the local backend.</p>
       </div>
-      <EvidenceIntakePanel onApproved={snapshot => { applyCashPosition(snapshot); setCashRefresh(value => value + 1); }} />
+      {canUseIntake && <EvidenceIntakePanel onApproved={snapshot => { applyCashPosition(snapshot); setCashRefresh(value => value + 1); }} />}
       <CashPositionPanel key={cashRefresh} onApply={applyCashPosition} appliedId={sourceSnapshot?.id ?? null} />
       <div className="debt-layout">
         <form className="workspace-card debt-form" onSubmit={submit}>

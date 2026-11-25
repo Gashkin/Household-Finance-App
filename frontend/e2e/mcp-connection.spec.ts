@@ -1,3 +1,4 @@
+import { openWorkspace } from './workspace-navigation';
 import { test, expect } from "@playwright/test";
 import { unlockFixture } from "./workspace-helper";
 test.beforeEach(unlockFixture);
@@ -10,9 +11,7 @@ test("owner sees disabled connection and cannot enable missing OAuth configurati
   page,
 }) => {
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "ChatGPT connection", exact: true })
-    .click();
+  await openWorkspace(page, "ChatGPT connection");
   await expect(
     page.getByRole("heading", { name: "ChatGPT connection", exact: true }),
   ).toBeVisible();
@@ -72,9 +71,7 @@ test("one-use approval denial disable and failure recovery controls are accessib
     });
   });
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "ChatGPT connection", exact: true })
-    .click();
+  await openWorkspace(page, "ChatGPT connection");
   await expect(page.getByText(id, { exact: true })).toBeVisible();
   fail = true;
   await page

@@ -1,3 +1,4 @@
+import { openWorkspace } from './workspace-navigation';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { unlockFixture, BACKEND_URL } from './workspace-helper';
@@ -6,6 +7,7 @@ test.beforeEach(unlockFixture);
 
 test('unlock, inspect and correct source facts, approve once, and use them in a report', async ({ page, request }, testInfo) => {
   await page.goto('/');
+  await openWorkspace(page, 'Debt decision');
   await page.getByText('Paste evidence and review suggested facts', {exact:true}).click();
   await page.getByLabel('Intake access key', {exact:true}).fill('wrong');
   await page.getByRole('button', {name:'Unlock evidence intake',exact:true}).click();
@@ -56,6 +58,7 @@ test('unlock, inspect and correct source facts, approve once, and use them in a 
 
 test('editing the source discards old suggestions and an outage cannot approve anything', async ({ page }) => {
   await page.goto('/');
+  await openWorkspace(page, 'Debt decision');
   await page.getByText('Paste evidence and review suggested facts',{exact:true}).click();
   await page.getByLabel('Intake access key',{exact:true}).fill('synthetic-browser-intake-key');
   await page.getByRole('button',{name:'Unlock evidence intake',exact:true}).click();
@@ -75,6 +78,7 @@ test('model disclosure consent is consumed once and source edits clear it', asyn
   // Advertise a configured provider in the UI; the real test server has no external provider.
   await page.route('**/api/evidence-intake/capabilities', route => route.fulfill({json:{enabled:true,modelConfigured:true,modelDailyLimit:5,maxOutputTokens:1200}}));
   await page.goto('/');
+  await openWorkspace(page, 'Debt decision');
   await page.getByText('Paste evidence and review suggested facts',{exact:true}).click();
   await page.getByLabel('Intake access key',{exact:true}).fill('synthetic-browser-intake-key');
   await page.getByRole('button',{name:'Unlock evidence intake',exact:true}).click();

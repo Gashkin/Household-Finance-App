@@ -24,7 +24,12 @@ public class AccessController {
     try {if(bytes.length>8192)throw new IllegalArgumentException("Access request too large");var v=json.readValue(bytes,type);if(v==null)throw new IllegalArgumentException("Complete access request required");return v;}
     catch(IOException e){throw new IllegalArgumentException("Invalid access request");}finally{Arrays.fill(bytes,(byte)0);}
   }
-  @GetMapping("/me") public Map<String,Object> me(){var a=AccessContext.actor();return Map.of("id",a.id(),"username",a.username(),"roles",a.roles(),"custodian",a.custodian(),"canRead",a.reads(),"canEdit",a.edits(),"scope","LIMITED_OR_UNCERTAIN");}
+  @GetMapping("/me") public Map<String,Object> me(){
+    var a=AccessContext.actor();
+    return Map.of("id",a.id(),"username",a.username(),"roles",a.roles(),"custodian",a.custodian(),
+        "canRead",a.reads(),"canEdit",a.edits(),"scope","LIMITED_OR_UNCERTAIN",
+        "modules",WorkspaceModules.navigation(a));
+  }
   @GetMapping("/users") public List<AccessService.User> users(){return access.users();}
   @GetMapping("/audit") public List<Map<String,Object>> audit(){return access.audit();}
   @PostMapping("/invitations") public AccessService.Invitation invite(HttpServletRequest r)throws IOException{return access.invite(body(r,Invite.class).username());}

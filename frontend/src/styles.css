@@ -42,25 +42,77 @@ body {
 }
 
 .app-header {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.app-header h1 {
+  margin: 0 0 .9rem;
+  font-size: clamp(1.4rem, 3vw, 1.8rem);
+}
+
+.module-navigation ul, .module-pages ul {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .25rem .4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.module-navigation {
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.module-navigation a, .module-pages a {
+  display: flex;
   align-items: center;
-  margin-bottom: 1.5rem;
+  min-height: 44px;
+  padding: .45rem .75rem;
+  border-radius: .5rem;
+  color: #334155;
+  font-weight: 600;
+  text-decoration: none;
 }
 
-.role-switcher button {
-  margin-left: 0.5rem;
-  border: 1px solid #d1d5db;
-  border-radius: 999px;
-  padding: 0.5rem 0.9rem;
+.module-navigation a:hover, .module-pages a:hover {
+  background: #e2e8f0;
+}
+
+.module-navigation a[aria-current] {
+  background: #1e3a5f;
+  color: #fff;
+}
+
+.module-pages {
+  padding-top: .35rem;
+}
+
+.module-pages a[aria-current] {
+  color: #1e3a5f;
+  background: #e0eaf7;
+  text-decoration: underline;
+  text-underline-offset: .25em;
+}
+
+.app-header a:focus-visible, .app-main:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.skip-workspace-navigation {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  padding: .65rem .85rem;
   background: white;
-  cursor: pointer;
+  color: #1e3a5f;
+  transform: translateY(-200vh);
 }
 
-.role-switcher button.active {
-  background: #2563eb;
-  color: white;
-  border-color: #2563eb;
+.skip-workspace-navigation:focus {
+  transform: none;
 }
 
 .app-main {
@@ -576,12 +628,9 @@ body {
 .debt-safe { color: #166534; font-weight: 600; }
 .debt-disclosure { border: 0; background: transparent; padding: .25rem 0; color: #1d4ed8; font: inherit; font-weight: 650; cursor: pointer; }
 .debt-results li { margin: .5rem 0; }
-.role-switcher { display: flex; gap: .35rem; flex-wrap: wrap; }
 @media (max-width: 850px) {
   .debt-layout { grid-template-columns: 1fr; }
   .debt-metrics { grid-template-columns: 1fr; }
-  .app-header { align-items: flex-start; flex-direction: column; gap: 1rem; }
-  .role-switcher button { margin-left: 0; }
 }
 
 

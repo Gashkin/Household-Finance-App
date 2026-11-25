@@ -1,3 +1,4 @@
+import { openWorkspace } from './workspace-navigation';
 import { test, expect, type Page } from "@playwright/test";
 import { unlockFixture } from "./workspace-helper";
 test.use({ extraHTTPHeaders: { "X-Workspace-Request": "1" } });
@@ -139,9 +140,7 @@ test("statement corrections preserve drafts, recover unknown saves and export le
       "-1000.00",
     );
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Cards, loans & mortgages", exact: true })
-    .click();
+  await openWorkspace(page, "Cards, loans & mortgages");
   await expect(
     page.getByRole("heading", { name: "Cards, loans & mortgages" }),
   ).toBeVisible();
@@ -369,9 +368,7 @@ test("dated mortgage rates show principal interest fees payoff and constrained e
     ).ok(),
   ).toBeTruthy();
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Cards, loans & mortgages", exact: true })
-    .click();
+  await openWorkspace(page, "Cards, loans & mortgages");
   await expect(
     page.getByText("Statement net principal reduction", { exact: true }).last(),
   ).toBeVisible();

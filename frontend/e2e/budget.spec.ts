@@ -1,3 +1,4 @@
+import { openWorkspace } from './workspace-navigation';
 import {test,expect} from '@playwright/test';
 import {unlockFixture} from './workspace-helper';
 test.use({extraHTTPHeaders:{'X-Workspace-Request':'1'}});
@@ -9,7 +10,7 @@ test('preserve a budget original through reviewed spending, reallocation, report
  const category=await(await page.request.post('/api/ledger/review/categories',{data:{name:'Synthetic budget food '+suffix,parentId:null,retired:false,budgetEuro:'0.00',mergeInto:null,reason:'Synthetic budget category'}})).json();
  // A separate owner-scoped, non-overlapping historical period keeps this scenario independent of other browser fixtures.
  const anchor=info.project.name==='desktop'?'2024-01-15':'2025-01-15';
- await page.goto('/');await page.getByRole('button',{name:'Budgets & allocations',exact:true}).click();await page.getByLabel('Budget decision reason',{exact:true}).fill('Synthetic planned regular income');await page.getByLabel('Template name',{exact:true}).fill('Synthetic budget '+suffix);await page.getByLabel('Planned regular income EUR',{exact:true}).fill('100.00');await page.getByRole('button',{name:'Add template allocation',exact:true}).click();
+ await page.goto('/');await openWorkspace(page, 'Budgets & allocations');await page.getByLabel('Budget decision reason',{exact:true}).fill('Synthetic planned regular income');await page.getByLabel('Template name',{exact:true}).fill('Synthetic budget '+suffix);await page.getByLabel('Planned regular income EUR',{exact:true}).fill('100.00');await page.getByRole('button',{name:'Add template allocation',exact:true}).click();
  await page.getByRole('combobox',{name:'Category 1',exact:true}).selectOption(category.id);await page.getByLabel('Allocation EUR 1',{exact:true}).fill('100.00');await page.getByLabel('Carry remaining balance 1',{exact:true}).check();await page.getByRole('button',{name:'Save income template',exact:true}).click();await expect(page.getByRole('status')).toContainText('Template saved');await page.getByRole('button',{name:'Load template history',exact:true}).click();await expect(page.getByRole('status')).toContainText('Template history loaded');await expect(page.getByText('Template changed',{exact:false}).first()).toBeVisible();
  await page.getByLabel('Date within new period',{exact:true}).fill(anchor);await page.getByRole('button',{name:'Create budget period',exact:true}).click();await expect(page.getByRole('status')).toContainText('Period created');
  const selected=await page.getByRole('combobox',{name:'Budget period',exact:true}).inputValue();expect(selected).toBeTruthy();const before=await(await page.request.get('/api/ledger/budgets/periods/'+selected)).json();

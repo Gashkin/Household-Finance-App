@@ -1,3 +1,4 @@
+import { openWorkspace } from './workspace-navigation';
 import {test,expect} from '@playwright/test';
 import {unlockFixture} from './workspace-helper';
 test.use({extraHTTPHeaders:{'X-Workspace-Request':'1'}});
@@ -10,7 +11,7 @@ test('classify activity, approve a local rule and reopen protected source eviden
  const response=await page.request.post('/api/ledger/accounts',{data:{name:'Synthetic review cash '+suffix,kind:'CASH',openingDate:day,openingEuro:'100.00',source:'Synthetic browser statement'}});expect(response.ok()).toBeTruthy();let account=await response.json();
  const row={reference:'review-'+suffix,date:day,description:'Synthetic fee '+suffix,amountEuro:'-10.00',status:'BOOKED',kind:'ACTIVITY'};
  expect((await page.request.post('/api/ledger/accounts/'+account.id+'/activity',{data:{revision:account.revision,row,source:'Synthetic fee receipt',acknowledgedOverlap:true}})).ok()).toBeTruthy();
- await page.goto('/');await page.getByRole('button',{name:'Review & reconcile',exact:true}).click();await expect(page.getByRole('heading',{name:'Review & reconcile',exact:true})).toBeVisible();
+ await page.goto('/');await openWorkspace(page, 'Review & reconcile');await expect(page.getByRole('heading',{name:'Review & reconcile',exact:true})).toBeVisible();
  await page.getByText('Categories, subcategories and monthly budgets',{exact:true}).click();await page.getByLabel('Category name',{exact:true}).fill('Interest & Fees '+suffix);await page.getByLabel('Monthly budget (€)',{exact:true}).fill('20.00');await page.getByLabel('Category change reason',{exact:true}).fill('Synthetic category approval');await page.getByRole('button',{name:'Save category',exact:true}).click();await expect(page.getByRole('status')).toContainText('Category saved');
  await page.getByRole('combobox',{name:'Account filter',exact:true}).selectOption(account.id);await page.getByRole('button',{name:'Review '+row.description,exact:true}).click();
  await page.getByRole('combobox',{name:'Category',exact:true}).selectOption({label:'Interest & Fees '+suffix});await page.getByRole('combobox',{name:'Review state',exact:true}).selectOption('CONFIRMED');await page.getByLabel('Review reason / source',{exact:true}).fill('Synthetic fee source checked');await page.getByLabel('Offer an exact-description local rule after this confirmed correction',{exact:true}).check();await page.getByRole('button',{name:'Save classification',exact:true}).click();await expect(page.getByRole('status')).toContainText('Classification saved');

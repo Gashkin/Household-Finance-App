@@ -1,3 +1,4 @@
+import { openWorkspace } from './workspace-navigation';
 import { test, expect } from "@playwright/test";
 import { unlockFixture } from "./workspace-helper";
 test.use({ extraHTTPHeaders: { "X-Workspace-Request": "1" } });
@@ -7,6 +8,7 @@ test("financial goal becomes a decision, observed follow-up and revised evidence
 }, testInfo) => {
   test.setTimeout(120000);
   await page.goto("/");
+  await openWorkspace(page, "Debt decision");
   await page
     .getByRole("button", { name: "Compare scenarios", exact: true })
     .click();
@@ -62,9 +64,7 @@ test("financial goal becomes a decision, observed follow-up and revised evidence
     ),
   ).toBeVisible();
   await page.reload();
-  await page
-    .getByRole("button", { name: "Financial plans", exact: true })
-    .click();
+  await openWorkspace(page, "Financial plans");
   await expect(
     page.getByLabel("Financial plan title", { exact: true }),
   ).toHaveValue("Synthetic loan plan " + testInfo.project.name);
@@ -75,9 +75,7 @@ test("financial goal becomes a decision, observed follow-up and revised evidence
   ).toBeVisible();
   const tab = await page.context().newPage();
   await tab.goto("/");
-  await tab
-    .getByRole("button", { name: "Financial plans", exact: true })
-    .click();
+  await openWorkspace(tab, "Financial plans");
   await expect(
     tab.getByLabel("Financial plan title", { exact: true }),
   ).toHaveValue("Synthetic loan plan " + testInfo.project.name);

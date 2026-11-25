@@ -1,3 +1,4 @@
+import { openWorkspace } from './workspace-navigation';
 import { test, expect } from "@playwright/test";
 import { unlockFixture } from "./workspace-helper";
 test.use({ extraHTTPHeaders: { "X-Workspace-Request": "1" } });
@@ -19,9 +20,7 @@ test("packaged single-origin production protocol simulation, review and revoke",
     expect(new URL(page.url()).search).toBe("");
   }
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Money position", exact: true })
-    .click();
+  await openWorkspace(page, "Money position");
   await expect(page.getByText("Loading reviewed position…")).toBeHidden();
   const date = await page
     .getByLabel("Position as at", { exact: true })
@@ -38,7 +37,7 @@ test("packaged single-origin production protocol simulation, review and revoke",
     expect(created.ok()).toBeTruthy(); local = await created.json();
   }
   await page.reload();
-  await page.getByRole("button", { name: "Money position", exact: true }).click();
+  await openWorkspace(page, "Money position");
   const panel = page.getByRole("region", {
     name: "AIB bank connection",
     exact: true,
@@ -126,7 +125,7 @@ test("pending revocation cannot be forgotten without separately confirming the e
     await r.fulfill({json:{...state,state:"DISCONNECTED"}});
   });
   await page.goto("/");
-  await page.getByRole("button",{name:"Money position",exact:true}).click();
+  await openWorkspace(page, "Money position");
   const panel=page.getByRole("region",{name:"AIB bank connection",exact:true});
   await expect(panel).toContainText("REVOCATION_PENDING");
   await panel.getByLabel("I understand local forgetting does not revoke provider consent or erase reviewed ledger records").check();
@@ -148,7 +147,7 @@ test("empty bank refresh keeps balance evidence and clears an older activity rev
   };
   await page.route("**/api/banking/status", route => route.fulfill({ json: state }));
   await page.goto("/");
-  await page.getByRole("button", { name: "Money position", exact: true }).click();
+  await openWorkspace(page, "Money position");
   const date = await page.getByLabel("Position as at", { exact: true }).inputValue();
   const created = await page.request.post("/api/ledger/accounts", { data: {
     name: "Synthetic empty period " + testInfo.project.name, kind: "CASH",
@@ -178,7 +177,7 @@ test("empty bank refresh keeps balance evidence and clears an older activity rev
     }});
   });
   await page.reload();
-  await page.getByRole("button", { name: "Money position", exact: true }).click();
+  await openWorkspace(page, "Money position");
   await page.getByLabel("Review account", { exact: true }).selectOption(account.id);
   const panel = page.getByRole("region", { name: "AIB bank connection", exact: true });
   await panel.getByLabel("I authorise Enable Banking to access only my selected AIB accounts, balances and transactions, and retain reviewed records locally").check();

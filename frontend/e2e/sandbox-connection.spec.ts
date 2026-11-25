@@ -1,3 +1,4 @@
+import { openWorkspace } from './workspace-navigation';
 import { test, expect } from "@playwright/test";
 import { unlockFixture } from "./workspace-helper";
 test.use({ extraHTTPHeaders: { "X-Workspace-Request": "1" } });
@@ -14,9 +15,7 @@ test("connect synthetic read-only accounts, review paginated activity and discon
     expect(new URL(page.url()).search).toBe("");
   }
   await page.goto("/");
-  await page
-    .getByRole("button", { name: "Money position", exact: true })
-    .click();
+  await openWorkspace(page, "Money position");
   await expect(page.getByText("Loading reviewed position…")).toBeHidden();
   const date = await page
     .getByLabel("Position as at", { exact: true })
@@ -33,7 +32,7 @@ test("connect synthetic read-only accounts, review paginated activity and discon
     expect(created.ok()).toBeTruthy(); local = await created.json();
   }
   await page.reload();
-  await page.getByRole("button", { name: "Money position", exact: true }).click();
+  await openWorkspace(page, "Money position");
   const panel = page.getByRole("region", {
     name: "Enable Banking sandbox connection",
     exact: true,
