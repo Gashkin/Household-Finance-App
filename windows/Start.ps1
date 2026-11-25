@@ -1,4 +1,4 @@
-param([ValidateRange(1024,65535)][int]$Port=8080, [switch]$LocalSuggestions)
+param([ValidateRange(1024,65535)][int]$Port=8080, [switch]$DisableLocalSuggestions)
 . "$PSScriptRoot\Common.ps1"
 $root = Get-InstanceRoot
 $manifest = Get-PackageManifest $PSScriptRoot
@@ -8,10 +8,10 @@ $modelProcess = $null
 try {
     # Optional inference is a sibling process with its own ephemeral credential.
     [Environment]::SetEnvironmentVariable('FINANCE_INFERENCE_KEY',$null,'Process')
-    if ($LocalSuggestions) {
+    $modelDirectory = Join-Path $root 'inference'
+    if (!$DisableLocalSuggestions -and [Environment]::UserName -eq 'Dev Server One' -and (Test-Path -LiteralPath $modelDirectory -PathType Container)) {
+      try {
         Assert-StandardRuntimeIdentity | Out-Null
-        if ([Environment]::UserName -ne 'Dev Server One') { throw 'Start local suggestions from Dev Server One.' }
-        $modelDirectory = Join-Path $root 'inference'
         Assert-PrivatePath $modelDirectory
         $modelFile = Join-Path $modelDirectory 'qwen2.5-1.5b-instruct-q4_k_m.gguf'
         if ((Get-FileHash -LiteralPath $modelFile).Hash -ne '6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e') { throw 'Unexpected model checksum.' }
@@ -23,11 +23,17 @@ try {
         $modelProcess = Start-Process -FilePath (Join-Path $modelDirectory 'llama-server.exe') -WorkingDirectory $modelDirectory -WindowStyle Hidden -PassThru -ArgumentList @('-m','qwen2.5-1.5b-instruct-q4_k_m.gguf','--alias','qwen2.5-1.5b-instruct-q4_k_m','--host','127.0.0.1','--port','18737','--parallel','1','-c','4096','-t','4','--offline','--no-ui','--no-ui-mcp-proxy','--log-disable')
         $timer=[Diagnostics.Stopwatch]::StartNew()
         do {
-            if ($modelProcess.HasExited -or $timer.Elapsed.TotalSeconds -gt 60) { throw 'Local inference startup failed. Start without -LocalSuggestions for manual review.' }
+            if ($modelProcess.HasExited -or $timer.Elapsed.TotalSeconds -gt 60) { throw 'Local inference startup failed.' }
             Start-Sleep -Milliseconds 250
             $listener = Get-NetTCPConnection -State Listen -LocalPort 18737 -ErrorAction SilentlyContinue
         } until ($listener)
         if ($listener.OwningProcess -ne $modelProcess.Id -or $listener.LocalAddress -ne '127.0.0.1') { throw 'Unexpected inference listener.' }
+      } catch {
+        if ($modelProcess -and !$modelProcess.HasExited) { $modelProcess.Kill(); $modelProcess.WaitForExit() }
+        [Environment]::SetEnvironmentVariable('FINANCE_INFERENCE_KEY',$null,'Process')
+        [Environment]::SetEnvironmentVariable('LLAMA_API_KEY',$null,'Process')
+        Write-Warning 'Local inference could not start. Manual review remains available. Check the installed inference files and port 18737.'
+      }
     }
     # Read after the lock: readiness/disable must not race the launch decision.
     $config = Read-PrivateConfig $root

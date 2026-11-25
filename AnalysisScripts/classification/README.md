@@ -1,6 +1,6 @@
 # Transaction suggestion benchmark
 
-Keep local suggestions disabled by default on this laptop. On the eight frozen synthetic cases, the model gave six category recommendations, five of them wrong. One of its two commitment recommendations was wrong. The approved-rule baseline recommended one category correctly. This small diagnostic set cannot establish a household-wide error rate.
+The installed app starts a configured local model by default under Dev Server One. Owners request suggestions for individual transactions and retain the final decision. On the eight frozen synthetic cases, the model gave six category recommendations, five of them wrong. One of its two commitment recommendations was wrong. The approved-rule baseline recommended one category correctly. This small diagnostic set cannot establish a household-wide error rate.
 
 ## Development-account measurements, 25 November 2026
 
@@ -12,6 +12,8 @@ Ryzen 7 5800H, 20,782,837,760 bytes of system RAM, Windows x64. The CPU build us
 | Local model | Category | 1 | 5 | 2 (2) | 0 / 0 | 37.5% | 75% |
 | Local model | Merchant | 1 | 0 | 7 (3) | 0 / 0 | 50% | 12.5% |
 | Local model | Commitment | 1 | 1 | 6 (6) | 0 / 0 | 87.5% | 25% |
+
+The benchmark uses one synthetic author's expected answers, frozen before inference. For a category or commitment, a recommendation is correct only if the returned ID equals the expected ID. For a merchant, the scorer compares the expected label with the returned label case-insensitively. For example, “Wren Foods” is accepted for “POS 104 WREN FOODS”. Extra words that might make a label equally useful to a person can score as wrong. An abstention is appropriate only when the expected answer is null. No household owner has ratified these synthetic labels.
 
 The rules have no merchant or commitment output. Category confirmation removes categories from the model choices and enables eligible commitment candidates. A legitimate no-match counts toward accuracy. Coverage counts only actual recommendations. The frozen held-out labels include three correct no-merchant outcomes. The tuning example is excluded from scoring.
 
@@ -40,6 +42,6 @@ python AnalysisScripts/classification/benchmark.py openai
 
 ## Installed instance and rollback
 
-Under the standard Dev Server One identity, install the release containing this story using the existing Windows installation workflow. From that account, create `%LOCALAPPDATA%\HouseholdFinance\inference` under the installed private instance directory. Copy the verified extracted runtime and model there. Confirm the directory and files inherit the instance's restricted ACL. Start the installed release with `.\Start.ps1 -LocalSuggestions`. The launcher binds the authenticated model to 127.0.0.1:18737 and supplies an ephemeral credential to the backend. No API key is needed for app use. The model accepts one request at a time. The backend supplies at most ten eligible occurrences within seven days either side of the entry. Saving requires an explicit owner action.
+Under the standard Dev Server One identity, install the release containing this story using the existing Windows installation workflow. From that account, create `%LOCALAPPDATA%\HouseholdFinance\inference` under the installed private instance directory. Copy the verified extracted runtime and model there. Confirm the directory and files inherit the instance's restricted ACL. Start the installed release with `.\Start.ps1`. The launcher binds the authenticated model to 127.0.0.1:18737 and supplies an ephemeral credential to the backend. No API key is needed for app use. The model accepts one request at a time. The backend supplies at most ten eligible occurrences within seven days either side of the entry. Saving requires an explicit owner action.
 
-Use a synthetic installed workspace for acceptance. Disconnect the network after setup, request suggestions, inspect the actor and source in audit history, exercise manual review while inference is running, and record the identity, endpoint protection and observed response times. This check is outstanding. To disable inference, stop the foreground app and restart with `.\Start.ps1`. Accepted labels remain available in the ledger and encrypted backup.
+Use a synthetic installed workspace for acceptance. Disconnect the network after setup, request suggestions, inspect the actor and source in audit history, exercise manual review while inference is running, and record the identity, endpoint protection and observed response times. This check is outstanding. To disable inference, stop the foreground app and restart with `.\Start.ps1 -DisableLocalSuggestions`. An absent model or a startup failure leaves manual review available. Accepted labels remain available in the ledger and encrypted backup.
