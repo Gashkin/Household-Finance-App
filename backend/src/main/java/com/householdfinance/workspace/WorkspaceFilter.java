@@ -21,6 +21,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 /** All backend routes fail closed, including legacy paths and servlet error dispatch. */
 @Component @Order(Ordered.HIGHEST_PRECEDENCE)
 public class WorkspaceFilter extends OncePerRequestFilter {
+    private static final Set<String> PASSIVE_READS = Set.of(
+        "/api/workspace/status", "/api/access/me", "/api/contracts/alerts");
     private record Session(Instant created, Instant seen, String userId, long revision, Instant verified) {}
     private AccessService users;
     private final Map<String, Session> sessions = new HashMap<>();
@@ -57,7 +59,9 @@ public class WorkspaceFilter extends OncePerRequestFilter {
         Session session = sessions.get(token);
         if (session == null) return false;
         if (users != null && users.active(session.userId(),session.revision()) == null) { sessions.remove(token); return false; }
-        Instant seen=Set.of("/api/workspace/status","/api/access/me").contains(request.getRequestURI())?session.seen():now;
+        boolean passiveRead = PASSIVE_READS.contains(request.getRequestURI())
+            && ("GET".equals(request.getMethod()) || "HEAD".equals(request.getMethod()));
+        Instant seen = passiveRead ? session.seen() : now;
         sessions.put(token, new Session(session.created(), seen, session.userId(), session.revision(),session.verified()));
         return true;
     }

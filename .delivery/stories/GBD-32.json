@@ -24,6 +24,10 @@
       "contains": ["verifiedCutoffAndLocalMidnight", "PreserveHistoryAndCashFlow"]
     },
     {
+      "path": "backend/src/test/java/com/householdfinance/workspace/WorkspaceFilterTest.java",
+      "contains": ["backgroundContractInboxReadsRespectWorkspaceIdleExpiry"]
+    },
+    {
       "path": "frontend/e2e/contracts.spec.ts",
       "contains": ["rolling subscription", "provider closure"]
     }
