@@ -107,12 +107,11 @@ public class ActivityReviewService {
     check(Objects.equals(input.revision(),r.revision),"Rule changed; reload");if(input.approved())active(before.categoryId());
     var result=new Rule(id,++r.revision,before.description(),before.categoryId(),input.approved());r.payload=encode(result);records.save(r);audit(AccessContext.publicationId(),"RULE_APPROVAL",input.reason(),before,result);return result;
   }
-  private Suggestion suggest(LedgerEntry e,List<Rule> rules,List<Category> categories){
-    var matches=rules.stream().filter(r->r.approved()&&r.description().equalsIgnoreCase(e.description)&&categories.stream().anyMatch(c->c.id().equals(r.categoryId())&&!c.retired())).toList();
-    var distinct=matches.stream().map(Rule::categoryId).distinct().toList();
-    if(distinct.size()==1)return new Suggestion(distinct.get(0),"HIGH","Exact description matches an explicitly approved local rule; confirm against the source");
-    if(distinct.size()>1)return new Suggestion(null,"LOW","Approved rules disagree; choose a category manually");
-    return new Suggestion(null,"NONE","No approved exact-description rule; no category was applied");
+  @Transactional(readOnly=true)
+  public Suggestion categoryPrefill(LedgerEntry entry, List<Category> categories) {
+    account(entry.accountId);
+    var history = entries.findByAccountIdOrderByDateAscReferenceAsc(entry.accountId);
+    return new CategoryPrefill(rules(), categories, history).suggest(entry);
   }
   private List<String> issues(LedgerEntry e){
     var list=new ArrayList<String>();if(!e.reviewState.equals("CONFIRMED"))list.add("PROVISIONAL");
@@ -125,9 +124,11 @@ public class ActivityReviewService {
     var result=new ArrayList<Item>();
     var localRules=rules();var localCategories=categories();
     for(var a:accounts.findAll())if(AccessContext.owns(a.ownerId)&&(accountId==null||a.id.equals(accountId))){
-      for(var e:entries.findByAccountIdOrderByDateAscReferenceAsc(a.id))if(!e.status.equals("VOID")&&!e.date.isBefore(from)&&!e.date.isAfter(to)){
+      var history = entries.findByAccountIdOrderByDateAscReferenceAsc(a.id);
+      var prefill = new CategoryPrefill(localRules, localCategories, history);
+      for(var e:history)if(!e.status.equals("VOID")&&!e.date.isBefore(from)&&!e.date.isAfter(to)){
         var problems=issues(e);String level=problems.contains("COUNTERPART")||Math.abs(e.amountMinor)>=100000?"HIGH":"NORMAL";
-        if((issue==null||problems.contains(issue))&&(risk==null||risk.equals(level)))result.add(new Item(a.id,a.name,a.revision,e,problems,level,suggest(e,localRules,localCategories)));
+        if((issue==null||problems.contains(issue))&&(risk==null||risk.equals(level)))result.add(new Item(a.id,a.name,a.revision,e,problems,level,prefill.suggest(e)));
       }
     }
     return result.stream().sorted(Comparator.comparing((Item i)->!i.risk().equals("HIGH")).thenComparing(i->i.entry().date)).toList();

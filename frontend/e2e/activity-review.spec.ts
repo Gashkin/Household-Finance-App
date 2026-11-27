@@ -16,15 +16,30 @@ test('classify activity, approve a local rule and reopen protected source eviden
  await page.getByRole('combobox',{name:'Account filter',exact:true}).selectOption(account.id);await page.getByRole('button',{name:'Review '+row.description,exact:true}).click();
  await page.getByRole('button',{name:'Suggest locally'}).click();
  await expect(page.getByRole('alert')).toContainText('Local suggestions are disabled');
+ const categoryField=page.getByRole('combobox',{name:'Category',exact:true});
+ const categoryId=await categoryField.getByRole('option',{name:'Interest & Fees '+suffix,exact:true}).getAttribute('value');
  await page.route('**/api/ledger/review/activity/*/suggest',route=>route.fulfill({json:{
    revision:route.request().postDataJSON().revision, model:'synthetic fixture',
-   advice:{merchant:'Synthetic fee',categoryId:null,commitmentId:null,explanation:'The description includes the label.'},
+   advice:{merchant:'Synthetic fee',categoryId,commitmentId:null,explanation:'The description includes the label.'},
    commitments:{revision:0,options:[]}
  }}));
  await page.getByRole('button',{name:'Suggest locally'}).click();
+ await expect(categoryField).toHaveValue(categoryId!);
+ await expect(page.getByRole('button',{name:'Confirm category',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Dismiss suggestions'}).click();
  await expect(page.getByText('Reviewed merchant: Synthetic fee')).toHaveCount(0);
+ await categoryField.selectOption('');
+ const pending=page.waitForRequest('**/api/ledger/review/activity/*/suggest');
+ let release!:()=>void;
+ const delayed=new Promise<void>(resolve=>{release=resolve;});
+ await page.route('**/api/ledger/review/activity/*/suggest',async route=>{await delayed;await route.fallback();},{times:1});
  await page.getByRole('button',{name:'Suggest locally'}).click();
+ await pending;
+ await categoryField.selectOption(categoryId!);
+ await categoryField.selectOption('');
+ release();
+ await expect(page.getByLabel('Suggested merchant')).toBeVisible();
+ await expect(categoryField).toHaveValue('');
  await page.getByLabel('Suggested merchant').fill('Reviewed synthetic fee');
  await page.getByRole('button',{name:'Save merchant label'}).click();
  await expect(page.getByText('Reviewed merchant: Reviewed synthetic fee')).toBeVisible();

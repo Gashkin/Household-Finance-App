@@ -18,6 +18,10 @@ export default function ActivityReviewWorkspace(){
  const [history,setHistory]=useState<Audit[]>([]),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[ack,setAck]=useState(false);
  const current=all.find(i=>i.entry.id===selected);
  const generation=useRef(0);
+ const categoryVersion=useRef(0);
+ const selectedVersion=categoryVersion.current;
+ const loadedVersion=generation.current;
+ const [modelPrefill,setModelPrefill]=useState(false);
  async function load(){
    const version=++generation.current;
    const q=new URLSearchParams({from,to:date});if(account)q.set('account',account);if(issue)q.set('issue',issue);if(risk)q.set('risk',risk);
@@ -45,7 +49,7 @@ export default function ActivityReviewWorkspace(){
    if(v.expectedMinor!==undefined)return 'Booked balance '+money(Number(v.expectedMinor));
    return 'Recorded source-backed decision; expand full evidence for its details';
  }
- function choose(i:Item){setSelected(i.entry.id);setCategory(i.entry.categoryId||i.suggestion.categoryId||'');setState(i.entry.reviewState==='CONFIRMED'?'CONFIRMED':'PROVISIONAL');setOther(i.entry.linkedEntryId||'');setReason('');setOffer(false);setHistory([]);}
+ function choose(i:Item){categoryVersion.current++;setModelPrefill(false);setSelected(i.entry.id);setCategory(i.entry.categoryId||i.suggestion.categoryId||'');setState(i.entry.reviewState==='CONFIRMED'?'CONFIRMED':'PROVISIONAL');setOther(i.entry.linkedEntryId||'');setReason('');setOffer(false);setHistory([]);}
  function categoryEdit(c?:Category){setEditCategory(c?.id||'');setName(c?.name||'');setParent(c?.parentId||'');setBudget(c?.budgetEuro||'0.00');setRetired(c?.retired||false);setMerge('');}
  return <section className="activity-review" aria-label="Activity review"><h2>Review &amp; reconcile</h2>
  <p>Resolve source-backed activity, then complete a dated review. Suggestions stay provisional until you confirm them. Transfers and card settlements require both booked sides.</p>
@@ -61,9 +65,16 @@ export default function ActivityReviewWorkspace(){
  <div className="table-scroll"><table><thead><tr><th>Activity</th><th>Account / amount</th><th>Review</th><th>Action</th></tr></thead><tbody>{items.map(i=><tr key={i.entry.id}><td>{i.entry.date} · {i.entry.description}<br/>{i.entry.reference}</td><td>{i.accountName} · {money(i.entry.amountMinor)}</td><td>{label(i.entry.categoryId)} · {i.entry.reviewState}<br/>{i.risk}: {i.issues.join(', ')||'No open activity issue'}{i.entry.linkType&&<p>{i.entry.linkType} linked</p>}</td><td><button disabled={busy} onClick={()=>choose(i)}>Review {i.entry.description}</button></td></tr>)}</tbody></table></div>
  {current&&<fieldset disabled={busy}><legend>Review selected activity</legend><h3>{current.entry.description}</h3>
  {current.entry.reviewedMerchant&&<p>Reviewed merchant: {current.entry.reviewedMerchant}</p>}
- <LocalSuggestions key={current.entry.id+':'+current.revision} id={current.entry.id} revision={current.revision} categories={categories.filter(c=>!c.retired)} refresh={load}/>
- <p>{current.suggestion.confidence} confidence: {current.suggestion.explanation}</p>
- <label>Category<select value={category} onChange={e=>setCategory(e.target.value)}><option value="">Choose category</option>{categories.filter(c=>!c.retired).map(c=><option key={c.id} value={c.id}>{c.parentId?label(c.parentId)+' / ':''}{c.name}</option>)}</select></label>
+ <LocalSuggestions key={current.entry.id+':'+current.revision} id={current.entry.id} revision={current.revision} applyCategory={id=>{
+   if(categoryVersion.current===selectedVersion && generation.current===loadedVersion && !category){
+     setCategory(id);setModelPrefill(true);
+   }
+ }} dismissCategory={()=>{if(modelPrefill){setCategory('');setModelPrefill(false);}}} refresh={load}/>
+ <p>{modelPrefill ? "Local model suggested a category. Review it before confirming." : current.suggestion.explanation}</p>
+ <label>Category<select value={category} onChange={e=>{categoryVersion.current++;setModelPrefill(false);setCategory(e.target.value);}}><option value="">Choose category</option>{categories.filter(c=>!c.retired).map(c=><option key={c.id} value={c.id}>{c.parentId?label(c.parentId)+' / ':''}{c.name}</option>)}</select></label>
+ {(modelPrefill||current.suggestion.categoryId)&&current.entry.reviewState!=='CONFIRMED'&&<button disabled={!category}
+   onClick={()=>run(()=>ledger('/review/activity/'+selected,{revision:current.revision,categoryId:category,state:'CONFIRMED',
+     reason:'Owner confirmed the selected category during activity review',offerRule:false},'PUT'),'Category confirmed')}>Confirm category</button>}
  <label>Review state<select value={state} onChange={e=>setState(e.target.value)}><option>PROVISIONAL</option><option>CONFIRMED</option></select></label>
  <label>Review reason / source<input value={reason} maxLength={200} onChange={e=>setReason(e.target.value)}/></label>
  <label><input type="checkbox" checked={offer} onChange={e=>setOffer(e.target.checked)}/>Offer an exact-description local rule after this confirmed correction</label>

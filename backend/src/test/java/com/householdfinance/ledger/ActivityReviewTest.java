@@ -24,13 +24,33 @@ class ActivityReviewTest {
  ActivityReviewService.Category category(String name){return review.category(null,new ActivityReviewService.CategoryInput(null,name,null,false,"100.00",null,"Synthetic category decision"));}
  void classify(LedgerEntry e,String c,boolean rule){review.classify(e.id,new ActivityReviewService.Classification(view(e.accountId).revision(),c,"CONFIRMED","Synthetic receipt correction",rule));}
  void link(LedgerEntry e,LedgerEntry other,String type){review.link(e.id,new ActivityReviewService.Link(view(e.accountId).revision(),other.id,view(other.accountId).revision(),type,"Synthetic link evidence"));}
- @Test void lookalikesRemainSeparateAndOnlyApprovedRulesSuggestWithoutConfirming(){
+ @Test void confirmedHistoryPrefillsAndApprovedRuleTakesPrecedenceWithoutConfirming(){
    var a=account("Synthetic cash","CASH");var first=add(a.id(),"one","-10.00","ACTIVITY");add(a.id(),"two","-10.00","ACTIVITY");var c=category("Food");classify(first,c.id(),true);
    assertEquals(2,ledger.activity(a.id()).size());var offered=review.rules().getFirst();
-   assertEquals("NONE",review.queue(null,today,today,null,null).getLast().suggestion().confidence());
+   assertEquals("MEDIUM",review.queue(null,today,today,"PROVISIONAL",null).getFirst().suggestion().confidence());
    review.approveRule(offered.id(),new ActivityReviewService.RuleApproval(offered.revision(),true,"Synthetic approval"));
-   var rows=review.queue(null,today,today,"PROVISIONAL",null);assertEquals(1,rows.size());assertEquals(c.id(),rows.getFirst().suggestion().categoryId());assertEquals("PROVISIONAL",rows.getFirst().entry().reviewState);
+   var rows=review.queue(null,today,today,"PROVISIONAL",null);assertEquals(1,rows.size());assertEquals("HIGH",rows.getFirst().suggestion().confidence());assertEquals(c.id(),rows.getFirst().suggestion().categoryId());assertEquals("PROVISIONAL",rows.getFirst().entry().reviewState);
    assertThrows(IllegalArgumentException.class,()->review.approveRule(offered.id(),new ActivityReviewService.RuleApproval(0L,false,"Stale approval")));
+ }
+ @Test void latestConfirmedChoicePrefillsOnlyItsAccountAndClearsAfterProvisionalEdit(){
+   var firstAccount=account("History source","CASH");
+   var otherAccount=account("Separate history","CASH");
+   var source=add(firstAccount.id(),"confirmed","-11.00","ACTIVITY");
+   var target=add(firstAccount.id(),"repeat","-19.00","ACTIVITY");
+   add(otherAccount.id(),"separate","-11.00","ACTIVITY");
+   var initial=category("Original choice");
+   var corrected=category("Corrected choice");
+   classify(source,initial.id(),false);
+   assertNull(review.queue(otherAccount.id(),today,today,"PROVISIONAL",null).getFirst().suggestion().categoryId());
+   classify(source,corrected.id(),false);
+   var repeat=review.queue(firstAccount.id(),today,today,"PROVISIONAL",null).getFirst();
+   assertEquals(target.id,repeat.entry().id);
+   assertEquals(corrected.id(),repeat.suggestion().categoryId());
+   assertNull(repeat.entry().categoryId);
+   review.classify(source.id,new ActivityReviewService.Classification(view(firstAccount.id()).revision(),
+       initial.id(),"PROVISIONAL","Owner reopened category choice",false));
+   assertTrue(review.queue(firstAccount.id(),today,today,"PROVISIONAL",null).stream()
+       .allMatch(item->item.suggestion().categoryId()==null));
  }
  @Test void transferAndCardSettlementPreserveCashNetAndExcludeActivityTotals(){
    var cash=account("Synthetic cash","CASH");var debt=account("Synthetic card","DEBT");var debit=add(cash.id(),"pay","-50.00","ACTIVITY");var credit=add(debt.id(),"settle","50.00","ACTIVITY");

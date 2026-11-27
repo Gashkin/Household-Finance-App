@@ -2,6 +2,12 @@
 
 The installed app starts a configured local model by default under Dev Server One. Owners request suggestions for individual transactions and retain the final decision. On the corrected eight-case run the model gave five category recommendations, four of them wrong. One request failed. One of its two commitment recommendations was wrong. The approved-rule baseline recommended one category correctly. This small diagnostic set cannot establish a household-wide error rate.
 
+## Reviewing a category
+
+Open an activity in Review & reconcile. Its Category field first uses an existing saved category, then an approved exact rule, then an approved merchant match that tolerates payment prefixes, punctuation and terminal numbers. With no matching rule, a confirmed booking for that merchant and payment direction in the same account can supply the category. Conflicting matches leave the choice open. Retired categories, provisional or voided examples and linked activity do not supply history.
+
+For an unmatched activity, **Suggest locally** can fill the same field. Manual selection remains available during inference. Edit the category if needed and select **Confirm category** to save it. The measurements below describe the original rule and model benchmark.
+
 ## Development-account measurements, 25 November 2026
 
 Ryzen 7 5800H, 20,782,837,760 bytes of system RAM, Windows x64. The CPU build used four threads and one inference slot. The machine also has an RTX 3060 Laptop GPU. GPU memory was not measured. The server ran with offline mode, UI and logging disabled. An unauthenticated inference request returned HTTP 401. External connectivity was available to Windows during the test.

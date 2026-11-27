@@ -50,9 +50,12 @@ public class LedgerController {
     var revision = body(request, ActivityReviewService.Revision.class).revision();
     var entry = review.suggestionEntry(id, revision);
     var categories = review.categories();
+    var prefill = review.categoryPrefill(entry, categories);
+    // A local match or a conflict already has a decision in the editable category field.
+    var modelCategories = "NONE".equals(prefill.confidence()) ? categories : java.util.List.<ActivityReviewService.Category>of();
     var shortlist = commitments.shortlist(entry);
     // Authorise and snapshot under workspace admission. Release admission before waiting on inference.
-    return () -> localClassifier.suggest(entry, categories, shortlist, revision);
+    return () -> localClassifier.suggest(entry, modelCategories, shortlist, revision);
   }
 
   @PutMapping("/review/activity/{id}/merchant")
