@@ -1,0 +1,14 @@
+{
+  "work_id": "GBD-43",
+  "page_id": "423d3419-fef0-8113-afa7-c1ab05b31e59",
+  "branch": "story/43-delivery",
+  "token": "claim token a77c510b-4357-463e-8bba-258f31f735e2",
+  "claimed_at": "2026-11-27T04:18:52.640Z",
+  "base_sha": "69cd6bae2145343b45979b00c7ddbc62f602e7da",
+  "history": [
+    {
+      "event": "claim",
+      "method": "Created the canonical branch and verified matching Notion ownership."
+    }
+  ]
+}

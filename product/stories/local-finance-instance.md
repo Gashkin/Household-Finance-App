@@ -101,10 +101,10 @@ To import:
 
 1. Sign in to Dev Server One, launch the app and unlock it with the workspace
    password.
-2. Open **Money position**. Select the account that matches the statement; this
+2. Open **Overview → Money position**. Select the account that matches the statement; this
    account selection is the import mapping. Create the account first if needed,
    using a dated opening balance and its statement source.
-3. Select **Preview and review statement CSV** and choose the downloaded AIB
+3. Select **Preview and review CSV activity** and choose the downloaded AIB
    CSV or paste the statement rows. Enter a source label that identifies the
    institution/file period without exposing an account number, then select
    **Preview CSV**. No column conversion is needed for supported AIB exports.
@@ -124,7 +124,7 @@ To import:
 7. Confirm the account position and its reconciliation date/source. The dated
    commitments and cash forecast remain separate from imported transactions;
    do not manually add a commitment for an already posted payment.
-8. Use **Backup & recovery** in the app navigation to create an encrypted
+8. Use **Settings → Backup & recovery** to create an encrypted
    backup. Save it into `%LOCALAPPDATA%\HouseholdFinance\backups` and keep its
    passphrase separately. The directory ACL denies other standard users access.
    Test restore only in an empty synthetic workspace, never over live records.

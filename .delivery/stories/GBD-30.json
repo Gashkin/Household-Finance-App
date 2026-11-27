@@ -72,7 +72,9 @@
         "Dev Server One",
         "Fast User Switching",
         "An elevated administrator or SYSTEM",
-        "Import a statement CSV",
+        "## Import an AIB statement or interchange CSV",
+        "**Preview CSV**",
+        "**Approve selected activity**",
         "Backup & recovery"
       ]
     },
@@ -120,7 +122,8 @@
       "contains": [
         "Correct opening balance and date",
         "Use AIB balance for this check",
-        "Preview and review statement CSV",
+        "onClick={previewCsv}",
+        "onClick={approve}",
         "multiple rows on its latest balance date"
       ]
     },
@@ -129,7 +132,8 @@
       "contains": [
         "Synthetic AIB export preview/balance",
         "Unused duplicate account was not removed",
-        "Synthetic AIB import or opening correction was incorrect before restart."
+        "$beforeAib.bookedMinor -ne 9266 -or $beforeAib.entries -ne 2 -or -not $beforeAib.reconciled",
+        "$afterAib.bookedMinor -ne 9266 -or $afterAib.entries -ne 2 -or -not $afterAib.reconciled"
       ]
     },
     {

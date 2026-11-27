@@ -1,0 +1,21 @@
+{
+  "work_id": "GBD-43",
+  "page_id": "423d3419-fef0-8113-afa7-c1ab05b31e59",
+  "branch": "story/43-delivery",
+  "artifacts": [
+    {
+      "path": "delivery/tests/test_story_catalogue.py",
+      "contains": [
+        "def test_declared_artifacts_match_the_checkout",
+        "validate_definition"
+      ]
+    },
+    {
+      "path": "delivery/README.md",
+      "contains": [
+        "test_story_catalogue",
+        "exact-main integration receipt"
+      ]
+    }
+  ]
+}
