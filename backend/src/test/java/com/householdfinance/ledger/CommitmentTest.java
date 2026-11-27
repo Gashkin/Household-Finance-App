@@ -35,6 +35,20 @@ class CommitmentTest {
  CommitmentService.ExceptionInput change(CommitmentService.Occurrence o,String action,String entry,Long accountRevision,LocalDate date,String amount){return new CommitmentService.ExceptionInput(rev(),id(),"Synthetic explicit occurrence decision",o.id(),date,amount,false,entry,action,accountRevision);}
  LedgerEntry activity(String ref,String amount,String status){long revision=ledger.position(today).accounts().stream().filter(a->a.id().equals(account)).findFirst().orElseThrow().revision();ledger.manual(account,new LedgerService.Manual(revision,new LedgerService.Row(ref,today,"Synthetic activity",amount,status,"ACTIVITY"),"Synthetic evidence",true));var entry=ledger.activity(account).stream().filter(e->e.reference.equals(ref)).findFirst().orElseThrow();review.classify(entry.id,new ActivityReviewService.Classification(revision+1,category,"CONFIRMED","Synthetic reviewed category",false));return entry;}
  long accountRev(){return ledger.position(today).accounts().stream().filter(a->a.id().equals(account)).findFirst().orElseThrow().revision();}
+ @Test void localShortlistOnlyReturnsUnusedEligibleBookedMatches(){
+   create(rule("ONCE",today,"10.00"));
+   var debit=activity("booked","-10.00","BOOKED");
+   assertTrue(service.shortlist(debit).options().isEmpty()); // snapshot from before confirmation
+   var reviewed=review.suggestionEntry(debit.id,accountRev());
+   var options=service.shortlist(reviewed);
+   assertEquals(1,options.options().size());
+   var o=upcoming(today,today).getFirst();
+   assertEquals(o.id(),options.options().getFirst().id());
+   var pending=activity("pending","-10.00","PENDING");
+   assertTrue(service.shortlist(review.suggestionEntry(pending.id,accountRev())).options().isEmpty());
+   service.exception(change(o,"MATCH",debit.id,accountRev(),null,null));
+   assertTrue(service.shortlist(reviewed).options().isEmpty());
+ }
  @Test void monthEndLeapYearWeeklyFortnightlyAndOneOffHaveStableOccurrenceIds(){
   var jan=LocalDate.of(2024,1,31);var s=create(rule("MONTHLY",jan,"1.01"));var rows=upcoming(jan,jan.plusMonths(2));assertEquals(List.of(jan,LocalDate.of(2024,2,29),LocalDate.of(2024,3,31)),rows.stream().map(CommitmentService.Occurrence::date).toList());assertEquals(rows,upcoming(jan,jan.plusMonths(2)));
   create(rule("WEEKLY",today,"2.00"));create(rule("FORTNIGHTLY",today,"3.00"));create(rule("ONCE",today,"4.00"));var next=upcoming(today,today.plusDays(28));assertEquals(5,next.stream().filter(o->o.amountMinor()==200).count());assertEquals(3,next.stream().filter(o->o.amountMinor()==300).count());assertEquals(1,next.stream().filter(o->o.amountMinor()==400).count());assertNotNull(s.id());

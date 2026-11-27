@@ -245,6 +245,21 @@ public class CommitmentService {
     }
     return result.stream().sorted(Comparator.comparing(DatedOccurrence::dueDate).thenComparing(x->x.occurrence().id())).toList();
   }
+  public record Option(String id, String name, LocalDate date, long amountMinor) {}
+  public record Shortlist(long revision, List<Option> options) {}
+  @Transactional(readOnly=true)
+  public Shortlist shortlist(LedgerEntry entry) {
+    if (!"CONFIRMED".equals(entry.reviewState) || entry.categoryId == null ||
+        !"BOOKED".equals(entry.status) || entry.date.isAfter(today())) return new Shortlist(0, List.of());
+    var s = visible(read());
+    if (s.exceptions().stream().anyMatch(x -> x.entryId() != null &&
+        (x.entryId().equals(entry.id) || x.entryId().equals(entry.linkedEntryId)))) return new Shortlist(s.revision(), List.of());
+    var options = occurrences(s, entry.date.minusDays(7), entry.date.plusDays(7), today()).stream()
+        .filter(o -> o.accountId().equals(entry.accountId) && o.entryId() == null && !o.suppressed()
+            && Objects.equals(o.categoryId(), entry.categoryId) && usableActual(ruleFor(s, o), entry, false))
+        .limit(10).map(o -> new Option(o.id(), o.name(), o.date(), o.amountMinor())).toList();
+    return new Shortlist(s.revision(), options);
+  }
   @Transactional(readOnly=true) public List<Candidate> candidates(String occurrenceId){
     var s=visible(read());var o=find(s,occurrenceId);var r=ruleFor(s,o);var a=account(r.accountId());
     return entries.findByAccountIdOrderByDateAscReferenceAsc(a.id).stream().filter(e->usableActual(r,e,false)||usableActual(r,e,true)).map(e->new Candidate(e.id,e.accountId,e.date,e.description,e.amountMinor,e.status,a.revision)).toList();

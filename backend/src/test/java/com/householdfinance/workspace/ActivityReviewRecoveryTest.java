@@ -29,7 +29,8 @@ class ActivityReviewRecoveryTest {
      review.classify(entry.id,new ActivityReviewService.Classification(1L,category.id(),"CONFIRMED","Synthetic receipt confirmation",true));var rule=review.rules().getFirst();review.approveRule(rule.id(),new ActivityReviewService.RuleApproval(0L,true,"Synthetic explicit approval"));
      ledger.manual(account,new LedgerService.Manual(2L,new LedgerService.Row("refund",today,"Synthetic partial reversal","4.00","BOOKED","ACTIVITY"),"Synthetic refund source",true));
      var refund=ledger.activity(account).stream().filter(e->e.reference.equals("refund")).findFirst().orElseThrow();review.link(refund.id,new ActivityReviewService.Link(3L,entry.id,3L,"REFUND","Synthetic refund link"));
-     ledger.reconcile(account,today,new LedgerService.Reconcile(4L,"94.00","Synthetic closing statement",true,false));
+     review.merchant(entry.id,new ActivityReviewService.Merchant(4L,"Synthetic Shop"));
+     ledger.reconcile(account,today,new LedgerService.Reconcile(5L,"94.00","Synthetic closing statement",true,false));
      review.complete(new ActivityReviewService.Completion(today,"Synthetic guided review",true,review.visibleAuditCount()));
      var backups=app.getBean(WorkspaceBackupService.class);counts=backups.counts();backup=backups.exportBackup(ARCHIVE);
    }
@@ -41,6 +42,8 @@ class ActivityReviewRecoveryTest {
    var review=app.getBean(ActivityReviewService.class);var ledger=app.getBean(LedgerService.class);
    assertTrue(review.rules().getFirst().approved());assertEquals("Interest & Fees",review.categories().getFirst().name());assertEquals(1,review.guide(today).completedReviews().size());assertEquals(600,ledger.position(today).spendingMinor());assertTrue(ledger.position(today).accounts().getFirst().reconciled());
    assertThrows(IllegalArgumentException.class,()->ledger.manual(account,new LedgerService.Manual(4L,new LedgerService.Row("late",today,"Synthetic late entry","-1.00","BOOKED","ACTIVITY"),"Synthetic late source",true)));assertTrue(ledger.history(account).stream().allMatch(h->h.actorId.equals("owner")));
+   assertEquals("Synthetic Shop",ledger.activity(account).stream().filter(e->e.reference.equals("original")).findFirst().orElseThrow().reviewedMerchant);
+   assertTrue(ledger.history(account).stream().anyMatch(h->h.action.equals("REVIEW_MERCHANT") && h.source.contains("qwen")));
    assertReplay(ledger,account,"original","Synthetic purchase","-10.00");assertReplay(ledger,account,"refund","Synthetic partial reversal","4.00");
  }
  void assertReplay(LedgerService ledger,String account,String reference,String description,String amount){

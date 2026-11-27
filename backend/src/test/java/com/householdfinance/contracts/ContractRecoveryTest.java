@@ -61,8 +61,8 @@ class ContractRecoveryTest {
       currentBackup = backup.exportBackup(PASSPHRASE);
       var json = app.getBean(ObjectMapper.class);
       var parsed = json.readValue(BackupCrypto.decrypt(currentBackup, PASSPHRASE), WorkspaceBackupService.Archive.class);
-      assertEquals(8, parsed.version());
-      var legacy = new LinkedHashMap<>(parsed.tables());
+      assertEquals(9, parsed.version());
+      var legacy = new LinkedHashMap<>(com.householdfinance.workspace.LegacyArchiveFixture.tables(parsed,7));
       legacy.remove("HOUSEHOLD_CONTRACTS");
       legacy.remove("CONTRACT_REVIEW_ALERTS");
       legacyBackup = BackupCrypto.encrypt(json.writeValueAsBytes(new WorkspaceBackupService.Archive(7, parsed.createdAt(), legacy)), PASSPHRASE);

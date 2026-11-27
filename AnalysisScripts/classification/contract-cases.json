@@ -1,0 +1,58 @@
+[
+  {
+    "name": "accepted",
+    "accepted": true,
+    "wire": "{\"model\":\"qwen2.5-1.5b-instruct-q4_k_m\",\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":15},\"choices\":[{\"message\":{\"content\":\"{\\\"categoryId\\\":null,\\\"merchant\\\":null,\\\"commitmentId\\\":null,\\\"explanation\\\":\\\" Synthetic evidence \\\"}\"}}]}"
+  },
+  {
+    "name": "duplicate-content",
+    "accepted": false,
+    "wire": "{\"model\":\"qwen2.5-1.5b-instruct-q4_k_m\",\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":15},\"choices\":[{\"message\":{\"content\":\"{\\\"categoryId\\\":null,\\\"merchant\\\":null,\\\"merchant\\\":null,\\\"commitmentId\\\":null,\\\"explanation\\\":\\\" Synthetic evidence \\\"}\"}}]}"
+  },
+  {
+    "name": "duplicate-envelope",
+    "accepted": false,
+    "wire": "{\"model\":\"qwen2.5-1.5b-instruct-q4_k_m\",\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":15},\"choices\":[],\"choices\":[{\"message\":{\"content\":\"{\\\"categoryId\\\":null,\\\"merchant\\\":null,\\\"commitmentId\\\":null,\\\"explanation\\\":\\\" Synthetic evidence \\\"}\"}}]}"
+  },
+  {
+    "name": "bad-type",
+    "accepted": false,
+    "wire": "{\"model\":\"qwen2.5-1.5b-instruct-q4_k_m\",\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":15},\"choices\":[{\"message\":{\"content\":\"{\\\"categoryId\\\":null,\\\"merchant\\\":false,\\\"commitmentId\\\":null,\\\"explanation\\\":\\\" Synthetic evidence \\\"}\"}}]}"
+  },
+  {
+    "name": "trailing-content",
+    "accepted": false,
+    "wire": "{\"model\":\"qwen2.5-1.5b-instruct-q4_k_m\",\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":15},\"choices\":[{\"message\":{\"content\":\"{\\\"categoryId\\\":null,\\\"merchant\\\":null,\\\"commitmentId\\\":null,\\\"explanation\\\":\\\" Synthetic evidence \\\"}{}\"}}]}"
+  },
+  {
+    "name": "unknown-field",
+    "accepted": false,
+    "wire": "{\"model\":\"qwen2.5-1.5b-instruct-q4_k_m\",\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":15},\"choices\":[{\"message\":{\"content\":\"{\\\"categoryId\\\":null,\\\"extra\\\":null,\\\"merchant\\\":null,\\\"commitmentId\\\":null,\\\"explanation\\\":\\\" Synthetic evidence \\\"}\"}}]}"
+  },
+  {
+    "name": "too-long",
+    "accepted": false,
+    "wire": "{\"model\":\"qwen2.5-1.5b-instruct-q4_k_m\",\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":15},\"choices\":[{\"message\":{\"content\":\"{\\\"categoryId\\\":null,\\\"merchant\\\":null,\\\"commitmentId\\\":null,\\\"explanation\\\":\\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\\"}\"}}]}"
+  },
+  {
+    "name": "control",
+    "accepted": false,
+    "wire": "{\"model\":\"qwen2.5-1.5b-instruct-q4_k_m\",\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":15},\"choices\":[{\"message\":{\"content\":\"{\\\"categoryId\\\":null,\\\"merchant\\\":null,\\\"commitmentId\\\":null,\\\"explanation\\\":\\\"a\\\\u0000b\\\"}\"}}]}"
+  },
+  {
+    "name": "wrong-id",
+    "accepted": false,
+    "wire": "{\"model\":\"qwen2.5-1.5b-instruct-q4_k_m\",\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":15},\"choices\":[{\"message\":{\"content\":\"{\\\"categoryId\\\":\\\"unknown\\\",\\\"merchant\\\":null,\\\"commitmentId\\\":null,\\\"explanation\\\":\\\" Synthetic evidence \\\"}\"}}]}"
+  },
+  {
+    "name": "nullable-explanation",
+    "accepted": false,
+    "wire": "{\"model\":\"qwen2.5-1.5b-instruct-q4_k_m\",\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":15},\"choices\":[{\"message\":{\"content\":\"{\\\"categoryId\\\":null,\\\"merchant\\\":null,\\\"commitmentId\\\":null,\\\"explanation\\\":null}\"}}]}"
+  },
+  {
+    "name": "oversized-envelope",
+    "accepted": false,
+    "wire": "{\"model\":\"qwen2.5-1.5b-instruct-q4_k_m\",\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":15},\"choices\":[{\"message\":{\"content\":\"{\\\"categoryId\\\":null,\\\"merchant\\\":null,\\\"commitmentId\\\":null,\\\"explanation\\\":\\\" Synthetic evidence \\\"}\"}}]}",
+    "padding": 8193
+  }
+]

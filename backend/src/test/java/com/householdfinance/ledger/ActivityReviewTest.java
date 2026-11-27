@@ -24,13 +24,33 @@ class ActivityReviewTest {
  ActivityReviewService.Category category(String name){return review.category(null,new ActivityReviewService.CategoryInput(null,name,null,false,"100.00",null,"Synthetic category decision"));}
  void classify(LedgerEntry e,String c,boolean rule){review.classify(e.id,new ActivityReviewService.Classification(view(e.accountId).revision(),c,"CONFIRMED","Synthetic receipt correction",rule));}
  void link(LedgerEntry e,LedgerEntry other,String type){review.link(e.id,new ActivityReviewService.Link(view(e.accountId).revision(),other.id,view(other.accountId).revision(),type,"Synthetic link evidence"));}
- @Test void lookalikesRemainSeparateAndOnlyApprovedRulesSuggestWithoutConfirming(){
+ @Test void confirmedHistoryPrefillsAndApprovedRuleTakesPrecedenceWithoutConfirming(){
    var a=account("Synthetic cash","CASH");var first=add(a.id(),"one","-10.00","ACTIVITY");add(a.id(),"two","-10.00","ACTIVITY");var c=category("Food");classify(first,c.id(),true);
    assertEquals(2,ledger.activity(a.id()).size());var offered=review.rules().getFirst();
-   assertEquals("NONE",review.queue(null,today,today,null,null).getLast().suggestion().confidence());
+   assertEquals("MEDIUM",review.queue(null,today,today,"PROVISIONAL",null).getFirst().suggestion().confidence());
    review.approveRule(offered.id(),new ActivityReviewService.RuleApproval(offered.revision(),true,"Synthetic approval"));
-   var rows=review.queue(null,today,today,"PROVISIONAL",null);assertEquals(1,rows.size());assertEquals(c.id(),rows.getFirst().suggestion().categoryId());assertEquals("PROVISIONAL",rows.getFirst().entry().reviewState);
+   var rows=review.queue(null,today,today,"PROVISIONAL",null);assertEquals(1,rows.size());assertEquals("HIGH",rows.getFirst().suggestion().confidence());assertEquals(c.id(),rows.getFirst().suggestion().categoryId());assertEquals("PROVISIONAL",rows.getFirst().entry().reviewState);
    assertThrows(IllegalArgumentException.class,()->review.approveRule(offered.id(),new ActivityReviewService.RuleApproval(0L,false,"Stale approval")));
+ }
+ @Test void latestConfirmedChoicePrefillsOnlyItsAccountAndClearsAfterProvisionalEdit(){
+   var firstAccount=account("History source","CASH");
+   var otherAccount=account("Separate history","CASH");
+   var source=add(firstAccount.id(),"confirmed","-11.00","ACTIVITY");
+   var target=add(firstAccount.id(),"repeat","-19.00","ACTIVITY");
+   add(otherAccount.id(),"separate","-11.00","ACTIVITY");
+   var initial=category("Original choice");
+   var corrected=category("Corrected choice");
+   classify(source,initial.id(),false);
+   assertNull(review.queue(otherAccount.id(),today,today,"PROVISIONAL",null).getFirst().suggestion().categoryId());
+   classify(source,corrected.id(),false);
+   var repeat=review.queue(firstAccount.id(),today,today,"PROVISIONAL",null).getFirst();
+   assertEquals(target.id,repeat.entry().id);
+   assertEquals(corrected.id(),repeat.suggestion().categoryId());
+   assertNull(repeat.entry().categoryId);
+   review.classify(source.id,new ActivityReviewService.Classification(view(firstAccount.id()).revision(),
+       initial.id(),"PROVISIONAL","Owner reopened category choice",false));
+   assertTrue(review.queue(firstAccount.id(),today,today,"PROVISIONAL",null).stream()
+       .allMatch(item->item.suggestion().categoryId()==null));
  }
  @Test void transferAndCardSettlementPreserveCashNetAndExcludeActivityTotals(){
    var cash=account("Synthetic cash","CASH");var debt=account("Synthetic card","DEBT");var debit=add(cash.id(),"pay","-50.00","ACTIVITY");var credit=add(debt.id(),"settle","50.00","ACTIVITY");
@@ -99,6 +119,49 @@ class ActivityReviewTest {
    var before=ledger.activity(id);long revision=view(id).revision(),balance=view(id).bookedMinor();var preview=ledger.preview(id,new LedgerService.PreviewInput("reference,date,description,amount,status,kind\n"+reference+","+today+",Synthetic merchant,"+amount+",BOOKED,ACTIVITY\n","Synthetic identical replay"));assertEquals("DUPLICATE",preview.proposals().getFirst().disposition());
    var result=ledger.approve(id,preview.id(),new LedgerService.Approval(revision,List.of(preview.proposals().getFirst().row()),true));assertEquals(0,result.added());assertEquals(1,result.duplicates());assertEquals(revision,view(id).revision());assertEquals(balance,view(id).bookedMinor());assertEquals(before.size(),ledger.activity(id).size());
    for(var e:before){var after=ledger.activity(id).stream().filter(x->x.id.equals(e.id)).findFirst().orElseThrow();assertEquals(e.linkedEntryId,after.linkedEntryId);assertEquals(e.linkType,after.linkType);assertEquals(e.reviewState,after.reviewState);}
+ }
+ @Test void frozenSyntheticBaselineMatchesProductionReviewQueue() throws Exception {
+   var json=new com.fasterxml.jackson.databind.ObjectMapper();
+   var corpus=json.readTree(java.nio.file.Path.of("../AnalysisScripts/classification/fixtures.json").toFile());
+   var a=account("Synthetic baseline","CASH");
+   var ids=new HashMap<String,String>();
+   for(var c:corpus.path("categories")) ids.put(c.path("id").asText(),category(c.path("name").asText()).id());
+   int index=0;
+   for(var rule:corpus.path("approvedRules")){
+     long r=view(a.id()).revision();String ref="seed-"+index++;
+     ledger.manual(a.id(),new LedgerService.Manual(r,new LedgerService.Row(ref,today,rule.get(0).asText(),"-1.00","BOOKED","ACTIVITY"),"Fixture",true));
+     var e=ledger.activity(a.id()).stream().filter(x->x.reference.equals(ref)).findFirst().orElseThrow();
+     classify(e,ids.get(rule.get(1).asText()),true);
+     var offered=review.rules().stream().filter(x->!x.approved()).findFirst().orElseThrow();
+     review.approveRule(offered.id(),new ActivityReviewService.RuleApproval(offered.revision(),true,"Fixture rule"));
+   }
+   int recommended=0;
+   for(var c:corpus.path("cases")){
+     String ref="case-"+index++;
+     ledger.manual(a.id(),new LedgerService.Manual(view(a.id()).revision(),new LedgerService.Row(ref,today,c.get(0).asText(),"-1.00","BOOKED","ACTIVITY"),"Fixture",true));
+     var item=review.queue(a.id(),today,today,null,null).stream().filter(x->x.entry().reference.equals(ref)).findFirst().orElseThrow();
+     if(item.suggestion().categoryId()!=null){
+       assertEquals(ids.get(c.get(2).get(0).asText()),item.suggestion().categoryId());recommended++;
+     }
+   }
+   assertEquals(1,recommended);
+ }
+ @Test void merchantAcceptanceChecksOwnerRevisionAndPreservesSourceFacts(){
+   var a=account("Synthetic label account","CASH");var e=add(a.id(),"label","-10.00","ACTIVITY");
+   long revision=view(a.id()).revision();
+   var input=new ActivityReviewService.Merchant(revision,"Reviewed shop");
+   var owner=AccessContext.actor();
+   try {
+     AccessContext.enter(new AccessContext.Actor("other-owner","other",Set.of("EDITOR"),0,false));
+     assertThrows(RuntimeException.class,()->review.suggestionEntry(e.id,revision));
+     assertThrows(RuntimeException.class,()->review.merchant(e.id,input));
+   } finally {AccessContext.enter(owner);}
+   review.merchant(e.id,input);
+   assertThrows(IllegalArgumentException.class,()->review.merchant(e.id,input));
+   var saved=ledger.activity(a.id()).getFirst();
+   assertEquals(e.description,saved.description);assertEquals(e.reference,saved.reference);
+   assertEquals(e.amountMinor,saved.amountMinor);assertEquals("Reviewed shop",saved.reviewedMerchant);
+   replay(a.id(),"label","-10.00");
  }
  @Test void adjustmentCannotEnterEitherSideOfTransferOrLoseItsSourcedIdentity(){
    var a=account("Synthetic ordinary source","CASH");var b=account("Synthetic adjustment source","CASH");var debit=add(a.id(),"debit","-10.00","ACTIVITY");

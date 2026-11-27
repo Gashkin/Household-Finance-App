@@ -1,0 +1,37 @@
+{
+  "work_id": "GBD-37",
+  "page_id": "421d3419-fef0-8100-a80f-c15b74fc6c61",
+  "branch": "story/37-delivery",
+  "artifacts": [
+    {
+      "path": "backend/src/main/java/com/householdfinance/ledger/LocalClassifier.java",
+      "contains": [
+        "class LocalClassifier"
+      ]
+    },
+    {
+      "path": "frontend/src/components/LocalSuggestions.tsx",
+      "contains": [
+        "Suggest locally"
+      ]
+    },
+    {
+      "path": "backend/src/test/java/com/householdfinance/ledger/LocalClassifierTest.java",
+      "contains": [
+        "authenticatedTransportAndStrictOutput"
+      ]
+    },
+    {
+      "path": "AnalysisScripts/classification/benchmark.py",
+      "contains": [
+        "def evaluate"
+      ]
+    },
+    {
+      "path": "windows/Start.ps1",
+      "contains": [
+        "LocalSuggestions"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "branch": "story/37-delivery",
+  "work_id": "GBD-37",
+  "claimed_at": "2026-11-25T18:24:17Z",
+  "token": "01a213e5-0c12-7510-a0b9-4ec3dd858689",
+  "history": [
+    {
+      "event": "claim",
+      "at": "2026-11-25T18:24:17Z"
+    }
+  ],
+  "page_id": "421d3419-fef0-8100-a80f-c15b74fc6c61",
+  "base_sha": "69cd6bae2145343b45979b00c7ddbc62f602e7da"
+}
